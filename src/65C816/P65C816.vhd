@@ -359,7 +359,7 @@ begin
 							IR = x"EB" or IR = x"AB" then
 							P(1 downto 0) <= ZO & CO; P(7 downto 6) <= SO & VO; -- ALU
 						end if;
-					when "010" => P(2) <= '1';		-- BRK
+					when "010" => P(2) <= '1'; P(3) <= '0';		-- BRK
 					when "011" => P(7 downto 6) <= D_IN(7 downto 6); P(5) <= D_IN(5) or EF; P(4) <= D_IN(4) or EF; P(3 downto 0) <= D_IN(3 downto 0); -- RTI/PLP
 					when "100" => 
 						case IR(7 downto 6) is

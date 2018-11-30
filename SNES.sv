@@ -169,7 +169,7 @@ parameter CONF_STR = {
 	"-;",
 	"R0,Reset;",
 	"J1,A,B,X,Y,LT,RT,Select,Start;",
-	"V,v0.50.",`BUILD_DATE
+	"V,v",`BUILD_DATE
 };
 
 wire  [1:0] buttons;

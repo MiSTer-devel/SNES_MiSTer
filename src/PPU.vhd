@@ -492,7 +492,7 @@ begin
 					OAM_PRIO <= DI(7);
 					OAM_ADDR_REQ <= '1';
 				when x"04" =>						--OAMDI
-					if OAM_ADDR(9) = '0' and OAM_ADDR(0) = '0' then
+					if OAM_ADDR(0) = '0' then
 						OAM_latch <= DI;
 					end if;
 					OAM_ADDR <= std_logic_vector(unsigned(OAM_ADDR) + 1);

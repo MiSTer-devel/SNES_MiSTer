@@ -30,7 +30,6 @@ begin
 
 	process(A, tempB, CI, ADD, BCD)
 		variable temp0, temp1, temp2, temp3 : unsigned(6 downto 0);
-		variable temp00, temp11, temp22, temp33 : std_logic_vector(6 downto 0);
 		variable c0, c1, c2, c3 : std_logic;
 	begin
 		temp0 := ("000" & unsigned(A(3 downto 0))) + ("000" & unsigned(tempB(3 downto 0))) + ("000000" & CI);
@@ -38,21 +37,15 @@ begin
 		if BCD = '1' then 
 			if ADD = '1' then 
 				if temp0 > 9 then
-					temp00 := std_logic_vector(temp0 + 6);
-				else
-					temp00 := std_logic_vector(temp0);
+					temp0 := temp0 + 6;
 				end if;
 			else
 				if temp0 <= 15 then
-					temp00 := std_logic_vector(temp0 - 6);
-				else
-					temp00 := std_logic_vector(temp0);
+					temp0 := temp0 - 6;
 				end if;
 			end if;
-		else
-			temp00 := std_logic_vector(temp0);
 		end if;
-		if temp00(5 downto 4) /= "00" and temp00(6) = '0' then
+		if temp0(5 downto 0) > 15 and temp0(6) = '0' then
 			c0 := '1';
 		end if;
 		
@@ -62,21 +55,15 @@ begin
 		if BCD = '1' then 
 			if ADD = '1' then 
 				if temp1 > 9 then
-					temp11 := std_logic_vector(temp1 + 6);
-				else
-					temp11 := std_logic_vector(temp1);
+					temp1 := temp1 + 6;
 				end if;
 			else
 				if temp1 <= 15 then
-					temp11 := std_logic_vector(temp1 - 6);
-				else
-					temp11 := std_logic_vector(temp1);
+					temp1 := temp1 - 6;
 				end if;
 			end if;
-		else
-			temp11 := std_logic_vector(temp1);
 		end if;
-		if temp11(5 downto 4) /= "00" and temp11(6) = '0' then
+		if temp1(5 downto 0) > 15 and temp1(6) = '0' then
 			c1 := '1';
 		end if;
 		
@@ -85,21 +72,15 @@ begin
 		if BCD = '1' then 
 			if ADD = '1' then 
 				if temp2 > 9 then
-					temp22 := std_logic_vector(temp2 + 6);
-				else
-					temp22 := std_logic_vector(temp2);
+					temp2 := temp2 + 6;
 				end if;
 			else
 				if temp2 <= 15 then
-					temp22 := std_logic_vector(temp2 - 6);
-				else
-					temp22 := std_logic_vector(temp2);
+					temp2 := temp2 - 6;
 				end if;
 			end if;
-		else
-			temp22 := std_logic_vector(temp2);
 		end if;
-		if temp22(5 downto 4) /= "00" and temp22(6) = '0' then
+		if temp2(5 downto 0) > 15 and temp2(6) = '0' then
 			c2 := '1';
 		end if;
 		
@@ -109,21 +90,15 @@ begin
 		if BCD = '1' then 
 			if ADD = '1' then 
 				if temp3 > 9 then
-					temp33 := std_logic_vector(temp3 + 6);
-				else
-					temp33 := std_logic_vector(temp3);
+					temp3 := temp3 + 6;
 				end if;
 			else
 				if temp3 <= 15 then
-					temp33 := std_logic_vector(temp3 - 6);
-				else
-					temp33 := std_logic_vector(temp3);
+					temp3 := temp3 - 6;
 				end if;
 			end if;
-		else
-			temp33 := std_logic_vector(temp3);
 		end if;
-		if temp33(5 downto 4) /= "00" and temp33(6) = '0' then
+		if temp3(5 downto 0) > 15 and temp3(6) = '0' then
 			c3 := '1';
 		end if;
 		

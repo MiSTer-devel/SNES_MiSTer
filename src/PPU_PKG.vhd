@@ -149,10 +149,10 @@ package body PPU_PKG is
 			end if;
 		else
 			temp := resize(a,temp'length) - resize(b,temp'length);
-			if half = '1' then
-				temp := "0"&temp(5 downto 1);
-			elsif temp(5) = '1' then
+			if temp(5) = '1' then
 				temp := "000000";
+			elsif half = '1' then
+				temp := "0"&temp(5 downto 1);
 			end if;
 		end if;
 		

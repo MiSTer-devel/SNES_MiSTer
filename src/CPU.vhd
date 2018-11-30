@@ -1054,10 +1054,10 @@ begin
 				end if;
 				
 				if HDS = HDS_TRANSFER and INT_CLKR_CE = '1' then
-					HDMA_A_WR <= DMAP(DCH)(7);
-					HDMA_A_RD <= not DMAP(DCH)(7);
-					HDMA_B_WR <= not DMAP(DCH)(7);
-					HDMA_B_RD <= DMAP(DCH)(7);
+					HDMA_A_WR <= DMAP(HCH)(7);
+					HDMA_A_RD <= not DMAP(HCH)(7);
+					HDMA_B_WR <= not DMAP(HCH)(7);
+					HDMA_B_RD <= DMAP(HCH)(7);
 				elsif (HDS = HDS_INIT or HDS = HDS_INIT_IND) and INT_CLKR_CE = '1' then
 					HDMA_A_WR <= '0';
 					HDMA_A_RD <= '1';

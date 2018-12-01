@@ -380,6 +380,9 @@ wire       WSRAM_WE_N;
 wire       WSRAM_OE_N;
 wire [7:0] WSRAM_Q, WSRAM_D;
 
+reg [1:0] sdram_clr;
+always @(posedge clk_sys) sdram_clr <= {sdram_clr[0], ioctl_download & ioctl_wr};
+
 sdram sdram
 (
 	.*,
@@ -393,11 +396,11 @@ sdram sdram
 	.ch0_wr(0),
 	.ch0_busy(),
 	
-	.ch1_addr({1'b1, 6'd0, WSRAM_ADDR}),
-	.ch1_din(WSRAM_D),
+	.ch1_addr({1'b1, 6'd0, ioctl_download ? ioctl_addr[16:0] : WSRAM_ADDR}),
+	.ch1_din(ioctl_download ? 8'h00 : WSRAM_D),
 	.ch1_dout(WSRAM_Q),
-	.ch1_rd(~WSRAM_CE_N & ~WSRAM_OE_N),
-	.ch1_wr(~WSRAM_CE_N & ~WSRAM_WE_N),
+	.ch1_rd(~ioctl_download & ~WSRAM_CE_N & ~WSRAM_OE_N),
+	.ch1_wr(sdram_clr[1] | (~WSRAM_CE_N & ~WSRAM_WE_N)),
 	.ch1_busy(),
 
 	.ch2_addr(ioctl_addr-10'd512),
@@ -411,38 +414,50 @@ sdram sdram
 wire [15:0] VSRAM_ADDRA;
 wire        VSRAM_WEA_N;
 wire  [7:0] VSRAM_DA, VSRAM_QA;
-spram #(15)	vram_a
+dpram #(15)	vram_a
 (
 	.clock(clk_sys),
-	.address(VSRAM_ADDRA[14:0]),
-	.data(VSRAM_DA),
-	.wren(~VSRAM_WEA_N),
-	.q(VSRAM_QA)
+	.address_a(VSRAM_ADDRA[14:0]),
+	.data_a(VSRAM_DA),
+	.wren_a(~VSRAM_WEA_N),
+	.q_a(VSRAM_QA),
+
+	// clear the RAM on loading
+	.address_b(ioctl_addr[14:0]),
+	.wren_b(ioctl_wr)
 );
 
 wire [15:0] VSRAM_ADDRB;
 wire        VSRAM_WEB_N;
 wire  [7:0] VSRAM_DB, VSRAM_QB;
-spram #(15) vram_b
+dpram #(15) vram_b
 (
 	.clock(clk_sys),
-	.address(VSRAM_ADDRB[14:0]),
-	.data(VSRAM_DB),
-	.wren(~VSRAM_WEB_N),
-	.q(VSRAM_QB)
+	.address_a(VSRAM_ADDRB[14:0]),
+	.data_a(VSRAM_DB),
+	.wren_a(~VSRAM_WEB_N),
+	.q_a(VSRAM_QB),
+
+	// clear the RAM on loading
+	.address_b(ioctl_addr[14:0]),
+	.wren_b(ioctl_wr)
 );
 
 wire [15:0] ASRAM_ADDR;
 wire        ASRAM_CE_N;
 wire        ASRAM_WE_N;
 wire  [7:0] ASRAM_Q, ASRAM_D;
-spram #(16) aram
+dpram #(16) aram
 (
 	.clock(clk_sys),
-	.address(ASRAM_ADDR),
-	.data(ASRAM_D),
-	.wren(~ASRAM_CE_N & ~ASRAM_WE_N),
-	.q(ASRAM_Q)
+	.address_a(ASRAM_ADDR),
+	.data_a(ASRAM_D),
+	.wren_a(~ASRAM_CE_N & ~ASRAM_WE_N),
+	.q_A(ASRAM_Q),
+
+	// clear the RAM on loading
+	.address_b(ioctl_addr[15:0]),
+	.wren_b(ioctl_wr)
 );
 
 wire [19:0] BSRAM_ADDR;

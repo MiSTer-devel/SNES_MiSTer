@@ -11,6 +11,7 @@ entity DSP is
 		CLK 			: in std_logic;
 		RST_N 		: in std_logic; 
 		ENABLE 		: in std_logic;
+		PAL			: in std_logic;
 
 		SMP_EN 		: out std_logic;
 		SMP_A    	: in std_logic_vector(15 downto 0);
@@ -42,7 +43,6 @@ end DSP;
 
 architecture rtl of DSP is 
 
-	signal CLK_CNT : unsigned(2 downto 0);
 	signal CE : std_logic;
 
 	signal RAM_DI : std_logic_vector(7 downto 0);
@@ -189,20 +189,27 @@ begin
 	SMP_CE <= CE;
 	
 	process( RST_N, CLK )
+		variable CLK_SUM : unsigned(23 downto 0);
+		variable MCLK_FREQ : unsigned(23 downto 0);
 	begin
 		if RST_N = '0' then
-			CLK_CNT <= (others => '0');
-		elsif rising_edge(CLK) then
+			CLK_SUM := (others => '0');
+		elsif falling_edge(CLK) then
+			CE <= '0';
 			if ENABLE = '1' then
-				CLK_CNT <= CLK_CNT + 1;
-				if CLK_CNT = 5 then
-					CLK_CNT <= (others => '0');
+				if PAL = '1' then
+					MCLK_FREQ := MCLK_PAL_FREQ;
+				else
+					MCLK_FREQ := MCLK_NTSC_FREQ;
+				end if;
+				CLK_SUM := CLK_SUM + ACLK_FREQ;
+				if CLK_SUM >= MCLK_FREQ then
+					CLK_SUM := CLK_SUM - MCLK_FREQ;
+					CE <= '1';
 				end if;
 			end if;
 		end if;
 	end process;
-	
-	CE <= '1' when CLK_CNT = 5 else '0';
 
 	process( RST_N, CLK )
 	begin

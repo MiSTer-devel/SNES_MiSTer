@@ -11,8 +11,8 @@ entity main is
 		MCLK_50M		: in  std_logic;
 		RESET_N		: in  std_logic;
 
-		CLK_21M		: in  std_logic;
-		CLK_24M		: in  std_logic;
+		MCLK			: in  std_logic;
+		ACLK			: in  std_logic;
 
 		ROM_TYPE		: in  std_logic_vector(7 downto 0);
 		ROM_MASK		: in  std_logic_vector(23 downto 0);
@@ -100,8 +100,8 @@ begin
 
 	SNES : entity work.SNES
 	port map(
-		MCLK			=> CLK_21M,
-		DSPCLK		=> CLK_24M,
+		MCLK			=> MCLK,
+		DSPCLK		=> ACLK,
 		
 		RST_N			=> RESET_N,
 		ENABLE		=> '1',
@@ -184,7 +184,7 @@ begin
 	--SMAP : entity work.CX4Map
 	port map(
 		MCLK50		=> MCLK_50M,
-		MCLK			=> CLK_21M,
+		MCLK			=> MCLK,
 		RST_N			=> RESET_N,
 		ENABLE		=> '1',
 		

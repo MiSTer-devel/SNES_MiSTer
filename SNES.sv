@@ -125,7 +125,6 @@ assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
 wire clock_locked;
 wire clk_mem;
 wire clk_sys;
-wire clk_aud;
 
 pll pll
 (
@@ -134,7 +133,6 @@ pll pll
 	.outclk_0(clk_mem),
 	.outclk_1(SDRAM_CLK),
 	.outclk_2(clk_sys),
-	.outclk_3(clk_aud),
 	.locked(clock_locked)
 );
 
@@ -302,8 +300,8 @@ main main
 	.MCLK_50M(CLK_50M),	// master clock for internal PLLs
 	.RESET_N(~reset),
 
-	.CLK_21M(clk_sys), // 21.47727
-	.CLK_24M(clk_aud), // 24.576
+	.MCLK(clk_sys), // 21.47727 / 21.28137
+	.ACLK(clk_sys),
 
 	.ROM_TYPE(rom_type),
 	.ROM_MASK(rom_mask),
@@ -440,7 +438,7 @@ wire        ASRAM_WE_N;
 wire  [7:0] ASRAM_Q, ASRAM_D;
 spram #(16) aram
 (
-	.clock(clk_aud),
+	.clock(clk_sys),
 	.address(ASRAM_ADDR),
 	.data(ASRAM_D),
 	.wren(~ASRAM_CE_N & ~ASRAM_WE_N),

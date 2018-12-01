@@ -354,6 +354,7 @@ begin
 		CLK			=> DSPCLK,
 		RST_N			=> RST_N,
 		ENABLE		=> APU_ENABLE,
+		PAL			=> PAL,
 				
 		SMP_EN    	=> SMP_EN,
 		SMP_A     	=> SMP_A,

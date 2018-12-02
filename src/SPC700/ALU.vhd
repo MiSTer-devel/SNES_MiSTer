@@ -153,10 +153,10 @@ begin
 		VO <= VI; 
 		SO <= tResult(7);  
 		case CTRL.secOp is
-			when "1000" => 
-				VO <= AddVO;		--ADC
-			when "1010" => 
-				VO <= AddVO;		--SBC 
+			when "1000" | "1001" => 
+				VO <= AddVO;		--ADC,ADD
+			when "1010" | "1011" => 
+				VO <= AddVO;		--SBC,SUB
 			when "1111" =>			--DIV
 				VO <= DivVI;
 			when others => null;

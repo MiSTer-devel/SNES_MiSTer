@@ -846,24 +846,24 @@ begin
 	elsif rising_edge(CLK) then
 		if ENABLE = '1' and DOT_CLKR_CE = '1' then
 			if PAL = '0' then
-				if BGINTERLACE = '1' and FIELD = '0' then
-					LAST_LINE := LINE_NUM_NTSC;
-				else
+				--if BGINTERLACE = '1' and FIELD = '0' then
+				--	LAST_LINE := LINE_NUM_NTSC;
+				--else
 					LAST_LINE := LINE_NUM_NTSC-1;
-				end if;
+				--end if;
 				LAST_DOT := DOT_NUM-1;
 				VSYNC_LINE := LINE_VSYNC_NTSC;
 			else
-				if BGINTERLACE = '1' and FIELD = '0' then
-					LAST_LINE := LINE_NUM_PAL;
-				else
+				--if BGINTERLACE = '1' and FIELD = '0' then
+				--	LAST_LINE := LINE_NUM_PAL;
+				--else
 					LAST_LINE := LINE_NUM_PAL-1;
-				end if;
-				if V_CNT = 311 and BGINTERLACE = '1' and FIELD = '1' then
-					LAST_DOT := DOT_NUM;
-				else
+				--end if;
+				--if V_CNT = 311 and BGINTERLACE = '1' and FIELD = '1' then
+				--	LAST_DOT := DOT_NUM;
+				--else
 					LAST_DOT := DOT_NUM-1;
-				end if;
+				--end if;
 				VSYNC_LINE := LINE_VSYNC_PAL;
 			end if;
 			
@@ -2426,7 +2426,7 @@ X_OUT <= std_logic_vector(OUT_X & DOT_CLK);
 Y_OUT <= std_logic_vector(FIELD & OUT_Y);
 V224 <= not OVERSCAN;
 
-FIELD_OUT <= BGINTERLACE and FIELD;
+FIELD_OUT <= FIELD;
 INTERLACE <= BGINTERLACE;
 
 

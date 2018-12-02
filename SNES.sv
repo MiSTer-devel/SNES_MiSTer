@@ -498,7 +498,7 @@ always @(posedge clk_mem) begin
 	ce_pix <= CE_PIX & ~old_ce;
 end
 
-assign VGA_F1 = FIELD;
+assign VGA_F1 = INTERLACE & ~FIELD;
 assign CLK_VIDEO = clk_mem;
 assign VGA_SL = {~INTERLACE,~INTERLACE}&sl[1:0];
 

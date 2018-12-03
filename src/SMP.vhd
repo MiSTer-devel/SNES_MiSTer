@@ -229,6 +229,7 @@ begin
 			
 			TIMER_CE <= '0';
 		elsif rising_edge(CLK) then
+			TIMER_CE <= '0';
 			if ENABLE = '0' then
 				if DBG_SMP_DAT_WR = '1' then
 					case DBG_REG is

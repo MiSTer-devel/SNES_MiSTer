@@ -726,11 +726,11 @@ begin
 			IRQ_FLAG_RSTr <= '0';
 		elsif rising_edge(CLK) then
 			if ENABLE = '1' and DOT_CLK_CE = '1' then
-				if HVIRQ_EN = "01" and H_CNT = unsigned(HTIME) then--H-IRQ:  every scanline, H=HTIME+~3.5
+				if HVIRQ_EN = "01" and H_CNT = unsigned(HTIME) + 2 then											--H-IRQ:  every scanline, H=HTIME+~3.5
 					IRQ_VALID := '1';
-				elsif HVIRQ_EN = "10" and V_CNT = unsigned(VTIME) then--V-IRQ:  V=VTIME, H=~2.5--H_CNT <= 4 and
+				elsif HVIRQ_EN = "10" and H_CNT = 2 and V_CNT = unsigned(VTIME) then							--V-IRQ:  V=VTIME, H=~2.5
 					IRQ_VALID := '1';
-				elsif HVIRQ_EN = "11" and H_CNT = unsigned(HTIME) and V_CNT = unsigned(VTIME) then--HV-IRQ: V=VTIME, H=HTIME+~3.5
+				elsif HVIRQ_EN = "11" and H_CNT = unsigned(HTIME) + 2 and V_CNT = unsigned(VTIME) then	--HV-IRQ: V=VTIME, H=HTIME+~3.5
 					IRQ_VALID := '1';
 				else
 					IRQ_VALID := '0';

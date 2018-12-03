@@ -244,17 +244,16 @@ ARCHITECTURE rtl OF ascal IS
   SIGNAL i_freeze : std_logic;
   SIGNAL i_hsize,i_hmin,i_hmax,i_hcpt : uint12;
   SIGNAL i_hrsize,i_vrsize : uint12;
-  SIGNAL i_chmin,i_chmax,i_cvmin,i_cvmax : uint12;
-  SIGNAL i_vsize,i_vmin,i_vmax,i_vmaxc,i_vcpt : uint12;
-  SIGNAL i_vminset : std_logic;
+  SIGNAL i_chmin,i_chmax,i_cvsize : uint12;
+  SIGNAL i_vsize,i_vmin,i_vmax,i_vsizec,i_vcpt : uint12;
   SIGNAL i_iauto : std_logic;
   SIGNAL i_mode : unsigned(4 DOWNTO 0);
-  SIGNAL i_ven : std_logic;
+  SIGNAL i_ven,i_de_vs : std_logic;
   SIGNAL i_wr : std_logic;
   SIGNAL i_de_pre,i_hs_pre,i_vs_pre,i_fl_pre : std_logic;
   SIGNAL i_vs_pred : std_logic;
   SIGNAL i_intercnt : natural RANGE 0 TO 7;
-  SIGNAL i_inter : std_logic;
+  SIGNAL i_inter,i_flm : std_logic;
   SIGNAL i_write,i_write_pre,i_walt : std_logic;
   SIGNAL i_push,i_pushend,i_pushend2,i_eol,i_eol2,i_eol3,i_eol4 : std_logic;
   SIGNAL i_pushhead : std_logic;
@@ -991,8 +990,8 @@ BEGIN
         -- Detect interleaved video
         IF NOT INTER THEN
           i_intercnt<=0;
-        ELSIF i_fl/=i_fl_pre AND i_intercnt<4 THEN
-          i_intercnt<=i_intercnt+2;
+        ELSIF i_fl/=i_fl_pre THEN
+          i_intercnt<=7;
         ELSIF i_vs='1' AND i_vs_pre='0' AND i_intercnt>0 THEN
           i_intercnt<=i_intercnt-1;
         END IF;
@@ -1007,7 +1006,8 @@ BEGIN
         
         IF i_vs='1' THEN
           i_vcpt<=0;
-          IF i_inter='1' AND i_fl='1' AND INTER THEN
+          i_de_vs<='0';
+          IF i_inter='1' AND i_flm='1' AND INTER THEN
             i_adrsi<=to_unsigned(N_BURST * i_hburst,32) +
                      to_unsigned(N_BURST * to_integer(
                        unsigned'("00") & to_std_logic(HEADER)),32);
@@ -1015,18 +1015,24 @@ BEGIN
             i_adrsi<=to_unsigned(N_BURST * to_integer(
                        unsigned'("00") & to_std_logic(HEADER)),32);
           END IF;
-          i_vminset<='0';
         END IF;
         
-        IF i_hs='1' AND i_hs_pre='0' THEN
+        IF i_de='1' THEN
+          i_de_vs<='1';
+          i_flm<=NOT i_fl;
+        END IF;
+        
+        IF i_hs='1' AND i_hs_pre='0' AND i_de_vs='1' THEN
           i_vcpt<=i_vcpt+1;
+        END IF;
+        IF i_hs='1' AND i_hs_pre='0' THEN
           i_wad<=2*BLEN-1;
         END IF;
         
         i_ven<=to_std_logic(i_hcpt+1>=i_hmin AND i_hcpt+1<=i_hmax AND
                             i_vcpt>=i_vmin AND i_vcpt<=i_vmax AND
-                            i_hs='0' AND i_vs='0');
-
+                            i_hs='0' AND i_vs='0' AND i_de='1');
+        
         i_syncline<=to_std_logic(i_vcpt=i_vmin + 3);
         
         ----------------------------------------------------
@@ -1038,28 +1044,26 @@ BEGIN
           i_chmax<=i_hcpt;
         END IF;
         
-        IF i_de='1' AND i_de_pre='0' AND i_vminset='0' THEN
-          i_cvmin<=i_vcpt;
-          i_vminset<='1';
-        END if;
         IF i_de='1' AND i_de_pre='0' THEN
-          i_vmaxc<=i_vcpt;
+          i_vsizec<=i_vcpt;
         END IF;
         IF i_vs='1' THEN
-          i_cvmax<=i_vmaxc;
+          i_cvsize<=i_vsizec;
         END IF;
         
         IF i_iauto='1' THEN
           i_hmin<=i_chmin;
           i_hmax<=i_chmax;
-          i_vmin<=i_cvmin;
-          i_vmax<=i_cvmax;
+          i_vmin<=0;
+          IF i_inter='0' OR i_fl='0' THEN
+            i_vmax<=i_cvsize;
+          END IF;
         ELSE
           -- Forced image
           i_hmin<=himin+i_chmin;
           i_hmax<=himax+i_chmin;
-          i_vmin<=vimin+i_cvmin;
-          i_vmax<=vimax+i_cvmin;
+          i_vmin<=vimin;
+          i_vmax<=vimax;
         END IF;
         
         ----------------------------------------------------
@@ -1100,7 +1104,6 @@ BEGIN
         
         ----------------------------------------------------
         -- Downscaling vertical
-        
         i_divstart<='0';
         IF i_hs='1' AND i_hs_pre='0' THEN
           IF i_vacc + i_ovsize < i_vsize THEN
@@ -1111,7 +1114,7 @@ BEGIN
             i_vnp<='1';
           END IF;
           i_divstart<='1';
-
+          
           IF i_vcpt=i_vmin THEN
             i_vacc<=i_ovsize/2 + i_vsize/2;
             i_vnp<='0'; -- <AVOIR>
@@ -1140,7 +1143,7 @@ BEGIN
         i_hpix0<=(i_r,i_g,i_b);
         i_hpix1<=i_hpix0;
         i_hpix2<=i_hpix1;
- 
+        
         -- i_hacc / i_hnp
         -- i_h_frac / i_hnp1
         -- i_hpix   / i_hnp2
@@ -1165,7 +1168,7 @@ BEGIN
         IF i_hdown='0' THEN
           i_hpix<=i_hpix2;
         END IF;
-
+        
         -- C3 : Vertical Bilinear
         IF i_bil='0' THEN
           frac2_v:=near_frac(i_v_frac(11 DOWNTO 0));
@@ -2237,7 +2240,7 @@ BEGIN
                             o_vcpt>=o_vmin AND o_vcpt<=o_vmax);
         o_hs0<=to_std_logic(o_hcpt>=o_hsstart AND o_hcpt<o_hsend);
         o_vs0<=to_std_logic(o_vcpt>=o_vsstart AND o_vcpt<o_vsend);
-
+        
         IF o_run='0' THEN
           o_de0<='0';
           o_pe0<='0';
@@ -2352,7 +2355,6 @@ BEGIN
           o_vpix22<=pix0_v;
           o_vpix12<=pix0_v;
         END IF;
-        
         
         -- CYCLE 3 -----------------------------------------
         o_vpixm3<=o_vpixm2;
@@ -2469,7 +2471,7 @@ BEGIN
   -- DEBUG
   Debug:PROCESS(o_clk) IS
     TYPE arr_uv8 IS ARRAY (natural RANGE <>) OF unsigned(7 DOWNTO 0);
-    CONSTANT chars : arr_uv8 :=(
+    CONSTANT CHARS : arr_uv8 :=(
       x"3E", x"63", x"73", x"7B", x"6F", x"67", x"3E", x"00",  -- 0
       x"0C", x"0E", x"0C", x"0C", x"0C", x"0C", x"3F", x"00",  -- 1
       x"1E", x"33", x"30", x"1C", x"06", x"33", x"3F", x"00",  -- 2
@@ -2522,7 +2524,7 @@ BEGIN
           o_debug_char<="10000"; -- " " : Blank character
         END IF;
         
-        o_debug_col<=chars(to_integer(o_debug_char)*8+(o_vcpt MOD 8));
+        o_debug_col<=CHARS(to_integer(o_debug_char)*8+(o_vcpt MOD 8));
         
         IF o_debug_col(o_hcpt4 MOD 8)='1' THEN
           o_debug_set<='1';
@@ -2557,7 +2559,7 @@ BEGIN
 
   o_debug_vin1<=
     CC(' ') & -- 1
-    CC('v') & -- 1
+    "0000" & i_inter & -- 1
     CC('^') & -- 1
     CN(o_hdelta(11 DOWNTO 0)) & -- 3
     CC(' ') & -- 1

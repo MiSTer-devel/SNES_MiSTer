@@ -33,8 +33,8 @@ entity SPPU is
 		
 		PAL			: in std_logic;
 		
+		HIGH_RES		: out std_logic;
 		DOTCLK		: out std_logic;
-		CE_PIX		: out std_logic;
 		
 		HBLANK		: out std_logic;
 		VBLANK		: out std_logic;
@@ -64,9 +64,8 @@ end SPPU;
 
 architecture rtl of SPPU is
 
-signal DOT_CNT : unsigned(1 downto 0);
 signal DOT_CLK : std_logic := '0';
-signal DOT_CLKR_CE, DOT_CLKF_CE : std_logic;
+signal DOT_CLKR_CE : std_logic;
 signal CLK_CNT : unsigned(2 downto 0) := (others => '0');
 signal MDR1, MDR2	: std_logic_vector(7 downto 0);
 signal D_OUT1, D_OUT2	: std_logic_vector(7 downto 0);
@@ -161,8 +160,6 @@ signal FIELD : std_logic;
 signal LAST_VIS_LINE : unsigned(8 downto 0);
 signal IN_HBL : std_logic;
 signal IN_VBL : std_logic;
-signal HDE_INT : std_logic;
-signal VDE_INT : std_logic;
 
 -- BACKGROUND
 signal BG_VRAM_ADDRA, BG_VRAM_ADDRB : std_logic_vector(15 downto 0);
@@ -241,6 +238,7 @@ signal SUBCOL : std_logic_vector(14 downto 0);
 signal MAIN_R, MAIN_G, MAIN_B	: unsigned(4 downto 0);
 signal SUB_R, SUB_G, SUB_B	: unsigned(4 downto 0);
 signal HIRES : std_logic;
+signal HRES : std_logic;
 
 -- CRAM
 signal CRAM_Q, CRAM_D, CRAM_IO_Q : std_logic_vector(14 downto 0);
@@ -271,7 +269,6 @@ begin
 		CLK_CNT <= (others => '0');
 		DOT_CLK <= '0';
 		DOT_CLKR_CE <= '0';
-		DOT_CLKF_CE <= '0';
 	elsif rising_edge(CLK) then
 		if ENABLE = '0' then
 			DOT_CYCLES := "100";
@@ -283,33 +280,17 @@ begin
 			DOT_CYCLES := "100";
 		end if;
 		
-		DOT_CNT <= DOT_CNT + 1;
-
 		DOT_CLKR_CE <= '0';
-		DOT_CLKF_CE <= '0';
 		CLK_CNT <= CLK_CNT + 1;
 		if CLK_CNT = 1  then
 			DOT_CLK <= '0';
 		elsif CLK_CNT = DOT_CYCLES-1  then
 			CLK_CNT <= (others => '0');
 			DOT_CLK <= '1';
-			if DOT_CYCLES = "100" then
-				DOT_CNT <= "00";
-			end if;
 		end if;
 
-		if CLK_CNT = 0 then			
-			DOT_CLKF_CE <= '1';
-		elsif CLK_CNT = DOT_CYCLES-1-1  then
+		if CLK_CNT = DOT_CYCLES-1-1  then
 			DOT_CLKR_CE <= '1';
-		end if;
-		
-		CE_PIX <= '0';
-		if DOT_CNT = 0 then
-			CE_PIX <= '1';
-		end if;
-		if DOT_CNT = 2 and HIRES = '1' then
-			CE_PIX <= '1';
 		end if;
 	end if;
 end process;
@@ -830,6 +811,8 @@ VRAM_WRB_N <= '1' when ENABLE = '0' else not VRAM2_WRITE;
 
 LAST_VIS_LINE <= '0' & x"E0" when OVERSCAN = '0' else '0' & x"EF";
 
+HIGH_RES <= HIRES;
+
 --HV counters
 process( RST_N, CLK )
 variable LAST_LINE: unsigned(8 downto 0);
@@ -846,24 +829,24 @@ begin
 	elsif rising_edge(CLK) then
 		if ENABLE = '1' and DOT_CLKR_CE = '1' then
 			if PAL = '0' then
-				--if BGINTERLACE = '1' and FIELD = '0' then
-				--	LAST_LINE := LINE_NUM_NTSC;
-				--else
+				if BGINTERLACE = '1' and FIELD = '0' then
+					LAST_LINE := LINE_NUM_NTSC;
+				else
 					LAST_LINE := LINE_NUM_NTSC-1;
-				--end if;
+				end if;
 				LAST_DOT := DOT_NUM-1;
 				VSYNC_LINE := LINE_VSYNC_NTSC;
 			else
-				--if BGINTERLACE = '1' and FIELD = '0' then
-				--	LAST_LINE := LINE_NUM_PAL;
-				--else
+				if BGINTERLACE = '1' and FIELD = '0' then
+					LAST_LINE := LINE_NUM_PAL;
+				else
 					LAST_LINE := LINE_NUM_PAL-1;
-				--end if;
-				--if V_CNT = 311 and BGINTERLACE = '1' and FIELD = '1' then
-				--	LAST_DOT := DOT_NUM;
-				--else
+				end if;
+				if V_CNT = 311 and BGINTERLACE = '1' and FIELD = '1' then
+					LAST_DOT := DOT_NUM;
+				else
 					LAST_DOT := DOT_NUM-1;
-				--end if;
+				end if;
 				VSYNC_LINE := LINE_VSYNC_PAL;
 			end if;
 			
@@ -894,15 +877,15 @@ begin
 				IN_VBL <= '0';
 			end if;
 			
-			if H_CNT = 19-1  then HDE_INT <= '1'; end if;
-			if H_CNT = 275-1 then HDE_INT <= '0'; end if;
+			if H_CNT = 19-1  then HDE <= '1'; end if;
+			if H_CNT = 275-1 then HDE <= '0'; end if;
 
 			if H_CNT = 296-1 then HSYNC <= '1'; end if;
 			if H_CNT = 306-1 then HSYNC <= '0'; end if;
 
-			if V_CNT = 1               then VDE_INT <= '1'; end if;
-			if V_CNT = LAST_VIS_LINE+1 then VDE_INT <= '0'; end if;
-			if V_CNT = VSYNC_LINE-3    then VDE_INT <= '0'; end if; -- make sure VDE deactivated before VSync!
+			if V_CNT = 1               then VDE <= '1'; end if;
+			if V_CNT = LAST_VIS_LINE+1 then VDE <= '0'; end if;
+			if V_CNT = VSYNC_LINE-3    then VDE <= '0'; end if; -- make sure VDE deactivated before VSync!
 
 			if V_CNT = VSYNC_LINE    then VSYNC <= '1'; end if;
 			if V_CNT = VSYNC_LINE+4  then VSYNC <= '0'; end if;
@@ -2400,22 +2383,8 @@ begin
 	end if;
 end process;
 
-process( RST_N, CLK)
-begin
-	if RST_N = '0' then
-		COLOR_OUT <= (others => '0');
-	elsif rising_edge(CLK) then 
-		if ENABLE = '1' then 
-			if DOT_CLKF_CE = '1' then
-				COLOR_OUT <= Bright(MB, SUB_B) & Bright(MB, SUB_G) & Bright(MB, SUB_R);
-			elsif DOT_CLKR_CE = '1' then
-				COLOR_OUT <= Bright(MB, MAIN_B) & Bright(MB, MAIN_G) & Bright(MB, MAIN_R);
-				HDE <= HDE_INT;
-				VDE <= VDE_INT;
-			end if;
-		end if;
-	end if;
-end process;
+COLOR_OUT <= Bright(MB, SUB_B) & Bright(MB, SUB_G) & Bright(MB, SUB_R) when DOT_CLK = '1'
+        else Bright(MB, MAIN_B) & Bright(MB, MAIN_G) & Bright(MB, MAIN_R);
 
 DOTCLK <= DOT_CLK;
 HBLANK <= IN_HBL;

@@ -57,17 +57,15 @@ entity SNES is
 		ARAM_OE_N	: out std_logic;
 		ARAM_WE_N	: out std_logic;
 		
-		DOTCLK		: out std_logic;
-		CE_PIX		: out std_logic;
-
-		HDE			: out std_logic;
-		VDE			: out std_logic;
-		
-		RGB_OUT 		: out std_logic_vector(14 downto 0);
+		HIGH_RES		: out std_logic;
 		FIELD_OUT	: out std_logic;
 		INTERLACE	: out std_logic;
 		V224_MODE	: out std_logic;
-		
+		DOTCLK		: out std_logic;
+
+		RGB_OUT 		: out std_logic_vector(14 downto 0);
+		HDE			: out std_logic;
+		VDE			: out std_logic;
 		HSYNC			: out std_logic;
 		VSYNC			: out std_logic;
 
@@ -277,23 +275,19 @@ begin
 		EXTLATCH		=> JPIO67(7),
 		
 		PAL			=> PAL,
-
+		HIGH_RES		=> HIGH_RES,
 		DOTCLK		=> DOTCLK,
-		CE_PIX		=> CE_PIX,
+		FIELD_OUT	=> FIELD_OUT,
+		INTERLACE   => INTERLACE,
+		V224 			=> V224_MODE,
 
+		COLOR_OUT 	=> RGB_OUT,
 		HBLANK		=> INT_HBLANK,
 		VBLANK		=> INT_VBLANK,
 		HDE			=> HDE,
 		VDE			=> VDE,
-		
-		COLOR_OUT 	=> RGB_OUT,
-		
-		FIELD_OUT	=> FIELD_OUT,
-		INTERLACE   => INTERLACE,
 		HSYNC			=> HSYNC,
 		VSYNC			=> VSYNC,
-		
-		V224 			=> V224_MODE,
 
 		DBG_REG 		=> DBG_REG,
 		DBG_DAT_OUT => DBG_PPU_DAT,

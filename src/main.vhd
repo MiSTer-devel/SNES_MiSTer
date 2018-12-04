@@ -54,15 +54,16 @@ entity main is
 		ASRAM_OE_N	: out std_logic;
 		ASRAM_WE_N	: out std_logic;
 
-		CE_PIX		: out std_logic;
 		PAL			: in  std_logic;
+		HIGH_RES		: out std_logic;
+		FIELD			: out std_logic;
+		INTERLACE	: out std_logic;
+		DOTCLK		: out std_logic;
 		R,G,B			: out std_logic_vector(4 downto 0);
 		HBLANK		: out std_logic;
 		VBLANK		: out std_logic;
 		HSYNC			: out std_logic;
 		VSYNC			: out std_logic;
-		FIELD			: out std_logic;
-		INTERLACE	: out std_logic;
 
 		JOY1_DI		: in  std_logic_vector(1 downto 0);
 		JOY2_DI		: in  std_logic_vector(1 downto 0);
@@ -105,7 +106,6 @@ begin
 		
 		RST_N			=> RESET_N,
 		ENABLE		=> '1',
-		PAL			=> PAL,
 		
 		CA     		=> CA,
 		CPURD_N		=> CPURD_N,
@@ -141,36 +141,37 @@ begin
 		VRAM_RD_N	=> VSRAM_OE_N,
 		VRAM_WRA_N	=> VSRAM_WEA_N,
 		VRAM_WRB_N	=> VSRAM_WEB_N,
-			
+
 		ARAM_ADDR	=> ASRAM_ADDR,
 		ARAM_D		=> ASRAM_D,
 		ARAM_Q		=> ASRAM_Q,
 		ARAM_CE_N	=> ASRAM_CE_N,
 		ARAM_OE_N	=> ASRAM_OE_N,
 		ARAM_WE_N	=> ASRAM_WE_N,
-			
+
 		JOY1_DI		=> JOY1_DI,
 		JOY2_DI		=> JOY2_DI,
 		JOY_STRB		=> JOY_STRB,
 		JOY1_CLK		=> JOY1_CLK,
 		JOY2_CLK		=> JOY2_CLK,
-		
-		CE_PIX		=> CE_PIX,
-		HDE			=> HBLANKn,
-		VDE			=> VBLANKn,
-			
-		RGB_OUT		=> RGB_OUT,
+
+		PAL			=> PAL,
+		HIGH_RES		=> HIGH_RES,
 		FIELD_OUT	=> FIELD,
 		INTERLACE   => INTERLACE,
-		
+		DOTCLK		=> DOTCLK,
+
+		RGB_OUT		=> RGB_OUT,
+		HDE			=> HBLANKn,
+		VDE			=> VBLANKn,
 		HSYNC			=> HSYNC,
 		VSYNC			=> VSYNC,
-		
+
 		DBG_SEL		=> (others =>'0'),
 		DBG_REG		=> (others =>'0'),
 		DBG_REG_WR	=> '0',
 		DBG_DAT_IN	=> (others =>'0'),
-		
+
 		AUDIO_L		=> AUDIO_L,
 		AUDIO_R		=> AUDIO_R
 	);

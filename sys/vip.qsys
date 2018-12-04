@@ -13,7 +13,15 @@
    {
       datum _sortIndex
       {
-         value = "9";
+         value = "10";
+         type = "int";
+      }
+   }
+   element Deinterlacer
+   {
+      datum _sortIndex
+      {
+         value = "4";
          type = "int";
       }
    }
@@ -21,7 +29,7 @@
    {
       datum _sortIndex
       {
-         value = "4";
+         value = "5";
          type = "int";
       }
    }
@@ -45,7 +53,7 @@
    {
       datum _sortIndex
       {
-         value = "6";
+         value = "7";
          type = "int";
       }
    }
@@ -53,7 +61,7 @@
    {
       datum _sortIndex
       {
-         value = "8";
+         value = "9";
          type = "int";
       }
    }
@@ -69,7 +77,7 @@
    {
       datum _sortIndex
       {
-         value = "5";
+         value = "6";
          type = "int";
       }
    }
@@ -85,7 +93,7 @@
    {
       datum _sortIndex
       {
-         value = "7";
+         value = "8";
          type = "int";
       }
    }
@@ -541,6 +549,46 @@
    dir="end" />
  <interface name="uart" internal="HPS.uart1" type="conduit" dir="end" />
  <module name="Controller" kind="avalon_combiner" version="17.0" enabled="1" />
+ <module name="Deinterlacer" kind="alt_vip_cl_dil" version="17.0" enabled="1">
+  <parameter name="AUTO_DEVICE" value="5CSEBA6U23I7" />
+  <parameter name="AUTO_DEVICE_SPEEDGRADE" value="7" />
+  <parameter name="BITS_PER_SYMBOL" value="8" />
+  <parameter name="BOB_BEHAVIOUR" value="FRAME_FOR_FIELD" />
+  <parameter name="CADENCE_ALGORITHM_NAME" value="CADENCE_32_22" />
+  <parameter name="CADENCE_DETECTION" value="0" />
+  <parameter name="CLOCKS_ARE_SEPARATE" value="1" />
+  <parameter name="COLOR_PLANES_ARE_IN_PARALLEL" value="1" />
+  <parameter name="DEINTERLACE_ALGORITHM" value="MOTION_ADAPTIVE" />
+  <parameter name="DISABLE_EMBEDDED_STREAM_CLEANER" value="0" />
+  <parameter name="EDI_READ_MASTER_BURST_TARGET" value="32" />
+  <parameter name="EDI_READ_MASTER_FIFO_DEPTH" value="128" />
+  <parameter name="FAMILY" value="Cyclone V" />
+  <parameter name="FIELD_LATENCY" value="0" />
+  <parameter name="INCOMING_VIDEO_IS_422" value="0" />
+  <parameter name="INCOMING_VIDEO_IS_YCBCR" value="0" />
+  <parameter name="MAX_HEIGHT" value="1080" />
+  <parameter name="MAX_SYMBOLS_PER_PACKET" value="10" />
+  <parameter name="MAX_WIDTH" value="1920" />
+  <parameter name="MA_READ_MASTER_BURST_TARGET" value="32" />
+  <parameter name="MA_READ_MASTER_FIFO_DEPTH" value="128" />
+  <parameter name="MEM_BASE_ADDR" value="570425344" />
+  <parameter name="MEM_PORT_WIDTH" value="128" />
+  <parameter name="MOTION_BLEED" value="1" />
+  <parameter name="MOTION_BPS" value="7" />
+  <parameter name="MOTION_READ_MASTER_BURST_TARGET" value="32" />
+  <parameter name="MOTION_READ_MASTER_FIFO_DEPTH" value="128" />
+  <parameter name="MOTION_WRITE_MASTER_BURST_TARGET" value="32" />
+  <parameter name="MOTION_WRITE_MASTER_FIFO_DEPTH" value="128" />
+  <parameter name="NUMBER_OF_COLOR_PLANES" value="3" />
+  <parameter name="PIXELS_IN_PARALLEL" value="2" />
+  <parameter name="RUNTIME_CONTROL" value="0" />
+  <parameter name="SWAP_F0_F1" value="0" />
+  <parameter name="USER_PACKETS_MAX_STORAGE" value="0" />
+  <parameter name="USER_PACKET_FIFO_DEPTH" value="0" />
+  <parameter name="USER_PACKET_SUPPORT" value="PASSTHROUGH" />
+  <parameter name="WRITE_MASTER_BURST_TARGET" value="32" />
+  <parameter name="WRITE_MASTER_FIFO_DEPTH" value="128" />
+ </module>
  <module name="Frame_Buffer" kind="alt_vip_cl_vfb" version="17.0" enabled="1">
   <parameter name="AUTO_DEVICE" value="5CSEBA6U23I7" />
   <parameter name="AUTO_DEVICE_SPEEDGRADE" value="7" />
@@ -973,6 +1021,24 @@
  <connection
    kind="avalon"
    version="17.0"
+   start="Deinterlacer.edi_read_master"
+   end="HPS.f2h_sdram0_data">
+  <parameter name="arbitrationPriority" value="1" />
+  <parameter name="baseAddress" value="0x0000" />
+  <parameter name="defaultConnection" value="false" />
+ </connection>
+ <connection
+   kind="avalon"
+   version="17.0"
+   start="Deinterlacer.ma_read_master"
+   end="HPS.f2h_sdram0_data">
+  <parameter name="arbitrationPriority" value="1" />
+  <parameter name="baseAddress" value="0x0000" />
+  <parameter name="defaultConnection" value="false" />
+ </connection>
+ <connection
+   kind="avalon"
+   version="17.0"
    start="Frame_Buffer.mem_master_rd"
    end="HPS.f2h_sdram0_data">
   <parameter name="arbitrationPriority" value="1" />
@@ -989,10 +1055,42 @@
   <parameter name="defaultConnection" value="false" />
  </connection>
  <connection
+   kind="avalon"
+   version="17.0"
+   start="Deinterlacer.motion_read_master"
+   end="HPS.f2h_sdram0_data">
+  <parameter name="arbitrationPriority" value="1" />
+  <parameter name="baseAddress" value="0x0000" />
+  <parameter name="defaultConnection" value="false" />
+ </connection>
+ <connection
+   kind="avalon"
+   version="17.0"
+   start="Deinterlacer.motion_write_master"
+   end="HPS.f2h_sdram0_data">
+  <parameter name="arbitrationPriority" value="1" />
+  <parameter name="baseAddress" value="0x0000" />
+  <parameter name="defaultConnection" value="false" />
+ </connection>
+ <connection
+   kind="avalon"
+   version="17.0"
+   start="Deinterlacer.write_master"
+   end="HPS.f2h_sdram0_data">
+  <parameter name="arbitrationPriority" value="1" />
+  <parameter name="baseAddress" value="0x0000" />
+  <parameter name="defaultConnection" value="false" />
+ </connection>
+ <connection
    kind="avalon_streaming"
    version="17.0"
    start="Mixer.dout"
    end="Video_Output.din" />
+ <connection
+   kind="avalon_streaming"
+   version="17.0"
+   start="Deinterlacer.dout"
+   end="Frame_Buffer.din" />
  <connection
    kind="avalon_streaming"
    version="17.0"
@@ -1007,7 +1105,17 @@
    kind="avalon_streaming"
    version="17.0"
    start="Video_Input.dout_0"
-   end="Frame_Buffer.din" />
+   end="Deinterlacer.din" />
+ <connection
+   kind="clock"
+   version="17.0"
+   start="HPS.h2f_user0_clock"
+   end="Deinterlacer.av_mm_clock" />
+ <connection
+   kind="clock"
+   version="17.0"
+   start="HPS.h2f_user0_clock"
+   end="Deinterlacer.av_st_clock" />
  <connection
    kind="clock"
    version="17.0"
@@ -1085,6 +1193,16 @@
    version="17.0"
    start="Reset_Source.reset_cold"
    end="HPS.f2h_cold_reset_req" />
+ <connection
+   kind="reset"
+   version="17.0"
+   start="Reset_Source.reset_sys"
+   end="Deinterlacer.av_mm_reset" />
+ <connection
+   kind="reset"
+   version="17.0"
+   start="Reset_Source.reset_sys"
+   end="Deinterlacer.av_st_reset" />
  <connection
    kind="reset"
    version="17.0"

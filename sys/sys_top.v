@@ -517,8 +517,7 @@ ascal
 #(
 	.RAMBASE(32'h20000000),
 	.N_DW(128),
-	.N_AW(28),
-	.NPOLY(1)
+	.N_AW(28)
 )
 ascal
 (

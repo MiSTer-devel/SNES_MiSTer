@@ -348,14 +348,13 @@ main main
 
 	.FIELD(FIELD),
 	.INTERLACE(INTERLACE),
+	.HIGH_RES(HIGH_RES),
+	.DOTCLK(DOTCLK),
 	
-	.HBLANK(HBLANK),
-	.VBLANK(VBLANK),
-	
+	.HBLANK(HBlank),
+	.VBLANK(VBlank),
 	.HSYNC(HSYNC),
 	.VSYNC(VSYNC),
-	
-	.CE_PIX(CE_PIX),
 
 	.JOY1_DI(JOY1_DO),
 	.JOY2_DI(JOY2_DO),
@@ -484,50 +483,59 @@ dpram_dif #(17,8,16,16) bsram
 
 wire [4:0] R,G,B;
 wire FIELD,INTERLACE;
-wire HSYNC;
-wire VSYNC;
-wire HBLANK;
-wire VBLANK;
-wire CE_PIX;
+wire HSync, HSYNC;
+wire VSync, VSYNC;
+wire HBlank;
+wire VBlank;
+wire HIGH_RES;
+wire DOTCLK;
 
 reg ce_pix;
 always @(posedge clk_mem) begin
-	reg old_ce;
+	reg [3:0] pcnt;
+	reg old_vsync;
+	reg tmp_hres, frame_hres;
+	reg old_dotclk;
+	
+	tmp_hres <= tmp_hres | HIGH_RES;
 
-	old_ce <= CE_PIX;
-	ce_pix <= CE_PIX & ~old_ce;
+	old_vsync <= VSync;
+	if(~old_vsync & VSync) begin
+		frame_hres <= tmp_hres | ~scandoubler;
+		tmp_hres <= HIGH_RES;
+	end
+
+	pcnt <= pcnt + 1'd1;
+	old_dotclk <= DOTCLK;
+	if(~old_dotclk & DOTCLK & ~HBlank & ~VBlank) pcnt <= 1;
+
+	ce_pix <= !pcnt[2:0] & (frame_hres | ~pcnt[3]);
+	
+	if(pcnt==6) {HSync, VSync} <= {HSYNC, VSYNC};
 end
 
-assign VGA_F1 = INTERLACE & ~FIELD;
+assign VGA_F1 = INTERLACE & FIELD;
 assign CLK_VIDEO = clk_mem;
 assign VGA_SL = {~INTERLACE,~INTERLACE}&sl[1:0];
 
 wire [2:0] scale = status[11:9];
 wire [2:0] sl = scale ? scale - 1'd1 : 3'd0;
+wire       scandoubler = ~INTERLACE && (scale || forced_scandoubler);
 
 video_mixer #(.LINE_LENGTH(520)) video_mixer
 (
 	.*,
 
 	.clk_sys(CLK_VIDEO),
-	.ce_pix(ce_pix),
 	.ce_pix_out(CE_PIXEL),
 
 	.scanlines(0),
-	.scandoubler(~INTERLACE && (scale || forced_scandoubler)),
 	.hq2x(scale==1),
-
 	.mono(0),
 
 	.R({R,R[4:2]}),
 	.G({G,G[4:2]}),
-	.B({B,B[4:2]}),
-
-	// Positive pulses.
-	.HSync(HSYNC),
-	.VSync(VSYNC),
-	.HBlank(HBLANK),
-	.VBlank(VBLANK)
+	.B({B,B[4:2]})
 );
 
 ////////////////////////////  I/O PORTS  ////////////////////////////////

@@ -83,6 +83,7 @@ architecture rtl of SCPU is
 
 	--CPU BUS
 	signal INT_A : std_logic_vector(23 downto 0);
+	signal INT_CPUWR_N, INT_CPURD_N : std_logic;
 	signal IO_SEL : std_logic;
 	signal CPU_WR, CPU_RD : std_logic;
 
@@ -224,6 +225,7 @@ architecture rtl of SCPU is
 	--debug
 	signal FRAME_CNT: unsigned(15 downto 0);
 	signal P65_RDY: std_logic;
+	signal DBG_HDMA_CNT: unsigned(7 downto 0);
 
 begin
 
@@ -436,16 +438,19 @@ begin
 		end if;
 		
 		if HDMA_RUN = '1' and EN = '1' then
-			CPURD_N <= not HDMA_A_RD;
-			CPUWR_N <= not HDMA_A_WR; 
+			INT_CPURD_N <= not HDMA_A_RD;
+			INT_CPUWR_N <= not HDMA_A_WR; 
 		elsif DMA_RUN = '1' and EN = '1' then
-			CPURD_N <= not DMA_A_RD;
-			CPUWR_N <= not DMA_A_WR;
+			INT_CPURD_N <= not DMA_A_RD;
+			INT_CPUWR_N <= not DMA_A_WR;
 		else
-			CPURD_N <= not CPU_RD;
-			CPUWR_N <= not CPU_WR; 
+			INT_CPURD_N <= not CPU_RD;
+			INT_CPUWR_N <= not CPU_WR; 
 		end if;
 	end process; 
+	
+	CPURD_N <= INT_CPURD_N;
+	CPUWR_N <= INT_CPUWR_N; 
 
 	
 	--IO Registers
@@ -671,18 +676,18 @@ begin
 			MDR <= (others => '1');
 		elsif rising_edge(CLK) then
 			if INT_CLKR_CE = '1' then
-				if P65_EN = '1' and (P65_VPA = '1' or P65_VDA = '1') then
-					if P65_R_WN = '1' then
-						MDR <= P65_DI;
-					else
-						MDR <= P65_DO;
-					end if;
+				if P65_EN = '1' and (P65_VPA = '1' or P65_VDA = '1') and P65_R_WN = '0' then
+					MDR <= P65_DO;
+				end if;
+			elsif INT_CLKF_CE = '1' then
+				if P65_EN = '1' and (P65_VPA = '1' or P65_VDA = '1') and P65_R_WN = '1' then
+					MDR <= P65_DI;
 				elsif DMA_ACTIVE = '1' and EN = '1' then
 					MDR <= DI;
 				end if;
 			end if;
 		end if;
-	end process; 
+	end process;
  
 	DO <= MDR;
 
@@ -728,7 +733,7 @@ begin
 			if ENABLE = '1' and DOT_CLK_CE = '1' then
 				if HVIRQ_EN = "01" and H_CNT = unsigned(HTIME) + 2 then											--H-IRQ:  every scanline, H=HTIME+~3.5
 					IRQ_VALID := '1';
-				elsif HVIRQ_EN = "10" and H_CNT = 2 and V_CNT = unsigned(VTIME) then							--V-IRQ:  V=VTIME, H=~2.5
+				elsif HVIRQ_EN = "10" and V_CNT = unsigned(VTIME) then							--V-IRQ:  V=VTIME, H=~2.5
 					IRQ_VALID := '1';
 				elsif HVIRQ_EN = "11" and H_CNT = unsigned(HTIME) + 2 and V_CNT = unsigned(VTIME) then	--HV-IRQ: V=VTIME, H=HTIME+~3.5
 					IRQ_VALID := '1';
@@ -803,7 +808,6 @@ begin
 			
 			HDMA_INIT_EXEC <= '1';
 			HDMA_RUN_EXEC <= '0';
-			HBLANKrr <= '0';
 		elsif rising_edge(CLK) then
 			if P65_R_WN = '0' and IO_SEL = '1' then
 				if P65_A(15 downto 8) = x"42" then
@@ -885,33 +889,29 @@ begin
 				end if;
 				
 				--HDMA
-				HBLANKrr <= HBLANK;
-				HDMA_RUN_EXEC <= '0';
-				if HBLANK = '1' and HBLANKrr = '0' and VBLANK = '0' then
-					HDMA_RUN_EXEC <= '1';
-				end if;
-				
-				HDMA_INIT_EXEC <= '0';
-				if VBLANK = '0' and VBLANKrr = '1' then
-					HDMA_INIT_EXEC <= '1';
-				end if;
-			
 				case HDS is
 					when HDS_IDLE =>
-						if HDMA_INIT_EXEC = '1' then
+						if H_CNT >= 4 and V_CNT = 0 and HDMA_INIT_EXEC = '0' then
 							HDMA_CH_RUN <= (others => '1');
 							HDMA_CH_DO <= (others => '0'); 
 							if HDMAEN /= x"00" then
 								HDMA_RUN <= '1';
 								HDS <= HDS_PRE_INIT;
 							end if;
+							HDMA_INIT_EXEC <= '1';
+						elsif V_CNT /= 0 and HDMA_INIT_EXEC = '1' then
+							HDMA_INIT_EXEC <= '0';
 						end if;
 						
-						if HDMA_RUN_EXEC = '1' then
+						if H_CNT >= 275 and VBLANK = '0' and HDMA_RUN_EXEC = '0' then
 							if (HDMA_CH_RUN and HDMAEN) /= x"00" then
 								HDMA_RUN <= '1';
 								HDS <= HDS_PRE_TRANSFER;
+								DBG_HDMA_CNT <= (others => '0'); 
 							end if;
+							HDMA_RUN_EXEC <= '1';
+						elsif H_CNT < 275 and HDMA_RUN_EXEC = '1' then
+							HDMA_RUN_EXEC <= '0';
 						end if;
 
 					when HDS_PRE_INIT =>
@@ -959,6 +959,7 @@ begin
 								HDS <= HDS_IDLE;
 							end if;
 						end if;	
+						DBG_HDMA_CNT <= DBG_HDMA_CNT + 1; 
 				
 					when HDS_INIT_IND =>
 						DAS(HCH) <= DI & DAS(HCH)(15 downto 8);
@@ -973,6 +974,7 @@ begin
 								HDS <= HDS_INIT;
 							end if;
 						end if;
+						DBG_HDMA_CNT <= DBG_HDMA_CNT + 1; 
 						
 					when HDS_PRE_TRANSFER =>
 						for i in 0 to 7 loop
@@ -991,6 +993,7 @@ begin
 							HDMA_CH_WORK <= HDMA_CH_RUN and HDMAEN;
 							HDS <= HDS_INIT;
 						end if;
+						DBG_HDMA_CNT <= DBG_HDMA_CNT + 1; 
 						
 					when HDS_TRANSFER =>
 						HDMA_TRMODE_STEP <= HDMA_TRMODE_STEP + 1;
@@ -1009,6 +1012,7 @@ begin
 								HDS <= HDS_INIT;
 							end if;
 						end if;
+						DBG_HDMA_CNT <= DBG_HDMA_CNT + 1; 
 						
 					when others => null;
 				end case;
@@ -1205,6 +1209,7 @@ begin
 					when x"1F" => DBG_DAT <= std_logic_vector(FRAME_CNT(7 downto 0));
 					when x"20" => DBG_DAT <= std_logic_vector(FRAME_CNT(15 downto 8));
 					when x"21" => DBG_DAT <= ENABLE & CPU_ACTIVEr & DMA_ACTIVEr & P65_RDY & REFRESHED & DMA_RUN & HDMA_RUN & P65_EN;
+					when x"22" => DBG_DAT <= std_logic_vector(DBG_HDMA_CNT);
 					when others => DBG_DAT <= x"00";
 				end case;
 			else

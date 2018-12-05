@@ -448,10 +448,10 @@ begin
 				PBR when MC.OUT_BUS = "110" and MC.BYTE_SEL(1) = '0' else
 				x"00";
 		
-	process(MC, IsResetInterrupt, EN)
+	process(MC, IsResetInterrupt)
 	begin
 		WE <= '1';
-		if MC.OUT_BUS /= "000" and IsResetInterrupt = '0' then-- and EN = '1'
+		if MC.OUT_BUS /= "000" and IsResetInterrupt = '0' then
 			WE <= '0';
 		end if;
 	end process;
@@ -655,7 +655,6 @@ begin
 					end if;
 				elsif DBG_CTRL(2) = '1' then		--opcode address break
 					if LAST_CYCLE = '1' and DBG_BRK_ADDR(15 downto 0) = DBG_NEXT_PC and DBG_BRK_ADDR(23 downto 16) = PBR then
---					if STATE = "0000" and DBG_BRK_ADDR(15 downto 0) = PC and DBG_BRK_ADDR(23 downto 16) = PBR then
 						BRK_OUT <= '1';
 					end if;
 				elsif DBG_CTRL(3) = '1' then		--read/write address break

@@ -68,7 +68,7 @@ signal DOT_CLK : std_logic := '0';
 signal DOT_CLKR_CE : std_logic;
 signal CLK_CNT : unsigned(2 downto 0) := (others => '0');
 signal MDR1, MDR2	: std_logic_vector(7 downto 0);
-signal D_OUT1, D_OUT2	: std_logic_vector(7 downto 0);
+signal D_OUT : std_logic_vector(7 downto 0);
 
 -- Registers
 signal FORCE_BLANK : std_logic;
@@ -110,9 +110,6 @@ signal M7HOFS: std_logic_vector(12 downto 0);
 signal M7VOFS: std_logic_vector(12 downto 0);
 signal M7X: std_logic_vector(12 downto 0);
 signal M7Y: std_logic_vector(12 downto 0);
-signal MPYL: std_logic_vector(7 downto 0);
-signal MPYM: std_logic_vector(7 downto 0);
-signal MPYH: std_logic_vector(7 downto 0);
 
 signal WH0 : std_logic_vector(7 downto 0);
 signal WH1 : std_logic_vector(7 downto 0);
@@ -187,7 +184,7 @@ signal BG2_PIX_DATA : std_logic_vector(7 downto 0);
 signal BG3_PIX_DATA, BG4_PIX_DATA : std_logic_vector(5 downto 0);
 
 signal M7_TEMP_X, M7_TEMP_Y : signed(23 downto 0);
-signal MPY, MPY2 : signed(23 downto 0);
+signal MPY : signed(23 downto 0);
 signal M7_TILE_N : unsigned(7 downto 0);
 signal M7_TILE_ROW, M7_TILE_COL : unsigned(2 downto 0);
 signal M7_TILE_OUTSIDE : std_logic;
@@ -700,86 +697,73 @@ begin
 		MDR1 <= (others => '1');
 		MDR2 <= (others => '1');
 	elsif rising_edge(CLK) then
-		MDR1 <= D_OUT1;
-		MDR2 <= D_OUT2;
+		if PARD_N = '0' then
+			if PA = x"34" or PA = x"35" or PA = x"36" or PA = x"38" or PA = x"39" or PA = x"3A" or PA = x"3E" then
+				MDR1 <= D_OUT;
+			end if;
+			if PA = x"3B" or PA = x"3C" or PA = x"3D" or PA = x"3F" then
+				MDR2 <= D_OUT;
+			end if;
+		end if;
 	end if;
 end process;
 
-process( PARD_N, PA, MPY, OAM_ADDR, OAM_Q_A, HOAM_Q_A, VRAMDATA_Prefetch,
-         OBJ_TIME_OFL, OBJ_RANGE_OFL, MDR1)
-begin 
-	D_OUT1 <= MDR1;
---	if PARD_N = '0' then
-		case PA is
-			when x"34" =>						--MPYL
-				D_OUT1 <= std_logic_vector(MPY(7 downto 0));
-			when x"35" =>						--MPYM
-				D_OUT1 <= std_logic_vector(MPY(15 downto 8));
-			when x"36" =>						--MPYH
-				D_OUT1 <= std_logic_vector(MPY(23 downto 16));
-			when x"38" =>						--RDOAM
-				if OAM_ADDR(9) = '0' then
-					if OAM_ADDR(0) = '0' then
-						D_OUT1 <= OAM_Q_A(7 downto 0);
-					else
-						D_OUT1 <= OAM_Q_A(15 downto 8);
-					end if;
-				else
-					D_OUT1 <= HOAM_Q_A;
-				end if;
-			when x"39" =>						--RDVRAML
-				D_OUT1 <= VRAMDATA_Prefetch(7 downto 0);
-			when x"3A" =>						--RDVRAMH
-				D_OUT1 <= VRAMDATA_Prefetch(15 downto 8);
-			when x"3E" =>						--STAT77
-				D_OUT1 <= OBJ_TIME_OFL & OBJ_RANGE_OFL & "0" & MDR1(4) & x"1";
-			when others =>
-				D_OUT1 <= MDR1;
-		end case;
---	end if;
-end process;
-
-process( PARD_N, PA, CGADD, CRAM_IO_Q, OPHCT_latch, OPHCT, OPVCT_latch, OPVCT, 
-         FIELD, F_LATCH, EXTLATCH, PAL, MDR2)
-begin 
-	D_OUT2 <= MDR2;
---	if PARD_N = '0' then
-		case PA is
-			when x"3B" =>						--RDCGRAM
-				if CGADD(0) = '0' then
-					D_OUT2 <= CRAM_IO_Q(7 downto 0);
-				else
-					D_OUT2 <= MDR2(7) & CRAM_IO_Q(14 downto 8);
-				end if;
-			when x"3C" =>						--OPHCT
-				if OPHCT_latch = '0' then
-					D_OUT2 <= OPHCT(7 downto 0);
-				else
-					D_OUT2 <= MDR2(7 downto 1) & OPHCT(8);
-				end if;
-			when x"3D" =>						--OPVCT
-				if OPVCT_latch = '0' then
-					D_OUT2 <= OPVCT(7 downto 0);
-				else
-					D_OUT2 <= MDR2(7 downto 1) & OPVCT(8);
-				end if;
-			when x"3F" =>						--STAT78
-				D_OUT2 <= FIELD & ((not EXTLATCH) or F_LATCH) & MDR2(5) & PAL & x"3";
-			when others =>
-				D_OUT2 <= MDR2;
-		end case;
---	end if;
-end process;
-
-process( PA, D_OUT1, D_OUT2)
+process( PA, MPY, OAM_ADDR, OAM_Q_A, HOAM_Q_A, VRAMDATA_Prefetch, OBJ_TIME_OFL, OBJ_RANGE_OFL, 
+			CGADD, CRAM_IO_Q, OPHCT_latch, OPHCT, OPVCT_latch, OPVCT, FIELD, F_LATCH, EXTLATCH, PAL, MDR1, MDR2, DI)
 begin 
 	case PA is
-		when x"3B" | x"3C" | x"3D" | x"3F" =>
-			DO <= D_OUT2;
+		when x"04" | x"05" | x"06" | x"08" | x"09" | x"0A" | 
+			  x"14" | x"15" | x"16" | x"18" | x"19" | x"1A" | 
+			  x"24" | x"25" | x"26" | x"28" | x"29" =>	
+			D_OUT <= MDR1;
+		when x"34" =>						--MPYL
+			D_OUT <= std_logic_vector(MPY(7 downto 0));
+		when x"35" =>						--MPYM
+			D_OUT <= std_logic_vector(MPY(15 downto 8));
+		when x"36" =>						--MPYH
+			D_OUT <= std_logic_vector(MPY(23 downto 16));
+		when x"38" =>						--RDOAM
+			if OAM_ADDR(9) = '0' then
+				if OAM_ADDR(0) = '0' then
+					D_OUT <= OAM_Q_A(7 downto 0);
+				else
+					D_OUT <= OAM_Q_A(15 downto 8);
+				end if;
+			else
+				D_OUT <= HOAM_Q_A;
+			end if;
+		when x"39" =>						--RDVRAML
+			D_OUT <= VRAMDATA_Prefetch(7 downto 0);
+		when x"3A" =>						--RDVRAMH
+			D_OUT <= VRAMDATA_Prefetch(15 downto 8);
+		when x"3E" =>						--STAT77
+			D_OUT <= OBJ_TIME_OFL & OBJ_RANGE_OFL & "0" & MDR1(4) & x"1";
+		when x"3B" =>						--RDCGRAM
+			if CGADD(0) = '0' then
+				D_OUT <= CRAM_IO_Q(7 downto 0);
+			else
+				D_OUT <= MDR2(7) & CRAM_IO_Q(14 downto 8);
+			end if;
+		when x"3C" =>						--OPHCT
+			if OPHCT_latch = '0' then
+				D_OUT <= OPHCT(7 downto 0);
+			else
+				D_OUT <= MDR2(7 downto 1) & OPHCT(8);
+			end if;
+		when x"3D" =>						--OPVCT
+			if OPVCT_latch = '0' then
+				D_OUT <= OPVCT(7 downto 0);
+			else
+				D_OUT <= MDR2(7 downto 1) & OPVCT(8);
+			end if;
+		when x"3F" =>						--STAT78
+			D_OUT <= FIELD & ((not EXTLATCH) or F_LATCH) & MDR2(5) & PAL & x"3";
 		when others =>
-			DO <= D_OUT1;
+			D_OUT <= DI;
 	end case;
 end process;
+
+DO <= D_OUT;
 
 				 
 VMADD_TRANS <= VMADD(15 downto  8) & VMADD(4 downto 0) & VMADD(7 downto 5) when VMAIN_ADDRTRANS = "01" else 
@@ -947,7 +931,7 @@ BF <= BF_TBL(to_integer(unsigned(BG_MODE)), to_integer(H_CNT(2 downto 0)));
 
 process( RST_N, CLK, BF, BG_MODE, BG_SIZE, BG_SC_ADDR, BG_SC_SIZE, BG_NBA, BG_HOFS, BG_VOFS, H_CNT, V_CNT, IN_VBL, FORCE_BLANK,
 			BG_DATA, BG_TILE_INFO, BG3_OPT_DATA0, BG3_OPT_DATA1, BG_MOSAIC_Y, BG_MOSAIC_EN, FIELD, HIRES, BGINTERLACE, VRAM_DAI,
-			M7_TILE_N, M7_TILE_COL, M7_TILE_ROW, M7_TEMP_X, M7_TEMP_Y, MPY, MPY2, M7SEL, M7HOFS, M7VOFS, M7X, M7Y, M7A, M7B, M7C, M7D)
+			M7_TILE_N, M7_TILE_COL, M7_TILE_ROW, M7SEL, M7HOFS, M7VOFS, M7X, M7Y, M7A, M7B, M7C, M7D)
 variable SCREEN_X : unsigned(8 downto 0);
 variable SCREEN_Y : unsigned(7 downto 0);
 variable OPTH_EN, OPTV_EN : std_logic;
@@ -1154,28 +1138,19 @@ begin
 		M7_SCREEN_Y := signed(resize(not SCREEN_Y, 9));
 	end if;
 				
-	if FORCE_BLANK = '0' and IN_VBL = '0' and BG_MODE = "111" then
-		case H_CNT is
-			when "101010001" =>	-- H = -3 (337)
-				MPY <= resize(signed(M7A) * signed(ORG_X), MPY'length);
-				MPY2 <= resize(signed(M7C) * signed(ORG_X), MPY'length);
-			when "101010010" =>	-- H = -2 (338)
-				MPY <= resize(signed(M7B) * signed(ORG_Y), MPY'length);
-				MPY2 <= resize(signed(M7D) * signed(ORG_Y), MPY'length);
-			when "101010011" =>	-- H = -1 (339)
-				MPY <= resize(signed(M7B) * M7_SCREEN_Y, MPY'length);
-				MPY2 <= resize(signed(M7D) * M7_SCREEN_Y, MPY'length);
-			when others =>	-- H = 0-336
-				MPY <= resize(signed(M7A) * M7_SCREEN_X, MPY'length);
-				MPY2 <= resize(signed(M7C) * M7_SCREEN_X, MPY'length);
-		end case;
-	else
-		MPY <= resize(signed(M7A) * signed(M7B(15 downto 8)), MPY'length);
-		MPY2 <= resize(signed(M7A) * signed(M7B(15 downto 8)), MPY'length);
-	end if;
+	MPY <= resize(signed(M7A) * signed(M7B(15 downto 8)), MPY'length);
 	
-	M7_VRAM_X := M7_TEMP_X + MPY;
-	M7_VRAM_Y := M7_TEMP_Y + MPY2;
+	M7_VRAM_X := (resize(signed(M7X), M7_VRAM_X'length) sll 8) + 
+					 (resize(signed(M7A) * signed(ORG_X), M7_VRAM_X'length) and x"FFFFC0") + 
+					 (resize(signed(M7B) * signed(ORG_Y), M7_VRAM_X'length) and x"FFFFC0") + 
+					 (resize(signed(M7B) * M7_SCREEN_Y, M7_VRAM_X'length) and x"FFFFC0") + 
+					 resize(signed(M7A) * M7_SCREEN_X, M7_VRAM_X'length);
+	M7_VRAM_Y := (resize(signed(M7Y), M7_VRAM_Y'length) sll 8) + 
+					 (resize(signed(M7C) * signed(ORG_X), M7_VRAM_Y'length) and x"FFFFC0") + 
+					 (resize(signed(M7D) * signed(ORG_Y), M7_VRAM_Y'length) and x"FFFFC0") + 
+					 (resize(signed(M7D) * M7_SCREEN_Y, M7_VRAM_Y'length) and x"FFFFC0") + 
+					 resize(signed(M7C) * M7_SCREEN_X, M7_VRAM_Y'length);
+					 
 	if M7_VRAM_X(23 downto 18) = "000000" and M7_VRAM_Y(23 downto 18) = "000000" then
 		M7_IS_OUTSIDE := '0';
 	else
@@ -1226,9 +1201,6 @@ begin
 		BG3_OPT_DATA0 <= (others => '0');
 		BG3_OPT_DATA1 <= (others => '0');
 		BG_MOSAIC_Y <= (others => '0');
-		
-		M7_TEMP_X <= (others => '0');
-		M7_TEMP_Y <= (others => '0');
 	elsif rising_edge(CLK) then 
 		if ENABLE = '1' and DOT_CLKR_CE = '1' then
 			if H_CNT = 339 and V_CNT <= LAST_VIS_LINE then
@@ -1244,19 +1216,6 @@ begin
 			if H_CNT = 339 and V_CNT = 261 then
 				BG_MOSAIC_Y <= (others => '0');
 			end if;
-			
-			case H_CNT is
-				when "101010001" =>	-- H = -3 (337)
-					M7_TEMP_X <= (resize(signed(M7X), M7_TEMP_X'length) sll 8) + signed(MPY(23 downto 6) & "000000");
-					M7_TEMP_Y <= (resize(signed(M7Y), M7_TEMP_Y'length) sll 8) + signed(MPY2(23 downto 6) & "000000");
-				when "101010010" =>	-- H = -2 (338)
-					M7_TEMP_X <= M7_TEMP_X + signed(MPY(23 downto 6) & "000000");
-					M7_TEMP_Y <= M7_TEMP_Y + signed(MPY2(23 downto 6) & "000000");
-				when "101010011" =>	-- H = -1 (339)
-					M7_TEMP_X <= M7_TEMP_X + signed(MPY(23 downto 6) & "000000");
-					M7_TEMP_Y <= M7_TEMP_Y + signed(MPY2(23 downto 6) & "000000");
-				when others => null;
-			end case;
 			
 			if BG_VRAM_FETCH = '1' and FORCE_BLANK = '0' then
 				if BG_MODE /= "111" then 
@@ -2248,7 +2207,7 @@ begin
 		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and MOBJPR2EN = '1' then
 			CRAM_MAIN_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
-		elsif BG2_PIX_DATA(6 downto 0) /= "0000000" and MBGPR1EN(1) = '1' then
+		elsif BG2_PIX_DATA(6 downto 0) /= "0000000" and MBGPR1EN(1) = '1' and M7EXTBG = '1' then
 			CRAM_MAIN_ADDR <= "0" & BG2_PIX_DATA(6 downto 0);
 		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and MOBJPR1EN = '1' then
 			CRAM_MAIN_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
@@ -2260,7 +2219,7 @@ begin
 		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and MOBJPR0EN = '1' then
 			CRAM_MAIN_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
-		elsif BG2_PIX_DATA(6 downto 0) /= "0000000" and MBGPR0EN(1) = '1' then
+		elsif BG2_PIX_DATA(6 downto 0) /= "0000000" and MBGPR0EN(1) = '1' and M7EXTBG = '1' then
 			CRAM_MAIN_ADDR <= "0" & BG2_PIX_DATA(6 downto 0);
 		else
 			CRAM_MAIN_ADDR <= (others => '0');
@@ -2314,7 +2273,7 @@ begin
 					SUB_COLOR := CRAM_SUB_Q ;
 				end if;
 				
-				HALF := CGADSUB(6) and MAIN_EN and ((not CGWSEL(1)) or (not SUB_BD));
+				HALF := CGADSUB(6) and MAIN_EN and not (SUB_BD and CGWSEL(1));
 				if CGWSEL(1) = '1' then
 					MATH_R := AddSub(unsigned(MAIN_COLOR(4 downto 0)),unsigned(SUB_COLOR(4 downto 0)),not CGADSUB(7),HALF);
 					MATH_G := AddSub(unsigned(MAIN_COLOR(9 downto 5)),unsigned(SUB_COLOR(9 downto 5)),not CGADSUB(7),HALF);

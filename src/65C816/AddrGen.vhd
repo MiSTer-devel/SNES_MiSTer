@@ -89,6 +89,7 @@ begin
 		
 		if RST_N = '0' then
 			PCr <= (others=>'0');
+			PCOffset <= (others=>'0');
 		elsif rising_edge(CLK) then
 			if EN = '1' then
 				PCOffset <= unsigned(D_IN & DR);
@@ -160,9 +161,17 @@ begin
 	NewDL <= std_logic_vector(unsigned("0" & InnerDS(7 downto 0)) + unsigned("0" & D_IN));
 	NewAAHWithCarry <= std_logic_vector(unsigned(NewAAH) + ("00000000"&SavedCarry));
 	
-	process(CLK)
+	process(CLK, RST_N)
 	begin
-		if rising_edge(CLK) then
+		if RST_N = '0' then
+			AAL <= (others=>'0');
+			AAH <= (others=>'0');
+			AB <= (others=>'0');
+			DL <= (others=>'0');
+			DH <= (others=>'0');
+			AAHCarry <= '0';
+			SavedCarry <= '0';
+		elsif rising_edge(CLK) then
 			if EN = '1' then
 				case AALCtrl is
 					when "000" => 

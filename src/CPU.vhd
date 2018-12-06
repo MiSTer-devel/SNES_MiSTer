@@ -111,7 +111,7 @@ architecture rtl of SCPU is
 	signal RDDIV, RDMPY : std_logic_vector(15 downto 0);
 
 	signal IRQ_FLAG_RST, IRQ_FLAG_RSTr : std_logic;
-	signal NMI_FLAG, IRQ_FLAG : std_logic;
+	signal NMI_FLAG, IRQ_FLAG, NMI_LINE : std_logic;
 	signal MUL_REQ, DIV_REQ : std_logic;
 	signal REFRESHED : std_logic;
 	signal MUL_CNT	: unsigned(3 downto 0);
@@ -474,6 +474,7 @@ begin
 			VTIME <= (others => '1');
 
 			NMI_FLAG <= '0'; 
+			NMI_LINE <= '0';
 			VBLANKrr <= '0';
 			IRQ_FLAG_RST <= '0';
 			
@@ -492,6 +493,12 @@ begin
 					NMI_FLAG <= '0';
 				elsif P65_R_WN = '1' and P65_A(15 downto 0) = x"4210" and IO_SEL = '1' then
 					NMI_FLAG <= '0'; 
+				end if;
+				
+				if NMI_FLAG = '1' and DMA_ACTIVE = '0' then
+					NMI_LINE <= '1';
+				elsif NMI_FLAG = '0' then
+					NMI_LINE <= '0';
 				end if;
 
 				if MUL_REQ = '1' then
@@ -752,7 +759,7 @@ begin
 		end if;
 	end process; 
 
-	P65_NMI_N <= not (NMI_EN and NMI_FLAG);
+	P65_NMI_N <= not (NMI_EN and NMI_LINE);
 	P65_IRQ_N <= not IRQ_FLAG and IRQ_N; 
 
 
@@ -856,7 +863,6 @@ begin
 					case DS is
 						when DS_IDLE =>
 							if MDMAEN /= x"00" then
-								DMA_RUN <= '1';
 								DS <= DS_CH_SEL;
 							end if;
 						
@@ -864,6 +870,7 @@ begin
 							if MDMAEN /= x"00" then
 								DAS(DCH) <= std_logic_vector(unsigned(DAS(DCH)) - 1);
 								DMA_TRMODE_STEP <= (others => '0');
+								DMA_RUN <= '1';
 								DS <= DS_TRANSFER;
 							else
 								DMA_RUN <= '0';

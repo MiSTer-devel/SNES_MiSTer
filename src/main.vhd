@@ -179,9 +179,8 @@ begin
 	HBLANK <= not HBLANKn;
 	VBLANK <= not VBLANKn;
 
-	SMAP : entity work.LHRomMap
+	SMAP : entity work.DSP_LHRomMap
 	--SMAP : entity work.SDD1Map
-	--SMAP : entity work.DSPMap
 	--SMAP : entity work.CX4Map
 	port map(
 		MCLK50		=> MCLK_50M,
@@ -222,7 +221,7 @@ begin
 		MAP_CTRL		=> ROM_TYPE,
 		ROM_MASK		=> ROM_MASK,
 		BSRAM_MASK	=> RAM_MASK,
-		
+
 		DBG_REG  	=> (others =>'0'),
 		DBG_DAT_IN	=> (others =>'0'),
 		DBG_DAT_WR	=> '0'

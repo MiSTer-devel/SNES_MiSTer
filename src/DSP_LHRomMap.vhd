@@ -6,7 +6,7 @@ use IEEE.NUMERIC_STD.ALL;
 use IEEE.STD_LOGIC_UNSIGNED.ALL;
 use IEEE.STD_LOGIC_TEXTIO.all;
 
-entity LHRomMap is
+entity DSP_LHRomMap is
 	port(
 		MCLK50		: in std_logic;
 		MCLK			: in std_logic;
@@ -46,23 +46,40 @@ entity LHRomMap is
 		MAP_CTRL		: in std_logic_vector(7 downto 0);
 		ROM_MASK		: in std_logic_vector(23 downto 0);
 		BSRAM_MASK	: in std_logic_vector(23 downto 0);
-	
+		
 		BRK_OUT		: out std_logic;
 		DBG_REG		: in std_logic_vector(7 downto 0);
 		DBG_DAT_IN	: in std_logic_vector(7 downto 0);
 		DBG_DAT_OUT	: out std_logic_vector(7 downto 0);
 		DBG_DAT_WR	: in std_logic
 	);
-end LHRomMap;
+end DSP_LHRomMap;
 
-architecture rtl of LHRomMap is
+architecture rtl of DSP_LHRomMap is
 
+	signal DSP_CLK	: std_logic;
 	signal CART_ADDR 	: std_logic_vector(22 downto 0);
-	signal BRAM_ADDR  : std_logic_vector(19 downto 0);
+	signal BRAM_ADDR : std_logic_vector(19 downto 0);
 	signal BSRAM_SEL 	: std_logic;
+	signal DSP_SEL	: std_logic;
+	
+	signal SRAM1_DO, SRAM2_DO : std_logic_vector(7 downto 0);
+	signal DSP_DO : std_logic_vector(7 downto 0);
+	signal DSP_A0	: std_logic;
+	signal DSP_CS_N : std_logic;
+	signal DSP_CE	: std_logic;
 
 begin
 	
+	CEGen : entity work.CEGen
+	port map(
+		CLK     => MCLK,
+		RST_N   => RST_N,
+		IN_CLK  => 2147727,
+		OUT_CLK =>  760000,
+		CE      => DSP_CE
+	);
+
 	process( CA, MAP_CTRL, ROMSEL_N, RAMSEL_N, BSRAM_MASK )
 	begin
 		case MAP_CTRL(3 downto 0) is
@@ -74,6 +91,12 @@ begin
 				else
 					BSRAM_SEL <= '0';
 				end if;
+				if CA(22 downto 21) = "01" and CA(15) = '1' then	--20-3F/a0-bf:8000-FFFF
+					DSP_SEL <= MAP_CTRL(7);
+				else
+					DSP_SEL <= '0';
+				end if;
+				DSP_A0 <= CA(14);
 			when x"1" =>							-- HiROM
 				CART_ADDR <= "0" & CA(21 downto 0);
 				BRAM_ADDR <= "00" & CA(20 downto 16) & CA(12 downto 0);
@@ -82,6 +105,12 @@ begin
 				else
 					BSRAM_SEL <= '0';
 				end if;
+				if CA(22 downto 21) = "00" and CA(15 downto 13) = "011" then	--00-1F/80-9f:6000-7FFF
+					DSP_SEL <= MAP_CTRL(7);
+				else
+					DSP_SEL <= '0';
+				end if;
+				DSP_A0 <= CA(12);
 			when x"5" =>							-- ExHiROM
 				CART_ADDR <= (not CA(23)) & CA(21 downto 0);
 				BRAM_ADDR <= CA(19 downto 0);
@@ -90,28 +119,55 @@ begin
 				else
 					BSRAM_SEL <= '0';
 				end if;
+				DSP_SEL <= '0';
+				DSP_A0 <= '1';
 			when others =>
-				CART_ADDR <= (not CA(23)) & CA(21 downto 0);
+				CART_ADDR <= (not CA(23) and not MAP_CTRL(7)) & CA(21 downto 0);
 				BRAM_ADDR <= CA(19 downto 0);
 				BSRAM_SEL <= '0';
+				DSP_SEL <= '0';
+				DSP_A0 <= '1';
 		end case;
 	end process;
+	
+	DSP_CS_N <= not DSP_SEL;
+	
+	DSPn : entity work.DSPn
+	port map(
+		CLK			=> MCLK,
+		CE				=> DSP_CE,
+		RST_N			=> RST_N,
+		ENABLE		=> ENABLE,
+		A0				=> DSP_A0,
+		DI				=> DI,
+		DO				=> DSP_DO,
+		CS_N			=> DSP_CS_N,
+		RD_N			=> CPURD_N,
+		WR_N			=> CPUWR_N,
+		
+		VER			=> MAP_CTRL(5 downto 4),
+		
+		BRK_OUT		=> BRK_OUT,
+		DBG_REG  	=> DBG_REG,
+		DBG_DAT_IN	=> DBG_DAT_IN,
+		DBG_DAT_OUT	=> DBG_DAT_OUT,
+		DBG_DAT_WR	=> DBG_DAT_WR
+	);
 
 	ROM_ADDR <= CART_ADDR(22 downto 0) and ROM_MASK(22 downto 0);
 	ROM_CE_N <= ROMSEL_N;
 	ROM_OE_N <= CPURD_N;
-
+	
 	BSRAM_ADDR <= BRAM_ADDR and BSRAM_MASK(19 downto 0);
 	BSRAM_CE_N <= not BSRAM_SEL;
 	BSRAM_OE_N <= CPURD_N;
 	BSRAM_WE_N <= CPUWR_N;
 	BSRAM_D <= DI;
-
-	DO <= BSRAM_Q when BSRAM_SEL = '1' else ROM_Q;
+	
+	DO <= DSP_DO when DSP_SEL = '1' else
+			BSRAM_Q when BSRAM_SEL = '1' else
+			ROM_Q;
 
 	IRQ_N <= '1';
 
-	BRK_OUT <= '0';
-	DBG_DAT_OUT <= (others => '0');
-	
 end rtl;

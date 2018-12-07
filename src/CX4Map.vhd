@@ -71,11 +71,11 @@ architecture rtl of CX4Map is
 
 begin
 	
-	pll : entity work.cx4pll
-	port map(
-		inclk0	=> CLK100,
-		c0			=> CX4_CLK
-	);
+--	pll : entity work.cx4pll
+--	port map(
+--		inclk0	=> CLK100,
+--		c0			=> CX4_CLK
+--	);
 
 	CX4 : entity work.CX4
 	port map(

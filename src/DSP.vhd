@@ -183,33 +183,24 @@ architecture rtl of DSP is
 	signal SAMPLE_CNT: unsigned(23 downto 0);
 	signal SF_DBG: signed(16 downto 0);
 -- synthesis translate_on 
+
+	signal MCLK_FREQ : integer;
+
 begin
 	
 	SMP_EN <= SMP_EN_INT;
 	SMP_CE <= CE;
 	
-	process( RST_N, CLK )
-		variable CLK_SUM : unsigned(23 downto 0);
-		variable MCLK_FREQ : unsigned(23 downto 0);
-	begin
-		if RST_N = '0' then
-			CLK_SUM := (others => '0');
-		elsif falling_edge(CLK) then
-			CE <= '0';
-			if ENABLE = '1' then
-				if PAL = '1' then
-					MCLK_FREQ := MCLK_PAL_FREQ;
-				else
-					MCLK_FREQ := MCLK_NTSC_FREQ;
-				end if;
-				CLK_SUM := CLK_SUM + ACLK_FREQ;
-				if CLK_SUM >= MCLK_FREQ then
-					CLK_SUM := CLK_SUM - MCLK_FREQ;
-					CE <= '1';
-				end if;
-			end if;
-		end if;
-	end process;
+	MCLK_FREQ <= MCLK_PAL_FREQ when PAL = '1' else MCLK_NTSC_FREQ;
+	
+	CEGen : entity work.CEGen
+	port map(
+		CLK      => CLK,
+		RST_N    => RST_N and ENABLE,
+		IN_CLK   => MCLK_FREQ,
+		OUT_CLK  => ACLK_FREQ,
+		CE       => CE
+	);
 
 	process( RST_N, CLK )
 	begin

@@ -5,9 +5,9 @@ use ieee.numeric_std.all;
 
 package DSP_PKG is  
 
-	constant MCLK_NTSC_FREQ : unsigned(23 downto 0) := x"20C58F"; -- 21.47727
-	constant MCLK_PAL_FREQ  : unsigned(23 downto 0) := x"207909"; -- 21.28137
-	constant ACLK_FREQ      : unsigned(23 downto 0) := x"064190"; --  4.1 (originally 4.096)
+	constant MCLK_NTSC_FREQ : integer := 2147727;
+	constant MCLK_PAL_FREQ  : integer := 2128137;
+	constant ACLK_FREQ      : integer :=  410000; --(originally 409600)
 
 	constant V0VOLL: std_logic_vector(7 downto 0) := x"00"; 
 	constant V1VOLL: std_logic_vector(7 downto 0) := x"10"; 

@@ -8,7 +8,6 @@ use IEEE.STD_LOGIC_TEXTIO.all;
 
 entity main is
 	port(
-		MCLK_50M		: in  std_logic;
 		RESET_N		: in  std_logic;
 
 		MCLK			: in  std_logic;
@@ -97,6 +96,17 @@ architecture rtl of main is
 
 	signal RGB_OUT : std_logic_vector(14 downto 0);
 
+	signal DLH_DO				: std_logic_vector(7 downto 0);
+	signal DLH_IRQ_N			: std_logic;
+	signal DLH_ROM_ADDR		: std_logic_vector(22 downto 0);
+	signal DLH_ROM_CE_N		: std_logic;
+	signal DLH_ROM_OE_N		: std_logic;
+	signal DLH_BSRAM_ADDR	: std_logic_vector(19 downto 0);
+	signal DLH_BSRAM_D		: std_logic_vector(7 downto 0);
+	signal DLH_BSRAM_CE_N	: std_logic;
+	signal DLH_BSRAM_OE_N	: std_logic;
+	signal DLH_BSRAM_WE_N	: std_logic;
+
 begin
 
 	SNES : entity work.SNES
@@ -176,6 +186,9 @@ begin
 		AUDIO_R		=> AUDIO_R
 	);
 
+	R <= RGB_OUT(4 downto 0);
+	G <= RGB_OUT(9 downto 5);
+	B <= RGB_OUT(14 downto 10);
 	HBLANK <= not HBLANKn;
 	VBLANK <= not VBLANKn;
 
@@ -183,14 +196,12 @@ begin
 	--SMAP : entity work.SDD1Map
 	--SMAP : entity work.CX4Map
 	port map(
-		MCLK50		=> MCLK_50M,
 		MCLK			=> MCLK,
 		RST_N			=> RESET_N,
-		ENABLE		=> '1',
 		
 		CA				=> CA,
 		DI				=> DO,
-		DO				=> DI,
+		DO				=> DLH_DO,
 		CPURD_N		=> CPURD_N,
 		CPUWR_N		=> CPUWR_N,
 		
@@ -204,31 +215,34 @@ begin
 		SYSCLK		=> SYSCLK,
 		REFRESH		=> REFRESH,
 
-		IRQ_N			=> IRQ_N,
+		IRQ_N			=> DLH_IRQ_N,
 		
-		ROM_ADDR		=> ROM_ADDR,
+		ROM_ADDR		=> DLH_ROM_ADDR,
 		ROM_Q			=> ROM_Q,
-		ROM_CE_N		=> ROM_CE_N,
-		ROM_OE_N		=> ROM_OE_N,
+		ROM_CE_N		=> DLH_ROM_CE_N,
+		ROM_OE_N		=> DLH_ROM_OE_N,
 
-		BSRAM_ADDR	=> BSRAM_ADDR,
-		BSRAM_D		=> BSRAM_D,
+		BSRAM_ADDR	=> DLH_BSRAM_ADDR,
+		BSRAM_D		=> DLH_BSRAM_D,
 		BSRAM_Q		=> BSRAM_Q,
-		BSRAM_CE_N	=> BSRAM_CE_N,
-		BSRAM_OE_N	=> BSRAM_OE_N,
-		BSRAM_WE_N	=> BSRAM_WE_N,
+		BSRAM_CE_N	=> DLH_BSRAM_CE_N,
+		BSRAM_OE_N	=> DLH_BSRAM_OE_N,
+		BSRAM_WE_N	=> DLH_BSRAM_WE_N,
 
 		MAP_CTRL		=> ROM_TYPE,
 		ROM_MASK		=> ROM_MASK,
-		BSRAM_MASK	=> RAM_MASK,
-
-		DBG_REG  	=> (others =>'0'),
-		DBG_DAT_IN	=> (others =>'0'),
-		DBG_DAT_WR	=> '0'
+		BSRAM_MASK	=> RAM_MASK
 	);
-
-	R <= RGB_OUT(4 downto 0);
-	G <= RGB_OUT(9 downto 5);
-	B <= RGB_OUT(14 downto 10);
 	
+	DI				<= DLH_DO;
+	IRQ_N			<= DLH_IRQ_N;
+	ROM_ADDR		<= DLH_ROM_ADDR;
+	ROM_CE_N		<= DLH_ROM_CE_N;
+	ROM_OE_N		<= DLH_ROM_OE_N;
+	BSRAM_ADDR	<= DLH_BSRAM_ADDR;
+	BSRAM_D		<= DLH_BSRAM_D;
+	BSRAM_CE_N	<= DLH_BSRAM_CE_N;
+	BSRAM_OE_N	<= DLH_BSRAM_OE_N;
+	BSRAM_WE_N	<= DLH_BSRAM_WE_N;
+
 end rtl;

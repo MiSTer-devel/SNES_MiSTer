@@ -8,11 +8,10 @@ use IEEE.STD_LOGIC_TEXTIO.all;
 
 entity DSP_LHRomMap is
 	port(
-		MCLK50		: in std_logic;
 		MCLK			: in std_logic;
 		RST_N			: in std_logic;
-		ENABLE		: in std_logic;
-		
+		ENABLE		: in std_logic := '1';
+
 		CA   			: in std_logic_vector(23 downto 0);
 		DI				: in std_logic_vector(7 downto 0);
 		DO				: out std_logic_vector(7 downto 0);
@@ -48,27 +47,27 @@ entity DSP_LHRomMap is
 		BSRAM_MASK	: in std_logic_vector(23 downto 0);
 		
 		BRK_OUT		: out std_logic;
-		DBG_REG		: in std_logic_vector(7 downto 0);
-		DBG_DAT_IN	: in std_logic_vector(7 downto 0);
+		DBG_REG		: in std_logic_vector(7 downto 0) := (others => '0');
+		DBG_DAT_IN	: in std_logic_vector(7 downto 0) := (others => '0');
 		DBG_DAT_OUT	: out std_logic_vector(7 downto 0);
-		DBG_DAT_WR	: in std_logic
+		DBG_DAT_WR	: in std_logic := '0'
 	);
 end DSP_LHRomMap;
 
 architecture rtl of DSP_LHRomMap is
 
-	signal DSP_CLK	: std_logic;
-	signal CART_ADDR 	: std_logic_vector(22 downto 0);
+	signal CART_ADDR : std_logic_vector(22 downto 0);
 	signal BRAM_ADDR : std_logic_vector(19 downto 0);
-	signal BSRAM_SEL 	: std_logic;
-	signal DSP_SEL	: std_logic;
-	
-	signal SRAM1_DO, SRAM2_DO : std_logic_vector(7 downto 0);
-	signal DSP_DO : std_logic_vector(7 downto 0);
-	signal DSP_A0	: std_logic;
-	signal DSP_CS_N : std_logic;
-	signal DSP_CE	: std_logic;
+	signal BSRAM_SEL : std_logic;
 
+	signal DSP_CLK	  : std_logic;
+	signal DSP_SEL	  : std_logic;
+	signal DSP_DO    : std_logic_vector(7 downto 0);
+	signal DSP_A0	  : std_logic;
+	signal DSP_CS_N  : std_logic;
+	signal DSP_CE	  : std_logic;
+
+	signal MAP_SEL	  : std_logic;
 begin
 	
 	CEGen : entity work.CEGen
@@ -130,13 +129,15 @@ begin
 		end case;
 	end process;
 	
+	MAP_SEL <= not MAP_CTRL(6);
+
 	DSP_CS_N <= not DSP_SEL;
 	
 	DSPn : entity work.DSPn
 	port map(
 		CLK			=> MCLK,
 		CE				=> DSP_CE,
-		RST_N			=> RST_N,
+		RST_N			=> RST_N and MAP_SEL,
 		ENABLE		=> ENABLE,
 		A0				=> DSP_A0,
 		DI				=> DI,
@@ -153,18 +154,19 @@ begin
 		DBG_DAT_OUT	=> DBG_DAT_OUT,
 		DBG_DAT_WR	=> DBG_DAT_WR
 	);
-
-	ROM_ADDR <= CART_ADDR(22 downto 0) and ROM_MASK(22 downto 0);
-	ROM_CE_N <= ROMSEL_N;
-	ROM_OE_N <= CPURD_N;
 	
-	BSRAM_ADDR <= BRAM_ADDR and BSRAM_MASK(19 downto 0);
-	BSRAM_CE_N <= not BSRAM_SEL;
-	BSRAM_OE_N <= CPURD_N;
-	BSRAM_WE_N <= CPUWR_N;
-	BSRAM_D <= DI;
+	ROM_ADDR <= (others => '1') when MAP_SEL = '0' else CART_ADDR(22 downto 0) and ROM_MASK(22 downto 0);
+	ROM_CE_N <= ROMSEL_N or not MAP_SEL;
+	ROM_OE_N <= CPURD_N or not MAP_SEL;
 	
-	DO <= DSP_DO when DSP_SEL = '1' else
+	BSRAM_ADDR <= (others => '1') when MAP_SEL = '0' else BRAM_ADDR and BSRAM_MASK(19 downto 0);
+	BSRAM_CE_N <= not BSRAM_SEL or not MAP_SEL;
+	BSRAM_OE_N <= CPURD_N or not MAP_SEL;
+	BSRAM_WE_N <= CPUWR_N or not MAP_SEL;
+	BSRAM_D    <= (others => '1') when MAP_SEL = '0' else DI;
+	
+	DO <= (others => '1') when MAP_SEL = '0' else
+			DSP_DO when DSP_SEL = '1' else
 			BSRAM_Q when BSRAM_SEL = '1' else
 			ROM_Q;
 

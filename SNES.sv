@@ -290,7 +290,6 @@ end
 
 main main
 (
-	.MCLK_50M(CLK_50M),	// master clock for internal PLLs
 	.RESET_N(~reset),
 
 	.MCLK(clk_sys), // 21.47727 / 21.28137

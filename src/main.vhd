@@ -30,29 +30,29 @@ entity main is
 		BSRAM_OE_N	: out std_logic;
 		BSRAM_WE_N	: out std_logic;
 
-		WSRAM_ADDR	: out std_logic_vector(16 downto 0);
-		WSRAM_D		: out std_logic_vector(7 downto 0);
-		WSRAM_Q		: in  std_logic_vector(7 downto 0);
-		WSRAM_CE_N	: out std_logic;
-		WSRAM_OE_N	: out std_logic;
-		WSRAM_WE_N	: out std_logic;
+		WRAM_ADDR	: out std_logic_vector(16 downto 0);
+		WRAM_D		: out std_logic_vector(7 downto 0);
+		WRAM_Q		: in  std_logic_vector(7 downto 0);
+		WRAM_CE_N	: out std_logic;
+		WRAM_OE_N	: out std_logic;
+		WRAM_WE_N	: out std_logic;
 
-		VSRAM_ADDRA	: out std_logic_vector(15 downto 0);
-		VSRAM_DAI	: in  std_logic_vector(7 downto 0);
-		VSRAM_DAO	: out std_logic_vector(7 downto 0);
-		VSRAM_WEA_N	: out std_logic;
-		VSRAM_ADDRB	: out std_logic_vector(15 downto 0);
-		VSRAM_DBI	: in  std_logic_vector(7 downto 0);
-		VSRAM_DBO	: out std_logic_vector(7 downto 0);
-		VSRAM_WEB_N	: out std_logic;
-		VSRAM_OE_N	: out std_logic;
+		VRAM1_ADDR	: out std_logic_vector(15 downto 0);
+		VRAM1_DI		: in  std_logic_vector(7 downto 0);
+		VRAM1_DO		: out std_logic_vector(7 downto 0);
+		VRAM1_WE_N	: out std_logic;
+		VRAM2_ADDR	: out std_logic_vector(15 downto 0);
+		VRAM2_DI		: in  std_logic_vector(7 downto 0);
+		VRAM2_DO		: out std_logic_vector(7 downto 0);
+		VRAM2_WE_N	: out std_logic;
+		VRAM_OE_N	: out std_logic;
 
-		ASRAM_ADDR	: out std_logic_vector(15 downto 0);
-		ASRAM_D		: out std_logic_vector(7 downto 0);
-		ASRAM_Q		: in  std_logic_vector(7 downto 0);
-		ASRAM_CE_N	: out std_logic;
-		ASRAM_OE_N	: out std_logic;
-		ASRAM_WE_N	: out std_logic;
+		ARAM_ADDR	: out std_logic_vector(15 downto 0);
+		ARAM_D		: out std_logic_vector(7 downto 0);
+		ARAM_Q		: in  std_logic_vector(7 downto 0);
+		ARAM_CE_N	: out std_logic;
+		ARAM_OE_N	: out std_logic;
+		ARAM_WE_N	: out std_logic;
 
 		PAL			: in  std_logic;
 		HIGH_RES		: out std_logic;
@@ -146,29 +146,29 @@ begin
 			
 		IRQ_N			=> IRQ_N,
 			
-		WSRAM_ADDR	=> WSRAM_ADDR,
-		WSRAM_D		=> WSRAM_D,
-		WSRAM_Q		=> WSRAM_Q,
-		WSRAM_CE_N	=> WSRAM_CE_N,
-		WSRAM_OE_N	=> WSRAM_OE_N,
-		WSRAM_WE_N	=> WSRAM_WE_N,
+		WSRAM_ADDR	=> WRAM_ADDR,
+		WSRAM_D		=> WRAM_D,
+		WSRAM_Q		=> WRAM_Q,
+		WSRAM_CE_N	=> WRAM_CE_N,
+		WSRAM_OE_N	=> WRAM_OE_N,
+		WSRAM_WE_N	=> WRAM_WE_N,
 			
-		VRAM_ADDRA	=> VSRAM_ADDRA,
-		VRAM_ADDRB	=> VSRAM_ADDRB,
-		VRAM_DAI		=> VSRAM_DAI,
-		VRAM_DBI		=> VSRAM_DBI,
-		VRAM_DAO		=> VSRAM_DAO,
-		VRAM_DBO		=> VSRAM_DBO,
-		VRAM_RD_N	=> VSRAM_OE_N,
-		VRAM_WRA_N	=> VSRAM_WEA_N,
-		VRAM_WRB_N	=> VSRAM_WEB_N,
+		VRAM_ADDRA	=> VRAM1_ADDR,
+		VRAM_ADDRB	=> VRAM2_ADDR,
+		VRAM_DAI		=> VRAM1_DI,
+		VRAM_DBI		=> VRAM2_DI,
+		VRAM_DAO		=> VRAM1_DO,
+		VRAM_DBO		=> VRAM2_DO,
+		VRAM_RD_N	=> VRAM_OE_N,
+		VRAM_WRA_N	=> VRAM1_WE_N,
+		VRAM_WRB_N	=> VRAM2_WE_N,
 
-		ARAM_ADDR	=> ASRAM_ADDR,
-		ARAM_D		=> ASRAM_D,
-		ARAM_Q		=> ASRAM_Q,
-		ARAM_CE_N	=> ASRAM_CE_N,
-		ARAM_OE_N	=> ASRAM_OE_N,
-		ARAM_WE_N	=> ASRAM_WE_N,
+		ARAM_ADDR	=> ARAM_ADDR,
+		ARAM_D		=> ARAM_D,
+		ARAM_Q		=> ARAM_Q,
+		ARAM_CE_N	=> ARAM_CE_N,
+		ARAM_OE_N	=> ARAM_OE_N,
+		ARAM_WE_N	=> ARAM_WE_N,
 
 		JOY1_DI		=> JOY1_DI,
 		JOY2_DI		=> JOY2_DI,

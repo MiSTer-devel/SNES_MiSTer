@@ -136,14 +136,7 @@ pll pll
 	.locked(clock_locked)
 );
 
-// hold machine in reset until first download starts
-reg init_reset_n = 0;
-always @(posedge clk_sys) begin
-	if(RESET) init_reset_n <= 0;
-	else if(ioctl_download) init_reset_n <= 1;
-end
-
-wire reset = ~init_reset_n | buttons[1] | status[0] | ioctl_download | bk_loading;
+wire reset = RESET | buttons[1] | status[0] | ioctl_download | bk_loading;
 
 
 ////////////////////////////  HPS I/O  //////////////////////////////////

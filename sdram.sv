@@ -1,6 +1,6 @@
 //
 // sdram.v
-// This version issues refresh only when 8bit channel reads the same 16bit words 2 times
+// This version issues refresh only when 8bit channel reads the same 16bit word 2 times
 //
 // sdram controller implementation
 // Copyright (c) 2018 Sorgelig
@@ -207,8 +207,8 @@ always @(posedge clk) begin
 	endcase
 
 	casex({ram_req,mode,state})
-		{1'b1,  MODE_NORMAL, STATE_START}: SDRAM_A <= a[21:9];
-		{1'b1,  MODE_NORMAL, STATE_CONT }: SDRAM_A <= {4'b0010, a[22], a[8:1]};
+		{1'b1,  MODE_NORMAL, STATE_START}: SDRAM_A <= a[13:1];
+		{1'b1,  MODE_NORMAL, STATE_CONT }: SDRAM_A <= {4'b0010, a[22:14]};
 
 		// init
 		{1'bX,     MODE_LDM, STATE_START}: SDRAM_A <= MODE;

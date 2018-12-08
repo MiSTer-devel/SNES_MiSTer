@@ -7,6 +7,8 @@ library work;
 entity CX4 is
 	port(
 		CLK			: in std_logic;		--60MHz (need for FPGA's sync ram)
+		MEM_CLK		: in std_logic;
+		CE				: in std_logic;
 		RST_N			: in std_logic;
 		ENABLE		: in std_logic;
 		ADDR   		: in std_logic_vector(23 downto 0);
@@ -25,6 +27,8 @@ entity CX4 is
 		ROM_CE1_N	: out std_logic;
 		ROM_CE2_N	: out std_logic;
 		SRAM_CE_N	: out std_logic;
+		
+		BUS_RD_N		: out std_logic;	--for MISTer sdram
 		
 		MAPPER		: in std_logic;
 		
@@ -169,19 +173,7 @@ architecture rtl of CX4 is
 	
 begin
 
-	process(CLK, RST_N)
-	begin
-		if RST_N = '0' then
-			CLK_CNT <= (others => '0');
-		elsif rising_edge(CLK) then
-			CLK_CNT <= CLK_CNT + 1;
-			if CLK_CNT = 3-1 then	
-				CLK_CNT <= (others => '0');
-			end if;
-		end if;
-	end process;	
-	
-	EN <= ENABLE when CLK_CNT = 3-1 else '0';		--60/3 = 20MHz core clock
+	EN <= ENABLE and CE;-- when CLK_CNT = 3-1 else '0';		--60/3 = 20MHz core clock
 	CPU_EN <= EN and CPU_RUN and (not CASHE_RUN) and (not DMA_RUN) and (not SUSPEND);
 	
 	--I/O Ports
@@ -499,6 +491,24 @@ begin
 			BUS_WE_N <= '1';
 		end if;
 	end process; 
+	
+	--for MISTer
+	process(CASHE_RUN, DMA_RUN, ROM_ACCESS, SRAM_ACCESS, SUSPEND, DMA_STATE, CPU_EN, ROM_SEL, RD_N, 
+			  BUS_ACCESS_CNT, DMA_WAIT_CNT, CASHE_WAIT_CNT, WS1, CPU_RUN)
+	begin
+		if CASHE_RUN = '1' and SUSPEND = '0' and CASHE_WAIT_CNT = 0 then
+			BUS_RD_N <= '0';
+		elsif DMA_RUN = '1' and SUSPEND = '0' and DMA_WAIT_CNT = 0 and DMA_STATE = '0' then
+			BUS_RD_N <= '0';
+		elsif ROM_ACCESS = '1' and SUSPEND = '0' and BUS_ACCESS_CNT = unsigned(WS1) and CPU_EN = '1' then
+			BUS_RD_N <= '0';
+		elsif ROM_SEL = '1' and CPU_RUN = '0' and CASHE_RUN = '0' and DMA_RUN = '0' and ROM_ACCESS = '0' and SRAM_ACCESS = '0' then 
+			BUS_RD_N <= RD_N;
+		else 
+			BUS_RD_N <= '1';
+		end if;
+	end process;
+	
 
 	--Cashe
 	process(CLK, RST_N)
@@ -1015,7 +1025,7 @@ begin
 			IRQ <= '0';
 			IRQ_FLAG <= '0';
 		elsif rising_edge(CLK) then
-			if CPU_RUN = '0' and EN = '1' then
+			if EN = '1' and CPU_RUN = '0' then
 				if MMIO_WR = '1' and ADDR(11 downto 0) = x"F48" then	--7F48
 					BANK <= DI(0);
 				elsif MMIO_WR = '1' and ADDR(11 downto 0) = x"F4F" then	--7F4F
@@ -1120,7 +1130,7 @@ begin
 		if RST_N = '0' then
 			GPR <= (others => (others => '0'));
 		elsif rising_edge(CLK) then
-			if CPU_RUN = '0' and EN = '1' then
+			if EN = '1' and CPU_RUN = '0' then
 				if MMIO_WR = '1' and ADDR(11 downto 8) = x"F" then	--7F80-7FAF
 					case ADDR(7 downto 0) is
 						when x"80" => GPR(0)(7 downto 0) <= DI;
@@ -1241,9 +1251,9 @@ begin
 		end if;
 	end process; 
 
-	DATA_ROM : entity work.CX4DRom
+	DATA_ROM : entity work.spram generic map(10, 24, "src/chip/cx4/drom.mif")
 	port map(
-		clock		=> CLK,
+		clock		=> MEM_CLK,
 		address	=> DATA_ROM_ADDR,
 		q			=> DATA_ROM_Q
 	);
@@ -1252,9 +1262,9 @@ begin
 	DATA_RAM_ADDR_B <= ADDR(11 downto 0) when ENABLE = '1' else DBG_RAM_ADDR;
 	DATA_RAM_DI_B <= DI;
 	DATA_RAM_WE_B <= '1' when EN = '1' and RAMIO_WR = '1' else '0';
-	DATA_RAM : entity work.CX4DRam
+	DATA_RAM : entity work.dpram generic map(12, 8)
 	port map(
-		clock			=> CLK,
+		clock			=> MEM_CLK,
 		address_a	=> DATA_RAM_ADDR_A,
 		data_a		=> DATA_RAM_DI_A,
 		wren_a		=> DATA_RAM_WE_A,
@@ -1269,14 +1279,14 @@ begin
 	PROG_ROM_ADDR_WR <= CASHE_BANK & CASHE_ADDR;
 	PROG_ROM_WE <= '1' when CASHE_RUN = '1' and EN = '1' and CASHE_WAIT_CNT = unsigned(WS1) else '0';
 	PROG_ROM_DI <= BUS_DI;
-	PROG_ROM : entity work.CX4PRom
+	PROG_ROM : entity work.dpram_dif generic map(10, 8, 9, 16)
 	port map(
-		clock			=> CLK,
-		wraddress	=> PROG_ROM_ADDR_WR,
-		data			=> PROG_ROM_DI,
-		wren			=> PROG_ROM_WE,
-		rdaddress	=> PROG_ROM_ADDR_RD,
-		q				=> PROG_ROM_Q
+		clock			=> MEM_CLK,
+		address_a	=> PROG_ROM_ADDR_WR,
+		data_a		=> PROG_ROM_DI,
+		wren_a		=> PROG_ROM_WE,
+		address_b	=> PROG_ROM_ADDR_RD,
+		q_b			=> PROG_ROM_Q
 	);
 	
 	

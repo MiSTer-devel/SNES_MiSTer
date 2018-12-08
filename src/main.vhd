@@ -10,6 +10,7 @@ entity main is
 	port(
 		RESET_N		: in  std_logic;
 
+		MEM_CLK		: in  std_logic;
 		MCLK			: in  std_logic;
 		ACLK			: in  std_logic;
 
@@ -107,6 +108,16 @@ architecture rtl of main is
 	signal DLH_BSRAM_OE_N	: std_logic;
 	signal DLH_BSRAM_WE_N	: std_logic;
 
+	signal CX4_DO				: std_logic_vector(7 downto 0);
+	signal CX4_IRQ_N			: std_logic;
+	signal CX4_ROM_ADDR		: std_logic_vector(22 downto 0);
+	signal CX4_ROM_CE_N		: std_logic;
+	signal CX4_ROM_OE_N		: std_logic;
+	signal CX4_BSRAM_ADDR	: std_logic_vector(19 downto 0);
+	signal CX4_BSRAM_D		: std_logic_vector(7 downto 0);
+	signal CX4_BSRAM_CE_N	: std_logic;
+	signal CX4_BSRAM_OE_N	: std_logic;
+	signal CX4_BSRAM_WE_N	: std_logic;
 begin
 
 	SNES : entity work.SNES
@@ -192,9 +203,7 @@ begin
 	HBLANK <= not HBLANKn;
 	VBLANK <= not VBLANKn;
 
-	SMAP : entity work.DSP_LHRomMap
-	--SMAP : entity work.SDD1Map
-	--SMAP : entity work.CX4Map
+	DSP_LHRomMap : entity work.DSP_LHRomMap
 	port map(
 		MCLK			=> MCLK,
 		RST_N			=> RESET_N,
@@ -233,16 +242,57 @@ begin
 		ROM_MASK		=> ROM_MASK,
 		BSRAM_MASK	=> RAM_MASK
 	);
+
+	CX4Map : entity work.CX4Map
+	port map(
+		MEM_CLK		=> MEM_CLK,
+		MCLK			=> MCLK,
+		RST_N			=> RESET_N,
+		
+		CA				=> CA,
+		DI				=> DO,
+		DO				=> CX4_DO,
+		CPURD_N		=> CPURD_N,
+		CPUWR_N		=> CPUWR_N,
+		
+		PA				=> PA,
+		PARD_N		=> PARD_N,
+		PAWR_N		=> PAWR_N,
+		
+		ROMSEL_N		=> ROMSEL_N,
+		RAMSEL_N		=> RAMSEL_N,
+		
+		SYSCLK		=> SYSCLK,
+		REFRESH		=> REFRESH,
+
+		IRQ_N			=> CX4_IRQ_N,
+		
+		ROM_ADDR		=> CX4_ROM_ADDR,
+		ROM_Q			=> ROM_Q,
+		ROM_CE_N		=> CX4_ROM_CE_N,
+		ROM_OE_N		=> CX4_ROM_OE_N,
+
+		BSRAM_ADDR	=> CX4_BSRAM_ADDR,
+		BSRAM_D		=> CX4_BSRAM_D,
+		BSRAM_Q		=> BSRAM_Q,
+		BSRAM_CE_N	=> CX4_BSRAM_CE_N,
+		BSRAM_OE_N	=> CX4_BSRAM_OE_N,
+		BSRAM_WE_N	=> CX4_BSRAM_WE_N,
+
+		MAP_CTRL		=> ROM_TYPE,
+		ROM_MASK		=> ROM_MASK,
+		BSRAM_MASK	=> RAM_MASK
+	);
 	
-	DI				<= DLH_DO;
-	IRQ_N			<= DLH_IRQ_N;
-	ROM_ADDR		<= DLH_ROM_ADDR;
-	ROM_CE_N		<= DLH_ROM_CE_N;
-	ROM_OE_N		<= DLH_ROM_OE_N;
-	BSRAM_ADDR	<= DLH_BSRAM_ADDR;
-	BSRAM_D		<= DLH_BSRAM_D;
-	BSRAM_CE_N	<= DLH_BSRAM_CE_N;
-	BSRAM_OE_N	<= DLH_BSRAM_OE_N;
-	BSRAM_WE_N	<= DLH_BSRAM_WE_N;
+	DI          <= DLH_DO         and CX4_DO;
+	IRQ_N       <= DLH_IRQ_N      and CX4_IRQ_N;
+	ROM_ADDR    <= DLH_ROM_ADDR   and CX4_ROM_ADDR;
+	ROM_CE_N    <= DLH_ROM_CE_N   and CX4_ROM_CE_N;
+	ROM_OE_N    <= DLH_ROM_OE_N   and CX4_ROM_OE_N;
+	BSRAM_ADDR  <= DLH_BSRAM_ADDR and CX4_BSRAM_ADDR;
+	BSRAM_D     <= DLH_BSRAM_D    and CX4_BSRAM_D;
+	BSRAM_CE_N  <= DLH_BSRAM_CE_N and CX4_BSRAM_CE_N;
+	BSRAM_OE_N  <= DLH_BSRAM_OE_N and CX4_BSRAM_OE_N;
+	BSRAM_WE_N  <= DLH_BSRAM_WE_N and CX4_BSRAM_WE_N;
 
 end rtl;

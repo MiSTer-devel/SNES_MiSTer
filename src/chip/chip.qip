@@ -1,7 +1,4 @@
-set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) CX4/dram.vhd ]
-set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) CX4/prom.vhd ]
 set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) CX4/CX4.vhd ]
-set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) CX4/drom.vhd ]
 set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) DSP/DSPn.vhd ]
 set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) SDD1/infifo.vhd ]
 set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) SDD1/InputMgr.vhd ]

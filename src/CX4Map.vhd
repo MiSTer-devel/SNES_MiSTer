@@ -8,11 +8,11 @@ use IEEE.STD_LOGIC_TEXTIO.all;
 
 entity CX4Map is
 	port(
-		CLK100		: in std_logic;
+		MEM_CLK		: in std_logic;	--85MHz
 		MCLK			: in std_logic;
 		RST_N			: in std_logic;
-		ENABLE		: in std_logic;
-		
+		ENABLE		: in std_logic := '1';
+
 		CA   			: in std_logic_vector(23 downto 0);
 		DI				: in std_logic_vector(7 downto 0);
 		DO				: out std_logic_vector(7 downto 0);
@@ -31,60 +31,64 @@ entity CX4Map is
 		
 		IRQ_N			: out std_logic;
 
-		SRAM1_ADDR	: out std_logic_vector(21 downto 0);
-		SRAM1_DQ		: inout std_logic_vector(7 downto 0);
-		SRAM1_CE_N	: out std_logic;
-		SRAM1_OE_N	: out std_logic;
-		SRAM1_WE_N	: out std_logic;
+		ROM_ADDR		: out std_logic_vector(22 downto 0);
+		ROM_Q			: in  std_logic_vector(7 downto 0);
+		ROM_CE_N		: out std_logic;
+		ROM_OE_N		: out std_logic;
 		
-		SRAM2_ADDR	: out std_logic_vector(21 downto 0);
-		SRAM2_DQ		: inout std_logic_vector(7 downto 0);
-		SRAM2_CE_N	: out std_logic;
-		SRAM2_OE_N	: out std_logic;
-		SRAM2_WE_N	: out std_logic;
+		BSRAM_ADDR	: out std_logic_vector(19 downto 0);
+		BSRAM_D		: out std_logic_vector(7 downto 0);
+		BSRAM_Q		: in  std_logic_vector(7 downto 0);
+		BSRAM_CE_N	: out std_logic;
+		BSRAM_OE_N	: out std_logic;
+		BSRAM_WE_N	: out std_logic;
 
 		MAP_CTRL		: in std_logic_vector(7 downto 0);
 		ROM_MASK		: in std_logic_vector(23 downto 0);
 		BSRAM_MASK	: in std_logic_vector(23 downto 0);
 		
-		LD_ADDR   	: in std_logic_vector(23 downto 0);
-		LD_DI			: in std_logic_vector(7 downto 0);
-		LD_WR			: in std_logic;
-		LD_EN			: in std_logic;
-		
 		BRK_OUT		: out std_logic;
-		DBG_REG		: in std_logic_vector(7 downto 0);
-		DBG_DAT_IN	: in std_logic_vector(7 downto 0);
+		DBG_REG		: in std_logic_vector(7 downto 0) := (others => '0');
+		DBG_DAT_IN	: in std_logic_vector(7 downto 0) := (others => '0');
 		DBG_DAT_OUT	: out std_logic_vector(7 downto 0);
-		DBG_DAT_WR	: in std_logic
+		DBG_DAT_WR	: in std_logic := '0'
 	);
 end CX4Map;
 
 architecture rtl of CX4Map is
 
-	signal CX4_CLK	: std_logic;
-	signal CX4_A 	: std_logic_vector(21 downto 0);
-	signal CX4_DI, CX4_DO : std_logic_vector(7 downto 0);
+	signal CX4_A : std_logic_vector(21 downto 0);
+	signal CX4_DI, CX4_DO, CPU_DO : std_logic_vector(7 downto 0);
 	signal SRAM_CE_N, ROM_CE1_N, ROM_CE2_N, CX4_OE_N, CX4_WE_N : std_logic;
-	signal CART_ADDR, BSRAM_ADDR : std_logic_vector(21 downto 0);
-	signal SRAM1_DO, SRAM2_DO : std_logic_vector(7 downto 0);
+	signal CART_ADDR : std_logic_vector(21 downto 0);
+	signal BRAM_ADDR : std_logic_vector(19 downto 0);
+	signal CX4_CE : std_logic;
+	signal CX4_RD_N : std_logic;
 
+	signal MAP_SEL	  : std_logic;
 begin
 	
---	pll : entity work.cx4pll
---	port map(
---		inclk0	=> CLK100,
---		c0			=> CX4_CLK
---	);
+	MAP_SEL <= '1' when MAP_CTRL(7 downto 4) = X"4" else '0';
+
+	CEGen : entity work.CEGen
+	port map(
+		CLK     => MCLK,
+		RST_N   => RST_N,
+		IN_CLK  => 2147727,
+		OUT_CLK => 2000000,
+		CE      => CX4_CE
+	);
 
 	CX4 : entity work.CX4
 	port map(
-		CLK			=> CX4_CLK,
+		CLK			=> MCLK,
+		MEM_CLK		=> MEM_CLK,
+		CE				=> CX4_CE,
 		RST_N			=> RST_N,
 		ENABLE		=> ENABLE,
 
 		ADDR			=> CA,
-		DO				=> DO,
+		DO				=> CPU_DO,
 		DI				=> DI,
 		RD_N			=> CPURD_N,
 		WR_N			=> CPUWR_N,
@@ -100,6 +104,8 @@ begin
 		ROM_CE2_N	=> ROM_CE2_N,
 		SRAM_CE_N	=> SRAM_CE_N,
 		
+		BUS_RD_N		=> CX4_RD_N,	--for MISTer sdram
+		
 		MAPPER		=> MAP_CTRL(0),
 		
 		BRK_OUT		=> BRK_OUT,
@@ -110,22 +116,18 @@ begin
 	);
 	
 	CART_ADDR <= "0" & not ROM_CE2_N & CX4_A(20 downto 16) & CX4_A(14 downto 0);
-	BSRAM_ADDR <= "00" & CX4_A(20 downto 16) & CX4_A(14 downto 0);
+	BRAM_ADDR <= CX4_A(20 downto 16) & CX4_A(14 downto 0);
 
-	SRAM1_ADDR <= LD_ADDR(21 downto 0) when LD_EN = '1' else (CART_ADDR and ROM_MASK(21 downto 0));
-	SRAM1_CE_N <= LD_ADDR(22) when LD_EN = '1' else ROM_CE1_N and ROM_CE2_N;
-	SRAM1_OE_N <= LD_WR when LD_EN = '1' else CX4_OE_N;
-	SRAM1_WE_N <= not LD_WR when LD_EN = '1' else '1';
-	SRAM1_DO <= SRAM1_DQ;
-	SRAM1_DQ <= LD_DI when LD_EN = '1' and LD_WR = '1' else "ZZZZZZZZ"; 
-	
-	SRAM2_ADDR <= (BSRAM_ADDR and BSRAM_MASK(21 downto 0));
-	SRAM2_CE_N <= SRAM_CE_N;
-	SRAM2_OE_N <= CX4_OE_N;
-	SRAM2_WE_N <= CX4_WE_N;
-	SRAM2_DO <= SRAM2_DQ;
-	SRAM2_DQ <= CX4_DO when CX4_WE_N = '0' and SRAM_CE_N = '0' else "ZZZZZZZZ"; 
-	
-	CX4_DI <= SRAM2_DO when SRAM_CE_N = '0' else SRAM1_DO;
+	ROM_ADDR <= (others => '1') when MAP_SEL = '0' else "0" & (CART_ADDR and ROM_MASK(21 downto 0));
+	ROM_CE_N <= (ROM_CE1_N and ROM_CE2_N) or not MAP_SEL;
+	ROM_OE_N <= CX4_RD_N or not MAP_SEL;--CX4_OE_N
 
+	BSRAM_ADDR <= (others => '1') when MAP_SEL = '0' else (BRAM_ADDR and BSRAM_MASK(19 downto 0));
+	BSRAM_CE_N <= SRAM_CE_N or not MAP_SEL;
+	BSRAM_OE_N <= CX4_OE_N or not MAP_SEL;
+	BSRAM_WE_N <= CX4_WE_N or not MAP_SEL;
+	BSRAM_D <= (others => '1') when MAP_SEL = '0' else CX4_DO;
+
+	CX4_DI <= BSRAM_Q when SRAM_CE_N = '0' else ROM_Q;
+	DO <= (others => '1') when MAP_SEL = '0' else CPU_DO;
 end rtl;

@@ -79,7 +79,7 @@ begin
 		CE      => DSP_CE
 	);
 
-	process( CA, MAP_CTRL, ROMSEL_N, RAMSEL_N, BSRAM_MASK )
+	process( CA, MAP_CTRL, ROMSEL_N, RAMSEL_N, BSRAM_MASK, ROM_MASK )
 	begin
 		case MAP_CTRL(3 downto 0) is
 			when x"0" =>							-- LoROM
@@ -90,7 +90,8 @@ begin
 				else
 					BSRAM_SEL <= '0';
 				end if;
-				if CA(22 downto 21) = "01" and CA(15) = '1' then	--20-3F/a0-bf:8000-FFFF
+				if (CA(22 downto 21) = "01" and CA(15) = '1' and ROM_MASK(20) = '0') or		--20-3F/A0-BF:8000-FFFF
+					(CA(22 downto 20) = "110" and CA(15) = '0' and ROM_MASK(20) = '1') then	--60-6F/E0-EF:0000-7FFF
 					DSP_SEL <= MAP_CTRL(7);
 				else
 					DSP_SEL <= '0';

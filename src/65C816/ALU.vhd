@@ -28,7 +28,7 @@ architecture rtl of ALU is
 	signal IntR16 : std_logic_vector(15 downto 0);
 	signal IntR8 : std_logic_vector(7 downto 0);
 	signal CR8, CR16, CR, ZR : std_logic;
-	signal CIIn, ADDIn: std_logic;
+	signal CIIn, ADDIn, BCDIn: std_logic;
 	
 	signal AddR : std_logic_vector(15 downto 0);
 	signal AddCO, AddVO : std_logic; 
@@ -82,6 +82,7 @@ begin
 	
 	CIIn <= CR or not CTRL.secOp(0);
 	ADDIn <= not CTRL.secOp(2);
+	BCDIn <= BCD and CTRL.secOp(0);
 	
 	AddSub: entity work.AddSubBCD
 	port map (
@@ -89,7 +90,7 @@ begin
 		B     	=> IntR16, 
 		CI     	=> CIIn, 
 		ADD     	=> ADDIn, 
-		BCD     	=> BCD,
+		BCD     	=> BCDIn,
 		w16     	=> w16, 
 		S     	=> AddR, 
 		CO     	=> AddCO,

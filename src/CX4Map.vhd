@@ -32,7 +32,7 @@ entity CX4Map is
 		IRQ_N			: out std_logic;
 
 		ROM_ADDR		: out std_logic_vector(22 downto 0);
-		ROM_Q			: in  std_logic_vector(7 downto 0);
+		ROM_Q			: in  std_logic_vector(15 downto 0);
 		ROM_CE_N		: out std_logic;
 		ROM_OE_N		: out std_logic;
 		
@@ -84,7 +84,7 @@ begin
 		CLK			=> MCLK,
 		MEM_CLK		=> MEM_CLK,
 		CE				=> CX4_CE,
-		RST_N			=> RST_N,
+		RST_N			=> RST_N and MAP_SEL,
 		ENABLE		=> ENABLE,
 
 		ADDR			=> CA,
@@ -128,6 +128,9 @@ begin
 	BSRAM_WE_N <= CX4_WE_N or not MAP_SEL;
 	BSRAM_D <= (others => '1') when MAP_SEL = '0' else CX4_DO;
 
-	CX4_DI <= BSRAM_Q when SRAM_CE_N = '0' else ROM_Q;
+	CX4_DI <= BSRAM_Q when SRAM_CE_N = '0' else
+			ROM_Q(7 downto 0) when CART_ADDR(0)='0' else
+			ROM_Q(15 downto 8);
+
 	DO <= (others => '1') when MAP_SEL = '0' else CPU_DO;
 end rtl;

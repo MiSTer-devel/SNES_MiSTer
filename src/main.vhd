@@ -19,7 +19,7 @@ entity main is
 		RAM_MASK		: in  std_logic_vector(23 downto 0);
 
 		ROM_ADDR		: out std_logic_vector(22 downto 0);
-		ROM_Q			: in  std_logic_vector(7 downto 0);
+		ROM_Q			: in  std_logic_vector(15 downto 0);
 		ROM_CE_N		: out std_logic;
 		ROM_OE_N		: out std_logic;
 

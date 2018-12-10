@@ -31,7 +31,7 @@ entity DSP_LHRomMap is
 		IRQ_N			: out std_logic;
 
 		ROM_ADDR		: out std_logic_vector(22 downto 0);
-		ROM_Q			: in  std_logic_vector(7 downto 0);
+		ROM_Q			: in  std_logic_vector(15 downto 0);
 		ROM_CE_N		: out std_logic;
 		ROM_OE_N		: out std_logic;
 		
@@ -169,7 +169,8 @@ begin
 	DO <= (others => '1') when MAP_SEL = '0' else
 			DSP_DO when DSP_SEL = '1' else
 			BSRAM_Q when BSRAM_SEL = '1' else
-			ROM_Q;
+			ROM_Q(7 downto 0) when CART_ADDR(0)='0' else
+			ROM_Q(15 downto 8);
 
 	IRQ_N <= '1';
 

@@ -363,7 +363,7 @@ main main
 wire[22:0] ROM_ADDR;
 wire       ROM_CE_N;
 wire       ROM_OE_N;
-wire [7:0] ROM_Q;
+wire[15:0] ROM_Q;
 
 reg [1:0] sdram_clr;
 always @(posedge clk_sys) sdram_clr <= {sdram_clr[0], ioctl_download & ioctl_wr};
@@ -374,11 +374,11 @@ sdram sdram
 	.init(~clock_locked),
 	.clk(clk_mem),
 	
-	.ch0_addr(ROM_ADDR),
-	.ch0_din(0),
+	.ch0_addr(ioctl_download ? ioctl_addr-10'd512 : ROM_ADDR),
+	.ch0_din(ioctl_dout),
 	.ch0_dout(ROM_Q),
-	.ch0_rd(~ROM_CE_N & ~ROM_OE_N),
-	.ch0_wr(0),
+	.ch0_rd(~ioctl_download & ~ROM_CE_N & ~ROM_OE_N),
+	.ch0_wr(ioctl_wr),
 	.ch0_busy(),
 
 	.ch1_addr(0),
@@ -386,14 +386,7 @@ sdram sdram
 	.ch1_dout(),
 	.ch1_rd(0),
 	.ch1_wr(0),
-	.ch1_busy(),
-
-	.ch2_addr(ioctl_addr-10'd512),
-	.ch2_din(ioctl_dout),
-	.ch2_dout(),
-	.ch2_rd(0),
-	.ch2_wr(ioctl_wr),
-	.ch2_busy()
+	.ch1_busy()
 );
 
 wire[16:0] WRAM_ADDR;

@@ -116,9 +116,8 @@ architecture rtl of SCPU is
 	signal REFRESHED : std_logic;
 	signal MUL_CNT	: unsigned(3 downto 0);
 	signal MATH_TEMP	: std_logic_vector(22 downto 0);
-	signal HBLANKrr : std_logic;
 	signal VBLANKr, VBLANKrr : std_logic;
-	signal IRQ_VALIDr : std_logic;
+	signal IRQ_VALIDr, IRQ_VALIDrr : std_logic;
 
 	-- DMA registers
 	type DmaReg8 is array (0 to 7) of std_logic_vector(7 downto 0);
@@ -137,10 +136,11 @@ architecture rtl of SCPU is
 	signal DMA_RUN, HDMA_RUN : std_logic;
 	signal DMA_ACTIVE : std_logic;
 	signal HDMA_CH_WORK, HDMA_CH_RUN, HDMA_CH_DO: std_logic_vector(7 downto 0);
-	signal HDMA_INIT_EXEC, HDMA_RUN_EXEC : std_logic;
+	signal HDMA_INIT_EXEC, HDMA_RUN_EXEC, HDMA_RUN_EXEC2 : std_logic;
 
 	type ds_t is (
 		DS_IDLE,
+		DS_INIT,
 		DS_CH_SEL,
 		DS_TRANSFER
 	);
@@ -486,7 +486,7 @@ begin
 		elsif rising_edge(CLK) then
 			if ENABLE = '1' and INT_CLKF_CE = '1' then
 				VBLANKrr <= VBLANK;
-				
+
 				if VBLANK = '1' and VBLANKrr = '0' then
 					NMI_FLAG <= '1';
 				elsif VBLANK = '0' and VBLANKrr = '1' then
@@ -694,7 +694,7 @@ begin
 				end if;
 			end if;
 		end if;
-	end process;
+	end process; 
  
 	DO <= MDR;
 
@@ -738,11 +738,11 @@ begin
 			IRQ_FLAG_RSTr <= '0';
 		elsif rising_edge(CLK) then
 			if ENABLE = '1' and DOT_CLK_CE = '1' then
-				if HVIRQ_EN = "01" and H_CNT = unsigned(HTIME) + 2 then											--H-IRQ:  every scanline, H=HTIME+~3.5
+				if HVIRQ_EN = "01" and H_CNT = unsigned(HTIME) + 2 then--H-IRQ:  every scanline, H=HTIME+~3.5
 					IRQ_VALID := '1';
-				elsif HVIRQ_EN = "10" and V_CNT = unsigned(VTIME) then							--V-IRQ:  V=VTIME, H=~2.5
+				elsif HVIRQ_EN = "10" and H_CNT = 2 and V_CNT = unsigned(VTIME) then--V-IRQ:  V=VTIME, H=~2.5--H_CNT <= 4 and
 					IRQ_VALID := '1';
-				elsif HVIRQ_EN = "11" and H_CNT = unsigned(HTIME) + 2 and V_CNT = unsigned(VTIME) then	--HV-IRQ: V=VTIME, H=HTIME+~3.5
+				elsif HVIRQ_EN = "11" and H_CNT = unsigned(HTIME) + 2 and V_CNT = unsigned(VTIME) then--HV-IRQ: V=VTIME, H=HTIME+~3.5
 					IRQ_VALID := '1';
 				else
 					IRQ_VALID := '0';
@@ -770,9 +770,9 @@ begin
 			REFRESHED <= '0';
 		elsif rising_edge(CLK) then
 			if ENABLE = '1' and INT_CLKF_CE = '1' then
-				if REFRESHED = '0' and H_CNT >= 131 and H_CNT < 131 + 10 then
+				if REFRESHED = '0' and H_CNT >= 132 and H_CNT < 132 + 10 then
 					REFRESHED <= '1';
-				elsif REFRESHED = '1' and H_CNT >= 131 + 10 then
+				elsif REFRESHED = '1' and H_CNT >= 132 + 10 then
 					REFRESHED <= '0';
 				end if;
 			end if;
@@ -863,14 +863,17 @@ begin
 					case DS is
 						when DS_IDLE =>
 							if MDMAEN /= x"00" then
-								DS <= DS_CH_SEL;
+								DS <= DS_INIT;
 							end if;
 						
+						when DS_INIT =>
+							DMA_RUN <= '1';
+							DS <= DS_CH_SEL;
+							
 						when DS_CH_SEL =>
 							if MDMAEN /= x"00" then
 								DAS(DCH) <= std_logic_vector(unsigned(DAS(DCH)) - 1);
 								DMA_TRMODE_STEP <= (others => '0');
-								DMA_RUN <= '1';
 								DS <= DS_TRANSFER;
 							else
 								DMA_RUN <= '0';

@@ -27,8 +27,9 @@ entity CX4 is
 		ROM_CE1_N	: out std_logic;
 		ROM_CE2_N	: out std_logic;
 		SRAM_CE_N	: out std_logic;
-		
-		BUS_RD_N		: out std_logic;	--for MISTer sdram
+
+		BUS_BUSY		: out std_logic;
+		BUS_RD_N		: out std_logic;
 		
 		MAPPER		: in std_logic;
 		
@@ -506,6 +507,7 @@ begin
 			BUS_RD_N <= '1';
 		end if;
 	end process;
+	BUS_BUSY <= BUSY;
 
 	--CACHE
 	process(CLK, RST_N)

@@ -6,24 +6,24 @@ use IEEE.NUMERIC_STD.ALL;
 
 entity SDD1 is
 	port(
-		RST_N			: in std_logic;
-		CLK			: in std_logic;
-		ENABLE		: in std_logic;
-		
-		CA   			: in std_logic_vector(23 downto 0);
+		RST_N			: in  std_logic;
+		CLK			: in  std_logic;
+		ENABLE		: in  std_logic;
+
+		CA   			: in  std_logic_vector(23 downto 0);
 		DO				: out std_logic_vector(7 downto 0);
-		DI				: in std_logic_vector(7 downto 0);
-		CPURD_N		: in std_logic;
-		CPUWR_N		: in std_logic;
-		
-		SYSCLK		: in std_logic;
-		
+		DI				: in  std_logic_vector(7 downto 0);
+		CPURD_N		: in  std_logic;
+		CPUWR_N		: in  std_logic;
+
+		SYSCLKF_CE	: in  std_logic;
+		SYSCLKR_CE	: in  std_logic;
+
 		ROM_A       : out std_logic_vector(23 downto 0);
-		ROM_DO		: in std_logic_vector(15 downto 0);
-		
-		SRAM_CS_N	: out std_logic;
-		
-		DBG_REG		: in std_logic_vector(7 downto 0);
+		ROM_DO		: in  std_logic_vector(15 downto 0);
+		ROM_RD_N		: out std_logic;
+
+		DBG_REG		: in  std_logic_vector(7 downto 0);
 		DBG_DAT_OUT	: out std_logic_vector(7 downto 0)
 	);
 end SDD1;
@@ -42,8 +42,7 @@ architecture rtl of SDD1 is
 	type DmaReg24 is array (0 to 7) of std_logic_vector(23 downto 0);
 	signal DMAA	: DmaReg24;
 	signal DMAS	: DmaReg16;
-	
-	
+
 	impure function GetDMACh(data: std_logic_vector(7 downto 0)) return integer is
 	variable res: integer range 0 to 7; 
 	begin
@@ -91,22 +90,19 @@ architecture rtl of SDD1 is
 	);
 	signal DS : ds_t;  
 	
-	signal DMA_CH: integer range 0 to 7; 
-	signal DEC_START	: std_logic;
-	signal SNES_ACCESS	: std_logic;
-	signal OUT_DATA_SEL	: std_logic;
-	signal DEC_EN	: std_logic;
-	signal TRANSFERING	: std_logic;
-	signal DMA_STOP_READING	: std_logic;
-	signal RD_PULSE_CNT	: unsigned(2 downto 0);
+	signal DMA_CH : integer range 0 to 7; 
+	signal DEC_START : std_logic;
+	signal SNES_ACCESS : std_logic;
+	signal OUT_DATA_SEL : std_logic;
+	signal DEC_EN : std_logic;
+	signal TRANSFERING : std_logic;
 
-	signal HEADER	: std_logic_vector(3 downto 0);
-	signal DEC_IN_DATA	: std_logic_vector(15 downto 0);
-	signal IM_DATA_REQ	: std_logic;
+	signal HEADER : std_logic_vector(3 downto 0);
+	signal DEC_IN_DATA : std_logic_vector(15 downto 0);
+	signal IM_DATA_REQ : std_logic;
+
+	signal RD_PULSE : std_logic;
 	
-	signal CLK_CNT	: unsigned(2 downto 0);
-	signal DBG_DS	: std_logic_vector(2 downto 0);
-
 begin
 
 	DMA_CH <= GetDMACh(DMAEN and DMARUN);
@@ -115,90 +111,8 @@ begin
 	DEC_CUR_SIZE <= DMAS(DMA_CH);
 	
 	SNES_ACCESS <= not (CPUWR_N and CPURD_N);
-	
---	process( RST_N, CLK)
---	begin
---		if RST_N = '0' then
---			CLK_CNT <= (others => '0');
---		elsif rising_edge(CLK) then
---			if ENABLE = '1' then
---				if SYSCLK = '1' then
---					CLK_CNT <= CLK_CNT + 1;
---				else
---					CLK_CNT <= (others => '0');
---				end if;
---			end if;
---		end if;
---	end process;
---
---	process( RST_N, CLK)
---		variable i : integer range 0 to 7; 
---	begin
---		if RST_N = '0' then
---			DMAA <= (others => (others => '0'));
---			DMAS <= (others => (others => '0'));
---			DMAEN <= (others => '0');
---			DMARUN <= (others => '0');
---			ROMBANKC <= x"0";
---			ROMBANKD <= x"1";
---			ROMBANKE <= x"2";
---			ROMBANKF <= x"3";
---			OUT_DATA_SEL <= '0';
---			DEC_START <= '0';
---		elsif rising_edge(CLK) then
---			if ENABLE = '1' then
---				DEC_START <= '0';
---				if CPUWR_N = '0' and CLK_CNT = 2 then
---					if CA(22) = '0' and CA(15 downto 8) = x"43" and CA(7) = '0' then 
---						i := to_integer(unsigned(CA(6 downto 4))); 
---						case CA(3 downto 0) is
---							when x"2" =>
---								DMAA(i)(7 downto 0) <= DI;
---							when x"3" =>
---								DMAA(i)(15 downto 8) <= DI;
---							when x"4" =>
---								DMAA(i)(23 downto 16) <= DI;
---							when x"5" =>
---								DMAS(i)(7 downto 0) <= DI;
---							when x"6" =>
---								DMAS(i)(15 downto 8) <= DI;
---							when others => null;
---						end case; 
---					elsif CA(22) = '0' and CA(15 downto 4) = x"480" then 
---						case CA(3 downto 0) is
---							when x"0" =>
---								DMAEN <= DI;
---							when x"1" =>
---								DMARUN <= DI;
---								if DI /= x"00" then
---									DEC_START <= '1';
---									OUT_DATA_SEL <= '0';
---								end if;
---							when x"4" =>
---								ROMBANKC <= DI(3 downto 0);
---							when x"5" =>
---								ROMBANKD <= DI(3 downto 0);
---							when x"6" =>
---								ROMBANKE <= DI(3 downto 0);
---							when x"7" =>
---								ROMBANKF <= DI(3 downto 0);
---							when others => null;
---						end case; 
---					end if;
---				elsif CPURD_N = '0' and CLK_CNT = 2 then
---					if CA = DEC_CUR_ADDR then
---						OUT_DATA_SEL <= not OUT_DATA_SEL;
---						DMAS(DMA_CH) <= std_logic_vector(unsigned(DMAS(DMA_CH)) - 1);
---						if DMAS(DMA_CH) = x"0001" then
---							DMARUN(DMA_CH) <= '0';
---						end if;
---					end if;
---				end if;
---			end if;
---		end if;
---	end process; 
-	
-	process( RST_N, SYSCLK)
+
+	process( RST_N, CLK)
 		variable i : integer range 0 to 7; 
 	begin
 		if RST_N = '0' then
@@ -212,10 +126,10 @@ begin
 			ROMBANKF <= x"3";
 			OUT_DATA_SEL <= '0';
 			DEC_START <= '0';
-		elsif falling_edge(SYSCLK) then
+		elsif rising_edge(CLK) then
 			if ENABLE = '1' then
 				DEC_START <= '0';
-				if CPUWR_N = '0' then
+				if CPUWR_N = '0' and SYSCLKF_CE = '1' then
 					if CA(22) = '0' and CA(15 downto 8) = x"43" and CA(7) = '0' then 
 						i := to_integer(unsigned(CA(6 downto 4))); 
 						case CA(3 downto 0) is
@@ -252,7 +166,7 @@ begin
 							when others => null;
 						end case; 
 					end if;
-				elsif CPURD_N = '0' then
+				elsif CPURD_N = '0' and SYSCLKF_CE = '1' then
 					if CA = DEC_CUR_ADDR then
 						OUT_DATA_SEL <= not OUT_DATA_SEL;
 						DMAS(DMA_CH) <= std_logic_vector(unsigned(DMAS(DMA_CH)) - 1);
@@ -268,32 +182,13 @@ begin
 	process( RST_N, CLK)
 	begin
 		if RST_N = '0' then
-			RD_PULSE_CNT <= (others => '0');
-			DMA_STOP_READING <= '0';
-		elsif rising_edge(CLK) then
-			if CPURD_N = '1' and CA = DEC_CUR_ADDR  then 
-				if RD_PULSE_CNT = 4 then
-					DMA_STOP_READING <= '1';
-				else
-					RD_PULSE_CNT <= RD_PULSE_CNT + 1;
-				end if;
-			else
-				RD_PULSE_CNT <= (others => '0');
-				DMA_STOP_READING <= '0';
-			end if;
-		end if;
-	end process; 
-	
-	process( RST_N, CLK)
-	begin
-		if RST_N = '0' then
 			DS <= DS_IDLE;
 			DEC_RUN <= '0';
 		elsif rising_edge(CLK) then
 			if ENABLE = '1' then
-				DEC_RUN <= '0';
 				case DS is
 					when DS_IDLE =>
+						DEC_RUN <= '0';
 						if DEC_START = '1' then
 							DS <= DS_INIT;
 						end if;
@@ -302,13 +197,14 @@ begin
 						DS <= DS_WAIT_INIT;
 						
 					when DS_WAIT_INIT =>	
-						if DEC_INIT_DONE = '1' and SNES_ACCESS = '0' then
+						if DEC_INIT_DONE = '1' then
 							DEC_RUN <= '1';
 							DS <= DS_PREDECODING;
 						end if;
 						
 					when DS_PREDECODING =>
 						if DEC_PLANE_DONE = '1' then
+							DEC_RUN <= '0';
 							DS <= DS_DECODING;
 						end if;
 					
@@ -317,19 +213,22 @@ begin
 							DS <= DS_IDLE;
 						end if;
 						
-						if CA = DEC_CUR_ADDR and OUT_DATA_SEL = '0' then
+						if DEC_PLANE_DONE = '1' then
+							DEC_RUN <= '0';
+						end if;
+
+						if CA = DEC_CUR_ADDR and OUT_DATA_SEL = '1' and CPURD_N = '0' and SYSCLKF_CE = '1' then
 							DEC_RUN <= '1';
 						end if;
-						
+
 					when others => null;
 				end case; 
 			end if;
 		end if;
 	end process; 
 	
-	DEC_EN <= '1' when DS = DS_WAIT_INIT and SNES_ACCESS = '0' else
-				 '1' when DS = DS_PREDECODING and DEC_PLANE_DONE = '0' and SNES_ACCESS = '0' else
-				 '1' when DS = DS_DECODING and CA = DEC_CUR_ADDR and DMA_STOP_READING = '0' else
+	DEC_EN <= '1' when (DS = DS_WAIT_INIT or DS = DS_PREDECODING) and SNES_ACCESS = '0' else
+				 '1' when DS = DS_DECODING and CA = DEC_CUR_ADDR else 
 				 '0';
 	
 	DEC_INIT <= '1' when DS = DS_INIT else '0';
@@ -343,11 +242,12 @@ begin
 		INIT_ADDR	=> DEC_CUR_ADDR,
 		
 		INIT			=> DEC_INIT,
-		EN				=> DEC_EN,
 		DATA_REQ		=> IM_DATA_REQ,
 
 		ROM_ADDR   	=> DEC_A,
 		ROM_DATA 	=> ROM_DO,
+		
+		ROM_RD   	=> RD_PULSE and DEC_EN,
 		
 		OUT_DATA   	=> DEC_IN_DATA,
 		HEADER		=> HEADER,
@@ -367,7 +267,6 @@ begin
 		
 		INIT			=> DEC_INIT,
 		RUN			=> DEC_RUN,
-		EN				=> DEC_EN,
 		DATA_REQ		=> IM_DATA_REQ,
 
 		DO   			=> DEC_DO,
@@ -382,7 +281,7 @@ begin
 			DEC_OUT_DATA0 <= (others => '0');
 			DEC_OUT_DATA1 <= (others => '0');
 		elsif rising_edge(CLK) then
-			if DEC_PLANE_DONE = '1' then
+			if DEC_PLANE_DONE = '1' and DEC_RUN = '1' then
 				DEC_OUT_DATA0 <= DEC_DO(7 downto 0);
 				DEC_OUT_DATA1 <= DEC_DO(15 downto 8);
 			end if;
@@ -411,16 +310,7 @@ begin
 			MAP_ROM_A <= x"FFFFFF";
 		end if;
 	end process; 
-	
-	process( MAP_ROM_A, ROM_DO )
-	begin
-		if MAP_ROM_A(0) = '0' then
-			ROM_DATA <= ROM_DO(7 downto 0);
-		else
-			ROM_DATA <= ROM_DO(15 downto 8);
-		end if;
-	end process;
-	
+
 	process( TRANSFERING, CA, DMAEN, DMARUN, ROMBANKC, ROMBANKD, ROMBANKE, ROMBANKF, 
 			   ROM_DATA, OUT_DATA_SEL, DEC_OUT_DATA0, DEC_OUT_DATA1 )
 	begin
@@ -455,19 +345,14 @@ begin
 	end process;
 	
 	ROM_A <= MAP_ROM_A;
-	
-	process( CA )
-	begin
-		if CA(23 downto 18) = x"7" & "00" or (CA(22) = '0' and CA(15 downto 13) = "011") then
-			SRAM_CS_N <= '0';
-		else
-			SRAM_CS_N <= '1';
-		end if;
-	end process;
+	ROM_DATA <= ROM_DO(7 downto 0) when MAP_ROM_A(0) = '0' else ROM_DO(15 downto 8);
+
+	RD_PULSE <= SYSCLKF_CE or SYSCLKR_CE when rising_edge(CLK);
+	ROM_RD_N <= not RD_PULSE;
 	
 	--debug
 	process(DBG_REG, HEADER, DEC_A, DEC_OUT_DATA0, DEC_OUT_DATA1, DEC_DONE, DMAEN, DMARUN, ROMBANKC, ROMBANKD, ROMBANKE, ROMBANKF,
-			  DEC_INIT, DEC_EN, TRANSFERING, DMA_STOP_READING, DEC_PLANE_DONE, DEC_INIT_DONE)
+			  DEC_INIT, DEC_EN, TRANSFERING, DEC_PLANE_DONE, DEC_INIT_DONE)
 	begin
 		case DBG_REG is
 			when x"00" => DBG_DAT_OUT <= "0000" & HEADER;
@@ -477,7 +362,7 @@ begin
 			when x"04" => DBG_DAT_OUT <= x"00";
 			when x"05" => DBG_DAT_OUT <= DEC_OUT_DATA0;
 			when x"06" => DBG_DAT_OUT <= DEC_OUT_DATA1;
-			when x"07" => DBG_DAT_OUT <= "0" & DEC_INIT & DEC_EN & TRANSFERING & DMA_STOP_READING & DEC_PLANE_DONE & DEC_INIT_DONE & DEC_DONE;
+			when x"07" => DBG_DAT_OUT <= "0" & DEC_INIT & DEC_EN & TRANSFERING & '0' & DEC_PLANE_DONE & DEC_INIT_DONE & DEC_DONE;
 			when x"08" => DBG_DAT_OUT <= DMAEN;
 			when x"09" => DBG_DAT_OUT <= DMARUN;
 			when x"0A" => DBG_DAT_OUT <= "0000" & ROMBANKC;

@@ -16,7 +16,6 @@ entity Decoder is
 		
 		INIT			: in std_logic;
 		RUN			: in std_logic;
-		EN				: in std_logic;
 		DATA_REQ		: out std_logic;
 		
 		DO       	: out std_logic_vector(15 downto 0);
@@ -196,7 +195,7 @@ begin
 					BIT_CNT <= "100";
 					BITS_CTR <= (others => x"00");
 					
-				elsif EN = '1' then
+				else
 					if RUN = '1' or BIT_NUM(3 downto 0) /= "0000" then
 						BIT_NUM <= BIT_NUM + 1;
 						BITPLANE_CNT(0) <= not BITPLANE_CNT(0);
@@ -205,10 +204,6 @@ begin
 						end if;
 								
 						if BITS_CTR(to_integer(TCODE_SIZE))(6 downto 0) = 0 then					
---							if NEW_BIT_CNT(3) = '1' then
---								DATA_REQ <= '1';
---							end if;
-							
 							BIT_CNT <= NEW_BIT_CNT(2 downto 0);
 							
 							if CODE(7) = '1' then

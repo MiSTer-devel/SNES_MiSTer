@@ -23,12 +23,13 @@ entity SCPU is
 		RAMSEL_N			: out std_logic;
 		ROMSEL_N			: out std_logic;
 		
-		SYSCLK			: out std_logic;
 		JPIO67			: out std_logic_vector(7 downto 6);
 		REFRESH			: out std_logic;
 		
-		SYSCLK_CE		: out std_logic;
-		
+		SYSCLK			: out std_logic;
+		SYSCLKF_CE		: out std_logic;
+		SYSCLKR_CE		: out std_logic;
+
 		HBLANK			: in std_logic;
 		VBLANK			: in std_logic;
 		
@@ -312,7 +313,8 @@ begin
 	P65_EN_CE <= not DMA_ACTIVE and EN and INT_CLKF_CE;
 
 	SYSCLK <= INT_CLK; 
-	SYSCLK_CE <= INT_CLKF_CE;
+	SYSCLKF_CE <= INT_CLKF_CE;
+	SYSCLKR_CE <= INT_CLKR_CE;
 
 
 	-- 65C816

@@ -89,8 +89,9 @@ architecture rtl of main is
 	signal PA 		: std_logic_vector(7 downto 0);
 	signal PARD_N 	: std_logic;
 	signal PAWR_N 	: std_logic;
-	signal SYSCLK 	: std_logic;
 	signal REFRESH : std_logic;
+	signal SYSCLKF_CE	: std_logic;
+	signal SYSCLKR_CE	: std_logic;
 
 	signal HBLANKn	: std_logic;
 	signal VBLANKn	: std_logic;
@@ -140,8 +141,9 @@ begin
 			
 		RAMSEL_N		=> RAMSEL_N,
 		ROMSEL_N		=> ROMSEL_N,
-			
-		SYSCLK		=> SYSCLK,
+		
+		SYSCLKF_CE	=> SYSCLKF_CE,
+		SYSCLKR_CE	=> SYSCLKR_CE,
 		REFRESH		=> REFRESH,
 			
 		IRQ_N			=> IRQ_N,
@@ -221,7 +223,8 @@ begin
 		ROMSEL_N		=> ROMSEL_N,
 		RAMSEL_N		=> RAMSEL_N,
 		
-		SYSCLK		=> SYSCLK,
+		SYSCLKF_CE	=> SYSCLKF_CE,
+		SYSCLKR_CE	=> SYSCLKR_CE,
 		REFRESH		=> REFRESH,
 
 		IRQ_N			=> DLH_IRQ_N,
@@ -262,7 +265,8 @@ begin
 		ROMSEL_N		=> ROMSEL_N,
 		RAMSEL_N		=> RAMSEL_N,
 		
-		SYSCLK		=> SYSCLK,
+		SYSCLKF_CE	=> SYSCLKF_CE,
+		SYSCLKR_CE	=> SYSCLKR_CE,
 		REFRESH		=> REFRESH,
 
 		IRQ_N			=> CX4_IRQ_N,

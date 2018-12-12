@@ -28,7 +28,8 @@ entity SNES is
 		RAMSEL_N		: out std_logic;
 		ROMSEL_N		: out std_logic;
 		
-		SYSCLK			: out std_logic;
+		SYSCLKF_CE	: out std_logic;
+		SYSCLKR_CE	: out std_logic;
 		REFRESH		: out std_logic;
 		
 		IRQ_N			: in std_logic;
@@ -105,8 +106,8 @@ architecture rtl of SNES is
 	signal INT_PARD_N : std_logic;
 	signal INT_PAWR_N : std_logic;
 	signal JPIO67 : std_logic_vector(7 downto 6);
-	signal INT_SYSCLK	: std_logic;
-	signal SYSCLK_CE	: std_logic;
+	signal INT_SYSCLKF_CE	: std_logic;
+	signal INT_SYSCLKR_CE	: std_logic;
 
 	signal BUSB_DO	: std_logic_vector(7 downto 0);
 	signal BUSA_SEL : std_logic;
@@ -169,12 +170,12 @@ begin
 		RAMSEL_N		=> INT_RAMSEL_N,
 		ROMSEL_N		=> INT_ROMSEL_N,
 		
-		SYSCLK		=> INT_SYSCLK,
 		REFRESH		=> REFRESH,
 		JPIO67		=> JPIO67,
 		
-		SYSCLK_CE	=> SYSCLK_CE,
-		
+		SYSCLKF_CE	=> INT_SYSCLKF_CE,
+		SYSCLKR_CE	=> INT_SYSCLKR_CE,
+
 		JOY1_DI		=> JOY1_DI,
 		JOY2_DI		=> JOY2_DI,
 		JOY_STRB		=> JOY_STRB,
@@ -214,7 +215,7 @@ begin
 	WRAM : entity work.SWRAM
 	port map(
 		CLK			=> MCLK,
-		SYSCLK_CE	=> SYSCLK_CE,
+		SYSCLK_CE	=> INT_SYSCLKF_CE,
 		RST_N			=> RST_N,
 		ENABLE		=> ENABLE,
 		
@@ -253,7 +254,7 @@ begin
 	port map(
 		RST_N			=> RST_N,
 		CLK			=> MCLK,
-		SYSCLK_CE	=> SYSCLK_CE,
+		SYSCLK_CE	=> INT_SYSCLKF_CE,
 		ENABLE		=> ENABLE,
 		
 		PA				=> INT_PA,
@@ -403,7 +404,8 @@ begin
 	
 	DO <= CPU_DO when BUSA_SEL = '1' else BUSB_DO;
 	
-	SYSCLK <= INT_SYSCLK;
+	SYSCLKF_CE <= INT_SYSCLKF_CE;
+	SYSCLKR_CE <= INT_SYSCLKR_CE;
 	
 	CPU_DBG_WR <= DBG_SEL(0) and DBG_REG_WR;
 	WRAM_DBG_WR <= DBG_SEL(2) and DBG_REG_WR;

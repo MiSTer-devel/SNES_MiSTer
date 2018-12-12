@@ -26,7 +26,8 @@ entity CX4Map is
 		ROMSEL_N		: in std_logic;
 		RAMSEL_N		: in std_logic;
 		
-		SYSCLK		: in std_logic;
+		SYSCLKF_CE	: in std_logic;
+		SYSCLKR_CE	: in std_logic;
 		REFRESH		: in std_logic;
 		
 		IRQ_N			: out std_logic;

@@ -61,6 +61,8 @@ architecture rtl of DSP_LHRomMap is
 	signal BRAM_ADDR : std_logic_vector(19 downto 0);
 	signal BSRAM_SEL : std_logic;
 
+	signal RD_PULSE  : std_logic;
+
 	signal DSP_CLK	  : std_logic;
 	signal DSP_SEL	  : std_logic;
 	signal DSP_DO    : std_logic_vector(7 downto 0);
@@ -156,17 +158,19 @@ begin
 		DBG_DAT_OUT	=> DBG_DAT_OUT,
 		DBG_DAT_WR	=> DBG_DAT_WR
 	);
-	
+
+	RD_PULSE <= SYSCLKF_CE or SYSCLKR_CE when rising_edge(MCLK);
+
 	ROM_ADDR <= (others => '1') when MAP_SEL = '0' else CART_ADDR(22 downto 0) and ROM_MASK(22 downto 0);
-	ROM_CE_N <= ROMSEL_N or not MAP_SEL;
-	ROM_OE_N <= CPURD_N or not MAP_SEL;
-	
+	ROM_CE_N <= '0' or not MAP_SEL;
+	ROM_OE_N <= RD_PULSE or not MAP_SEL;
+
 	BSRAM_ADDR <= (others => '1') when MAP_SEL = '0' else BRAM_ADDR and BSRAM_MASK(19 downto 0);
 	BSRAM_CE_N <= not BSRAM_SEL or not MAP_SEL;
 	BSRAM_OE_N <= CPURD_N or not MAP_SEL;
 	BSRAM_WE_N <= CPUWR_N or not MAP_SEL;
 	BSRAM_D    <= (others => '1') when MAP_SEL = '0' else DI;
-	
+
 	DO <= (others => '1') when MAP_SEL = '0' else
 			DSP_DO when DSP_SEL = '1' else
 			BSRAM_Q when BSRAM_SEL = '1' else

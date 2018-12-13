@@ -142,15 +142,24 @@ wire reset = RESET | buttons[1] | status[0] | ioctl_download | bk_loading;
 ////////////////////////////  HPS I/O  //////////////////////////////////
 
 `include "build_id.v"
-parameter CONF_STR = {
+parameter CONF_STR1 = {
 	"SNES;;",
 	"FS,SFCSMCBIN;",
 	"-;",
 	"O13,ROM Header,Auto,No Header,LoROM,HiROM,ExHiROM;",
-	"-;",
-	"RC,Load Backup RAM;",
-	"RD,Save Backup RAM;", 
-	"-;",
+	"-;"
+};
+
+parameter CONF_STR2 = {
+	"C,Load Backup RAM;"
+};
+
+parameter CONF_STR3 = {
+	"D,Save Backup RAM;", 
+};
+
+parameter CONF_STR4 = {
+	";",
 	"OEF,Video Region,Auto,NTSC,PAL;",
 	"O8,Aspect ratio,4:3,16:9;",
 	"O9B,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
@@ -185,11 +194,11 @@ wire        ioctl_wr;
 wire [11:0] joy0,joy1;
 wire [24:0] ps2_mouse;
 
-hps_io #(.STRLEN($size(CONF_STR)>>3), .WIDE(1)) hps_io
+hps_io #(.STRLEN(($size(CONF_STR1)>>3) + ($size(CONF_STR2)>>3) + ($size(CONF_STR3)>>3) + ($size(CONF_STR4)>>3) + 3), .WIDE(1)) hps_io
 (
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
-	.conf_str(CONF_STR),
+	.conf_str({CONF_STR1,bk_ena ? "R" : "+",CONF_STR2,bk_ena ? "R" : "+",CONF_STR3,bk_ena ? "-" : "+",CONF_STR4}),
 
 	.buttons(buttons),
 	.forced_scandoubler(forced_scandoubler),
@@ -283,7 +292,7 @@ always @(posedge clk_sys) begin
 		end
 
 		rom_mask <= (24'd1024 << rom_size) - 1'd1;
-		ram_mask <= (24'd1024 << ram_size) - 1'd1;
+		ram_mask <= ram_size ? (24'd1024 << ram_size) - 1'd1 : 24'd0;
 	end
 end
 
@@ -456,7 +465,7 @@ dpram #(16) aram
 	.wren_b(ioctl_wr)
 );
 
-localparam  BSRAM_BITS = 15; // 256Kbits is largest known size in official carts
+localparam  BSRAM_BITS = 16; // 512Kbits is largest known size in official carts
 wire [19:0] BSRAM_ADDR;
 wire        BSRAM_CE_N;
 wire        BSRAM_WE_N;
@@ -580,7 +589,7 @@ always @(posedge clk_sys) begin
 	if(~old_downloading & ioctl_download) bk_ena <= 0;
 	
 	//Save file always mounted in the end of downloading state.
-	if(ioctl_download && img_mounted && img_size && !img_readonly) bk_ena <= 1;
+	if(ioctl_download && img_mounted && img_size && !img_readonly) bk_ena <= |ram_mask;
 end
 
 wire bk_load    = status[12];

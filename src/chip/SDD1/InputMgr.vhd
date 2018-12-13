@@ -14,9 +14,6 @@ entity InputMgr is
 		INIT			: in std_logic;
 		DATA_REQ		: in std_logic;
 
-		READ_RQ		: out std_logic;
-		WRITE_RQ		: out std_logic;
-		
 		ROM_ADDR		: out std_logic_vector(23 downto 0);
 		ROM_DATA		: in std_logic_vector(15 downto 0);
 		
@@ -40,6 +37,8 @@ architecture rtl of InputMgr is
 	
 	type DataBuf_t is array(0 to 3) of std_logic_vector(15 downto 0);
 	signal DATA_BUF: DataBuf_t;
+	attribute ramstyle : string;
+	attribute ramstyle of DATA_BUF : signal is "logic";	
 	signal WR_POS 	: std_logic_vector(1 downto 0);
 	signal RD_POS 	: std_logic_vector(1 downto 0);
 begin
@@ -63,10 +62,8 @@ begin
 			if ENABLE = '1' then
 				if DATA_REQ = '1' and BYTE_LOAD = '1' then
 					READ_REQ := '1';
-					READ_RQ <= '1';
 				else
 					READ_REQ := '0';
-					READ_RQ <= '0';
 				end if;
 				
 				if ROM_RD = '1' and (WR_POS + 1 /= RD_POS) then
@@ -77,10 +74,8 @@ begin
 
 				if WAIT_ACCESS = 1 then
 					WRITE_REQ := '1';
-					WRITE_RQ <= '1';
 				else
 					WRITE_REQ := '0';
-					WRITE_RQ <= '0';
 				end if;
 
 				if INIT = '1' then

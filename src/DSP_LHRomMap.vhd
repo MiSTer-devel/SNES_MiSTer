@@ -114,7 +114,7 @@ begin
 					DSP_SEL <= '0';
 				end if;
 				DSP_A0 <= CA(12);
-			when x"5" =>							-- ExHiROM
+			when x"5"|x"2" =>						-- ExHiROM
 				CART_ADDR <= (not CA(23)) & CA(21 downto 0);
 				BRAM_ADDR <= CA(19 downto 0);
 				if CA(22 downto 21) = "01" and CA(15 downto 13) = "011" and BSRAM_MASK(10) = '1' then
@@ -133,7 +133,7 @@ begin
 		end case;
 	end process;
 	
-	MAP_SEL <= not MAP_CTRL(6);
+	MAP_SEL <= not MAP_CTRL(6) and (MAP_CTRL(7) or not (MAP_CTRL(5) or MAP_CTRL(4)));
 
 	DSP_CS_N <= not DSP_SEL;
 	

@@ -260,10 +260,11 @@ always @(posedge clk_sys) begin
 				1: rom_type <= 0;
 				2: rom_type <= 0;
 				3: rom_type <= 1;
-				4: rom_type <= 5;
+				4: rom_type <= 2;
 				default: rom_type <= ioctl_dout[15:8];
 			endcase
 		end
+
 		if (ioctl_addr == 2) begin
 			rom_region <= ioctl_dout[8];
 		end

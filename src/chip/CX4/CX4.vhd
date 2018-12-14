@@ -27,7 +27,7 @@ entity CX4 is
 		ROM_CE1_N	: out std_logic;
 		ROM_CE2_N	: out std_logic;
 		SRAM_CE_N	: out std_logic;
-
+		
 		BUS_BUSY		: out std_logic;
 		BUS_RD_N		: out std_logic;
 		
@@ -506,7 +506,7 @@ begin
 		else 
 			BUS_RD_N <= '1';
 		end if;
-	end process;
+	end process;	
 	BUS_BUSY <= BUSY;
 
 	--CACHE
@@ -605,7 +605,7 @@ begin
 						if DMA_WAIT_CNT = unsigned(WS1) then
 							DMA_SRC_ADDR <= std_logic_vector(unsigned(DMA_SRC_ADDR) + 1);
 							DMA_WAIT_CNT <= (others => '0');
-							DMA_STATE <= '1';
+							DMA_BUS_RD <= '1';
 						else
 							DMA_WAIT_CNT <= DMA_WAIT_CNT + 1;
 						end if;
@@ -616,7 +616,6 @@ begin
 							DMA_CNT <= DMA_CNT - 1;
 							if DMA_CNT = 0 then
 								DMA_RUN <= '0';
-								DMA_STATE <= '0';
 							else
 								DMA_BUS_RD <= '1';
 							end if;
@@ -625,6 +624,7 @@ begin
 							DMA_WAIT_CNT <= DMA_WAIT_CNT + 1;
 						end if;
 					end if;
+					DMA_STATE <= not DMA_STATE;
 				end if;
 			end if;
 		end if;
@@ -947,7 +947,6 @@ begin
 								else
 									SRAM_ACCESS <= '1';
 									BUS_ACCESS_CNT <= unsigned(WS2);
-									CPU_BUS_RD <= '1';
 									SRAM_WR <= '0';
 								end if;
 							end if;
@@ -973,7 +972,6 @@ begin
 					elsif IR(8) = '1' and IR(7 downto 0) = "00101111" then
 						SRAM_ACCESS <= '1';
 						BUS_ACCESS_CNT <= unsigned(WS2);
-						CPU_BUS_RD <= '1';
 						SRAM_WR <= '1';
 					end if;
 				end if;

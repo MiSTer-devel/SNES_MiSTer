@@ -1,6 +1,6 @@
 //
 // sdram.v
-// This version issues refresh only when 8bit channel reads the same 16bit words 2 times
+// This version issues refresh only when channel reads the same 16bit word 2 times
 //
 // sdram controller implementation
 // Copyright (c) 2018 Sorgelig
@@ -41,8 +41,8 @@ module sdram
 	input      [24:0] ch0_addr,
 	input             ch0_rd,
 	input             ch0_wr,
-	input       [7:0] ch0_din,
-	output reg  [7:0] ch0_dout,
+	input      [15:0] ch0_din,
+	output reg [15:0] ch0_dout,
 	output reg        ch0_busy,
 
 	input      [24:0] ch1_addr,
@@ -50,14 +50,7 @@ module sdram
 	input             ch1_wr,
 	input       [7:0] ch1_din,
 	output reg  [7:0] ch1_dout,
-	output reg        ch1_busy,
-
-	input      [24:0] ch2_addr,
-	input             ch2_rd,
-	input             ch2_wr,
-	input      [15:0] ch2_din,
-	output reg [15:0] ch2_dout,
-	output reg        ch2_busy
+	output reg        ch1_busy
 );
 
 assign SDRAM_CKE = ~init;
@@ -85,15 +78,15 @@ reg        we;
 reg        ds;
 reg        ram_req=0;
 
-wire [2:0] rd,wr;
+wire [1:0] rd,wr;
 
-assign rd = {ch2_rd, ch1_rd, ch0_rd};
-assign wr = {ch2_wr, ch1_wr, ch0_wr};
+assign rd = {ch1_rd, ch0_rd};
+assign wr = {ch1_wr, ch0_wr};
 
 // access manager
 always @(posedge clk) begin
 	reg old_ref;
-	reg  [2:0] old_rd,old_wr;//,rd,wr;
+	reg  [1:0] old_rd,old_wr;
 	reg [24:1] last_a[2] = '{{24{1'b1}},{24{1'b1}}};
 
 	old_rd <= old_rd & rd;
@@ -104,16 +97,16 @@ always @(posedge clk) begin
 		we <= 0;
 		ch0_busy <= 0;
 		ch1_busy <= 0;
-		ch2_busy <= 0;
 		if((~old_rd[0] & rd[0]) | (~old_wr[0] & wr[0])) begin
 			old_rd[0] <= rd[0];
 			old_wr[0] <= wr[0];
 			we <= wr[0];
-			ds <= 0;
+			ds <= 1;
 			{bank,a} <= ch0_addr;
-			data <= {ch0_din,ch0_din};
+			data <= ch0_din;
 			ram_req <= wr[0] || (last_a[0] != ch0_addr[24:1]);
-			last_a[0] <= wr[0] ? {24{1'b1}} : ch0_addr[24:1];
+			last_a[0] <= ch0_addr[24:1];
+			if(wr[0]) last_a <= '{{24{1'b1}},{24{1'b1}}};
 			ch0_busy <= 1;
 			state <= STATE_START;
 		end
@@ -125,20 +118,9 @@ always @(posedge clk) begin
 			{bank,a} <= ch1_addr;
 			data <= {ch1_din,ch1_din};
 			ram_req <= wr[1] || (last_a[1] != ch1_addr[24:1]);
-			last_a[1] <= wr[1] ? {24{1'b1}} : ch1_addr[24:1];
+			last_a[1] <= ch1_addr[24:1];
+			if(wr[1]) last_a <= '{{24{1'b1}},{24{1'b1}}};
 			ch1_busy <= 1;
-			state <= STATE_START;
-		end
-		else if((~old_rd[2] & rd[2]) | (~old_wr[2] & wr[2])) begin
-			old_rd[2] <= rd[2];
-			old_wr[2] <= wr[2];
-			we <= wr[2];
-			if(wr[2]) last_a <= '{{24{1'b1}},{24{1'b1}}};
-			ds <= 1;
-			{bank,a} <= ch2_addr;
-			data <= ch2_din;
-			ram_req <= 1;
-			ch2_busy <= 1;
 			state <= STATE_START;
 		end
 	end
@@ -146,7 +128,6 @@ always @(posedge clk) begin
 	if (state == STATE_READY) begin
 		ch0_busy <= 0;
 		ch1_busy <= 0;
-		ch2_busy <= 0;
 	end
 
 	if(mode != MODE_NORMAL || state != STATE_IDLE || reset) begin
@@ -207,8 +188,8 @@ always @(posedge clk) begin
 	endcase
 
 	casex({ram_req,mode,state})
-		{1'b1,  MODE_NORMAL, STATE_START}: SDRAM_A <= a[21:9];
-		{1'b1,  MODE_NORMAL, STATE_CONT }: SDRAM_A <= {4'b0010, a[22], a[8:1]};
+		{1'b1,  MODE_NORMAL, STATE_START}: SDRAM_A <= a[13:1];
+		{1'b1,  MODE_NORMAL, STATE_CONT }: SDRAM_A <= {4'b0010, a[22:14]};
 
 		// init
 		{1'bX,     MODE_LDM, STATE_START}: SDRAM_A <= MODE;
@@ -226,13 +207,13 @@ always @(posedge clk) begin
 	if(state == STATE_READY) begin
 		if(ch0_busy) begin
 			if(ram_req) begin
-				if(we) ch0_dout <= data[7:0];
+				if(we) ch0_dout <= data;
 				else begin
-					ch0_dout <= a[0] ? SDRAM_DQ[15:8] : SDRAM_DQ[7:0];
+					ch0_dout <= SDRAM_DQ;
 					last_data[0] <= SDRAM_DQ;
 				end
 			end
-			else ch0_dout <= a[0] ? last_data[0][15:8] : last_data[0][7:0];
+			else ch0_dout <= last_data[0];
 		end
 		if(ch1_busy) begin
 			if(ram_req) begin
@@ -244,7 +225,6 @@ always @(posedge clk) begin
 			end
 			else ch1_dout <= a[0] ? last_data[1][15:8] : last_data[1][7:0];
 		end
-		if(ch2_busy) ch2_dout <= we ? data : SDRAM_DQ;
 	end
 end
 

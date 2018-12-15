@@ -7,6 +7,7 @@ use IEEE.NUMERIC_STD.ALL;
 entity DSPn is
 	port(
 		CLK			: in std_logic;
+		CE				: in std_logic;
 		RST_N			: in std_logic;
 		ENABLE		: in std_logic;
 		A0   			: in std_logic;
@@ -91,7 +92,6 @@ architecture rtl of DSPn is
 	signal DATA_RAM_WE : std_logic;
 	
 	signal EN : std_logic;
-	signal CLK_CNT : unsigned(1 downto 0);
 	signal RD_Nr, WR_Nr : std_logic_vector(2 downto 0);
 	signal PORT_ACTIVE : std_logic;
 	
@@ -103,20 +103,7 @@ architecture rtl of DSPn is
 	
 begin
 
-	process(CLK, RST_N)
-	begin
-		if RST_N = '0' then
-			CLK_CNT <= (others => '0');
-		elsif rising_edge(CLK) then
-			if CLK_CNT = 1 then
-				CLK_CNT <= (others => '0');
-			else
-				CLK_CNT <= CLK_CNT + 1;
-			end if;
-		end if;
-	end process;
-	
-	EN <= ENABLE when CLK_CNT = 1 else '0';
+	EN <= ENABLE and CE;
 		
 	OP_INSTR <= PROG_ROM_Q(23 downto 22);
 	OP_P <= PROG_ROM_Q(21 downto 20);
@@ -431,7 +418,7 @@ begin
 	end process; 
 	
 	PROG_ROM_ADDR <= VER & PC;
-	PROG_ROM : entity work.prom
+	PROG_ROM : entity work.spram generic map(13, 24, "src/chip/dsp/dsp1b234_p.mif")
 	port map(
 		clock		=> CLK,
 		address	=> PROG_ROM_ADDR,
@@ -439,7 +426,7 @@ begin
 	);
 	
 	DATA_ROM_ADDR <= VER & RP;
-	DATA_ROM : entity work.drom
+	DATA_ROM : entity work.spram generic map(12, 16, "src/chip/dsp/dsp1b234_d.mif")
 	port map(
 		clock		=> CLK,
 		address	=> DATA_ROM_ADDR,
@@ -449,7 +436,7 @@ begin
 	DATA_RAM_ADDR_A <= DP;
 	DATA_RAM_ADDR_B <= DP or x"40";
 	DATA_RAM_WE <= '1' when OP_INSTR /= INSTR_JP and OP_DST = x"F" and EN = '1' else '0';
-	DATA_RAM : entity work.dram
+	DATA_RAM : entity work.dpram generic map(8, 16)
 	port map(
 		clock			=> CLK,
 		address_a	=> DATA_RAM_ADDR_A,

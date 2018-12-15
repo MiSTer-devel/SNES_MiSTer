@@ -6,7 +6,9 @@ library work;
 
 entity CX4 is
 	port(
-		CLK			: in std_logic;		--60MHz (need for FPGA's sync ram)
+		CLK			: in std_logic;
+		MEM_CLK		: in std_logic;
+		CE				: in std_logic;
 		RST_N			: in std_logic;
 		ENABLE		: in std_logic;
 		ADDR   		: in std_logic_vector(23 downto 0);
@@ -25,6 +27,9 @@ entity CX4 is
 		ROM_CE1_N	: out std_logic;
 		ROM_CE2_N	: out std_logic;
 		SRAM_CE_N	: out std_logic;
+		
+		BUS_BUSY		: out std_logic;
+		BUS_RD_N		: out std_logic;
 		
 		MAPPER		: in std_logic;
 		
@@ -111,7 +116,7 @@ architecture rtl of CX4 is
 	
 	signal EN : std_logic;
 	signal CLK_CNT : unsigned(1 downto 0);
-	signal CPU_RUN, CASHE_RUN, DMA_RUN : std_logic;
+	signal CPU_RUN, CACHE_RUN, DMA_RUN : std_logic;
 	signal CPU_EN : std_logic;
 	signal RD_Nr, WR_Nr : std_logic_vector(3 downto 0);
 	signal MMIO_WR, RAMIO_WR : std_logic;
@@ -119,11 +124,11 @@ architecture rtl of CX4 is
 	signal ROM_SEL, SRAM_SEL, RAM_SEL : std_logic;
 	signal BUSY : std_logic;
 	signal IRQ, IRQ_FLAG : std_logic;
-	signal CASHE_WAIT_CNT, DMA_WAIT_CNT : unsigned(2 downto 0);
-	signal CASHE_ADDR : std_logic_vector(8 downto 0);
-	signal CASHE_BANK : std_logic;
+	signal CACHE_WAIT_CNT, DMA_WAIT_CNT : unsigned(2 downto 0);
+	signal CACHE_ADDR : std_logic_vector(8 downto 0);
+	signal CACHE_BANK : std_logic;
 	type CachePage_t is array (0 to 1) of std_logic_vector(15 downto 0);
-	signal CASHE_PAGE : CachePage_t;
+	signal CACHE_PAGE : CachePage_t;
 	signal DMA_DST_ADDR : std_logic_vector(23 downto 0);
 	signal DMA_SRC_ADDR : std_logic_vector(23 downto 0);
 	signal DMA_DAT : std_logic_vector(7 downto 0);
@@ -148,6 +153,9 @@ architecture rtl of CX4 is
 	signal DATA_ROM_ADDR : std_logic_vector(9 downto 0);
 	signal DATA_ROM_Q : std_logic_vector(23 downto 0);
 	
+	signal CPU_BUS_RD, CACHE_BUS_RD, DMA_BUS_RD : std_logic;	--for MISTer sdram
+	signal BUS_RD_TEMP : std_logic;
+	
 	--debug
 	signal DBG_RUN_LAST : std_logic;
 	signal DBG_DAT_WRr : std_logic;
@@ -169,20 +177,8 @@ architecture rtl of CX4 is
 	
 begin
 
-	process(CLK, RST_N)
-	begin
-		if RST_N = '0' then
-			CLK_CNT <= (others => '0');
-		elsif rising_edge(CLK) then
-			CLK_CNT <= CLK_CNT + 1;
-			if CLK_CNT = 3-1 then	
-				CLK_CNT <= (others => '0');
-			end if;
-		end if;
-	end process;	
-	
-	EN <= ENABLE when CLK_CNT = 3-1 else '0';		--60/3 = 20MHz core clock
-	CPU_EN <= EN and CPU_RUN and (not CASHE_RUN) and (not DMA_RUN) and (not SUSPEND);
+	EN <= ENABLE and CE;
+	CPU_EN <= EN and CPU_RUN and (not CACHE_RUN) and (not DMA_RUN) and (not SUSPEND);
 	
 	--I/O Ports
 	process(ADDR, MAPPER)
@@ -292,7 +288,7 @@ begin
 		end if;
 	end process; 
 	
-	BUSY <= CPU_RUN or CASHE_RUN or DMA_RUN;
+	BUSY <= CPU_RUN or CACHE_RUN or DMA_RUN;
 
 	process( MMIO_SEL, RAMIO_SEL, ADDR, DMA_SRC, DMA_LEN, DMA_DST, PAGE_SEL, PAGE_LOCK, ROM_BASE, ROM_PAGE, WS1, WS2, IRQ_EN, ROM_MODE, 
 			   ROM_ACCESS, SRAM_ACCESS, VEC_MEM, GPR, CPU_RUN, DATA_RAM_Q_B, BUS_DI, IRQ_FLAG, SUSPEND, BUSY )
@@ -413,10 +409,10 @@ begin
 		end if;
 	end process;
 	
-	process( ADDR, CASHE_RUN, ROM_BASE, CASHE_PAGE, CASHE_ADDR, CASHE_BANK, DMA_RUN, DMA_STATE, DMA_SRC_ADDR, DMA_DST_ADDR, ROM_ACCESS, SRAM_ACCESS, EXT_BUS_ADDR )
+	process( ADDR, CACHE_RUN, ROM_BASE, CACHE_PAGE, CACHE_ADDR, CACHE_BANK, DMA_RUN, DMA_STATE, DMA_SRC_ADDR, DMA_DST_ADDR, ROM_ACCESS, SRAM_ACCESS, EXT_BUS_ADDR )
 	begin
-		if CASHE_RUN = '1' then
-			INT_ADDR <= std_logic_vector(unsigned(ROM_BASE) + (unsigned(CASHE_PAGE(BitToInt(CASHE_BANK))(14 downto 0)) & unsigned(CASHE_ADDR)));
+		if CACHE_RUN = '1' then
+			INT_ADDR <= std_logic_vector(unsigned(ROM_BASE) + (unsigned(CACHE_PAGE(BitToInt(CACHE_BANK))(14 downto 0)) & unsigned(CACHE_ADDR)));
 		elsif DMA_RUN = '1' then
 			if DMA_STATE = '0' then
 				INT_ADDR <= DMA_SRC_ADDR;
@@ -499,61 +495,80 @@ begin
 			BUS_WE_N <= '1';
 		end if;
 	end process; 
+	
+	--for MISTer
+	process(CACHE_RUN, DMA_RUN, ROM_ACCESS, SRAM_ACCESS, CPU_BUS_RD, CACHE_BUS_RD, DMA_BUS_RD, ROM_SEL, RD_N)
+	begin
+		if CACHE_RUN = '1' or DMA_RUN = '1' or ROM_ACCESS = '1' or SRAM_ACCESS = '1' then
+			BUS_RD_N <= not (CPU_BUS_RD or CACHE_BUS_RD or DMA_BUS_RD);
+		elsif ROM_SEL = '1' then 
+			BUS_RD_N <= RD_N;
+		else 
+			BUS_RD_N <= '1';
+		end if;
+	end process;	
+	BUS_BUSY <= BUSY;
 
-	--Cashe
+	--CACHE
 	process(CLK, RST_N)
 	begin
 		if RST_N = '0' then
-			CASHE_RUN <= '0';
-			CASHE_BANK <= '0';
-			CASHE_PAGE <= (others => (others => '1'));
-			CASHE_ADDR <= (others => '0');
-			CASHE_WAIT_CNT <= (others => '0');
+			CACHE_RUN <= '0';
+			CACHE_BANK <= '0';
+			CACHE_PAGE <= (others => (others => '1'));
+			CACHE_ADDR <= (others => '0');
+			CACHE_WAIT_CNT <= (others => '0');
+			CACHE_BUS_RD <= '0';
 		elsif rising_edge(CLK) then
+			CACHE_BUS_RD <= '0';
 			if EN = '1' then
-				if CASHE_RUN = '0' then
+				if CACHE_RUN = '0' then
 					if CPU_RUN = '0' then
 						if MMIO_WR = '1' and ADDR(11 downto 0) = x"F48" then	--7F48
-							if CASHE_PAGE(BitToInt(DI(0)))(14 downto 0) /= ROM_PAGE then
-								CASHE_RUN <= '1';
-								CASHE_BANK <= DI(0);
-								CASHE_PAGE(BitToInt(DI(0)))(14 downto 0) <= ROM_PAGE;
-								CASHE_ADDR <= (others => '0');
+							if CACHE_PAGE(BitToInt(DI(0)))(14 downto 0) /= ROM_PAGE then
+								CACHE_RUN <= '1';
+								CACHE_BANK <= DI(0);
+								CACHE_PAGE(BitToInt(DI(0)))(14 downto 0) <= ROM_PAGE;
+								CACHE_ADDR <= (others => '0');
+								CACHE_BUS_RD <= '1';
 							end if;
 						elsif MMIO_WR = '1' and ADDR(11 downto 0) = x"F4C" then	--7F4C
-							CASHE_PAGE(0)(15) <= DI(0);
+							CACHE_PAGE(0)(15) <= DI(0);
 							if DI(0) = '1' then
-								CASHE_PAGE(0)(14 downto 0) <= ROM_PAGE;
+								CACHE_PAGE(0)(14 downto 0) <= ROM_PAGE;
 							end if;
-							CASHE_PAGE(1)(15) <= DI(1);
+							CACHE_PAGE(1)(15) <= DI(1);
 							if DI(1) = '1' then
-								CASHE_PAGE(1)(14 downto 0) <= ROM_PAGE;
+								CACHE_PAGE(1)(14 downto 0) <= ROM_PAGE;
 							end if;
 						elsif MMIO_WR = '1' and ADDR(11 downto 0) = x"F4F" then	--7F4F
-							if CASHE_PAGE(0)(15) = '1' and CASHE_PAGE(0)(14 downto 0) = ROM_PAGE then
-								CASHE_BANK <= '0';
-							elsif CASHE_PAGE(1)(15) = '1' and CASHE_PAGE(1)(14 downto 0) = ROM_PAGE then
-								CASHE_BANK <= '1';
+							if CACHE_PAGE(0)(15) = '1' and CACHE_PAGE(0)(14 downto 0) = ROM_PAGE then
+								CACHE_BANK <= '0';
+							elsif CACHE_PAGE(1)(15) = '1' and CACHE_PAGE(1)(14 downto 0) = ROM_PAGE then
+								CACHE_BANK <= '1';
 							end if;
 						end if;
 					elsif CPU_EN = '1' then
 						if (INST = I_BR or INST = I_BSUB) and IR(9) = '1' and COND = '1' then
-							if CASHE_PAGE(BitToInt(not BANK))(14 downto 0) /= P then
-								CASHE_RUN <= '1';
-								CASHE_BANK <= not BANK;
-								CASHE_PAGE(BitToInt(not BANK))(14 downto 0) <= P;
-								CASHE_ADDR <= (others => '0');
+							if CACHE_PAGE(BitToInt(not BANK))(14 downto 0) /= P then
+								CACHE_RUN <= '1';
+								CACHE_BANK <= not BANK;
+								CACHE_PAGE(BitToInt(not BANK))(14 downto 0) <= P;
+								CACHE_ADDR <= (others => '0');
+								CACHE_BUS_RD <= '1';
 							end if;
 						end if;
 					end if;
 				elsif SUSPEND = '0' then
-					CASHE_WAIT_CNT <= CASHE_WAIT_CNT + 1;
-					if (CASHE_WAIT_CNT = unsigned(WS1) and ROM_SEL = '1') or (CASHE_WAIT_CNT = unsigned(WS2) and SRAM_SEL = '1') then
-						CASHE_ADDR <= std_logic_vector(unsigned(CASHE_ADDR) + 1);
-						if CASHE_ADDR = "111111111" then
-							CASHE_RUN <= '0';
+					CACHE_WAIT_CNT <= CACHE_WAIT_CNT + 1;
+					if (CACHE_WAIT_CNT = unsigned(WS1) and ROM_SEL = '1') or (CACHE_WAIT_CNT = unsigned(WS2) and SRAM_SEL = '1') then
+						CACHE_ADDR <= std_logic_vector(unsigned(CACHE_ADDR) + 1);
+						if CACHE_ADDR = "111111111" then
+							CACHE_RUN <= '0';
+						else
+							CACHE_BUS_RD <= '1';
 						end if;
-						CASHE_WAIT_CNT <= (others => '0');
+						CACHE_WAIT_CNT <= (others => '0');
 					end if;
 				end if;
 			end if;
@@ -571,7 +586,9 @@ begin
 			DMA_WAIT_CNT <= (others => '0');
 			DMA_DAT <= (others => '0');
 			DMA_STATE <= '0';
+			DMA_BUS_RD <= '0';
 		elsif rising_edge(CLK) then
+			DMA_BUS_RD <= '0';
 			if EN = '1' then
 				if DMA_RUN = '0' then
 					if MMIO_WR = '1' and ADDR(11 downto 0) = x"F47" then	--7F47
@@ -580,6 +597,7 @@ begin
 						DMA_DST_ADDR <= DMA_DST;
 						DMA_CNT <= unsigned(DMA_LEN) - 1;
 						DMA_STATE <= '0';
+						DMA_BUS_RD <= '1';
 					end if;
 				elsif SUSPEND = '0' then
 					if DMA_STATE = '0' then
@@ -587,6 +605,7 @@ begin
 						if DMA_WAIT_CNT = unsigned(WS1) then
 							DMA_SRC_ADDR <= std_logic_vector(unsigned(DMA_SRC_ADDR) + 1);
 							DMA_WAIT_CNT <= (others => '0');
+							DMA_BUS_RD <= '1';
 						else
 							DMA_WAIT_CNT <= DMA_WAIT_CNT + 1;
 						end if;
@@ -597,6 +616,8 @@ begin
 							DMA_CNT <= DMA_CNT - 1;
 							if DMA_CNT = 0 then
 								DMA_RUN <= '0';
+							else
+								DMA_BUS_RD <= '1';
 							end if;
 							DMA_WAIT_CNT <= (others => '0');
 						else
@@ -899,7 +920,9 @@ begin
 			ROM_ACCESS <= '0';
 			SRAM_ACCESS <= '0';
 			SRAM_WR <= '0';
+			CPU_BUS_RD <= '0';
 		elsif rising_edge(CLK) then
+			CPU_BUS_RD <= '0';
 			if CPU_EN = '1' then
 				if ROM_ACCESS = '1' or SRAM_ACCESS = '1' then 
 					if BUS_ACCESS_CNT = 0 then
@@ -920,6 +943,7 @@ begin
 								if IR(0) = '0' then
 									ROM_ACCESS <= '1';
 									BUS_ACCESS_CNT <= unsigned(WS1);
+									CPU_BUS_RD <= '1';
 								else
 									SRAM_ACCESS <= '1';
 									BUS_ACCESS_CNT <= unsigned(WS2);
@@ -1015,15 +1039,15 @@ begin
 			IRQ <= '0';
 			IRQ_FLAG <= '0';
 		elsif rising_edge(CLK) then
-			if CPU_RUN = '0' and EN = '1' then
+			if EN = '1' and CPU_RUN = '0' then
 				if MMIO_WR = '1' and ADDR(11 downto 0) = x"F48" then	--7F48
 					BANK <= DI(0);
 				elsif MMIO_WR = '1' and ADDR(11 downto 0) = x"F4F" then	--7F4F
 					CPU_RUN <= '1';
 					PC <= DI;
-					if CASHE_PAGE(0)(15) = '1' and CASHE_PAGE(0)(14 downto 0) = ROM_PAGE then
+					if CACHE_PAGE(0)(15) = '1' and CACHE_PAGE(0)(14 downto 0) = ROM_PAGE then
 						BANK <= '0';
-					elsif CASHE_PAGE(1)(15) = '1' and CASHE_PAGE(1)(14 downto 0) = ROM_PAGE then
+					elsif CACHE_PAGE(1)(15) = '1' and CACHE_PAGE(1)(14 downto 0) = ROM_PAGE then
 						BANK <= '1';
 					end if;
 					SP <= (others => '0');
@@ -1120,7 +1144,7 @@ begin
 		if RST_N = '0' then
 			GPR <= (others => (others => '0'));
 		elsif rising_edge(CLK) then
-			if CPU_RUN = '0' and EN = '1' then
+			if EN = '1' and CPU_RUN = '0' then
 				if MMIO_WR = '1' and ADDR(11 downto 8) = x"F" then	--7F80-7FAF
 					case ADDR(7 downto 0) is
 						when x"80" => GPR(0)(7 downto 0) <= DI;
@@ -1241,9 +1265,9 @@ begin
 		end if;
 	end process; 
 
-	DATA_ROM : entity work.CX4DRom
+	DATA_ROM : entity work.spram generic map(10, 24, "src/chip/cx4/drom.mif")
 	port map(
-		clock		=> CLK,
+		clock		=> MEM_CLK,
 		address	=> DATA_ROM_ADDR,
 		q			=> DATA_ROM_Q
 	);
@@ -1252,9 +1276,9 @@ begin
 	DATA_RAM_ADDR_B <= ADDR(11 downto 0) when ENABLE = '1' else DBG_RAM_ADDR;
 	DATA_RAM_DI_B <= DI;
 	DATA_RAM_WE_B <= '1' when EN = '1' and RAMIO_WR = '1' else '0';
-	DATA_RAM : entity work.CX4DRam
+	DATA_RAM : entity work.dpram generic map(12, 8)
 	port map(
-		clock			=> CLK,
+		clock			=> MEM_CLK,
 		address_a	=> DATA_RAM_ADDR_A,
 		data_a		=> DATA_RAM_DI_A,
 		wren_a		=> DATA_RAM_WE_A,
@@ -1266,17 +1290,17 @@ begin
 	);
 
 	PROG_ROM_ADDR_RD <= BANK & PC;
-	PROG_ROM_ADDR_WR <= CASHE_BANK & CASHE_ADDR;
-	PROG_ROM_WE <= '1' when CASHE_RUN = '1' and EN = '1' and CASHE_WAIT_CNT = unsigned(WS1) else '0';
+	PROG_ROM_ADDR_WR <= CACHE_BANK & CACHE_ADDR;
+	PROG_ROM_WE <= '1' when CACHE_RUN = '1' and EN = '1' and CACHE_WAIT_CNT = unsigned(WS1) else '0';
 	PROG_ROM_DI <= BUS_DI;
-	PROG_ROM : entity work.CX4PRom
+	PROG_ROM : entity work.dpram_dif generic map(10, 8, 9, 16)
 	port map(
-		clock			=> CLK,
-		wraddress	=> PROG_ROM_ADDR_WR,
-		data			=> PROG_ROM_DI,
-		wren			=> PROG_ROM_WE,
-		rdaddress	=> PROG_ROM_ADDR_RD,
-		q				=> PROG_ROM_Q
+		clock			=> MEM_CLK,
+		address_a	=> PROG_ROM_ADDR_WR,
+		data_a		=> PROG_ROM_DI,
+		wren_a		=> PROG_ROM_WE,
+		address_b	=> PROG_ROM_ADDR_RD,
+		q_b			=> PROG_ROM_Q
 	);
 	
 	
@@ -1292,8 +1316,8 @@ begin
 				if DBG_CTRL(0) = '1' then
 					BRK_OUT <= '1';
 				elsif DBG_CTRL(2) = '1' then
-					if (BANK = '0' and DBG_BRK_ADDR(22 downto 0) = CASHE_PAGE(0)(14 downto 0) & PC) or
-						(BANK = '1' and DBG_BRK_ADDR(22 downto 0) = CASHE_PAGE(1)(14 downto 0) & PC) then
+					if (BANK = '0' and DBG_BRK_ADDR(22 downto 0) = CACHE_PAGE(0)(14 downto 0) & PC) or
+						(BANK = '1' and DBG_BRK_ADDR(22 downto 0) = CACHE_PAGE(1)(14 downto 0) & PC) then
 						BRK_OUT <= '1';
 					end if;
 				end if;
@@ -1307,7 +1331,7 @@ begin
 	end process; 
 	
 	process(CLK, RST_N, DBG_REG, A, PC, BANK, FLAGS, SP, ROMB, RAMB, MAR, MBR, DPR, P,  
-			  CASHE_PAGE, CASHE_BANK, IR, WS1, WS2, EN, CASHE_RUN, DMA_RUN, CPU_RUN, DATA_RAM_Q_B)
+			  CACHE_PAGE, CACHE_BANK, IR, WS1, WS2, EN, CACHE_RUN, DMA_RUN, CPU_RUN, DATA_RAM_Q_B)
 	begin
 		case DBG_REG is
 			when x"00" => DBG_DAT_OUT <= A(7 downto 0);
@@ -1335,15 +1359,15 @@ begin
 			when x"16" => DBG_DAT_OUT <= "0000" & DPR(11 downto 8);
 			when x"17" => DBG_DAT_OUT <= P(7 downto 0);
 			when x"18" => DBG_DAT_OUT <= "0" & P(14 downto 8);
-			when x"19" => DBG_DAT_OUT <= CASHE_PAGE(0)(7 downto 0);
-			when x"1A" => DBG_DAT_OUT <= CASHE_PAGE(0)(15 downto 8);
-			when x"1B" => DBG_DAT_OUT <= CASHE_PAGE(1)(7 downto 0);
-			when x"1C" => DBG_DAT_OUT <= CASHE_PAGE(1)(15 downto 8);
-			when x"1D" => DBG_DAT_OUT <= "0000000" & CASHE_BANK;
+			when x"19" => DBG_DAT_OUT <= CACHE_PAGE(0)(7 downto 0);
+			when x"1A" => DBG_DAT_OUT <= CACHE_PAGE(0)(15 downto 8);
+			when x"1B" => DBG_DAT_OUT <= CACHE_PAGE(1)(7 downto 0);
+			when x"1C" => DBG_DAT_OUT <= CACHE_PAGE(1)(15 downto 8);
+			when x"1D" => DBG_DAT_OUT <= "0000000" & CACHE_BANK;
 			when x"1E" => DBG_DAT_OUT <= IR(7 downto 0);
 			when x"1F" => DBG_DAT_OUT <= IR(15 downto 8);
 			when x"20" => DBG_DAT_OUT <= "0" & WS1 & "0" & WS2;
-			when x"21" => DBG_DAT_OUT <= "0000" & EN & CASHE_RUN & DMA_RUN & CPU_RUN;
+			when x"21" => DBG_DAT_OUT <= "0000" & EN & CACHE_RUN & DMA_RUN & CPU_RUN;
 			
 			when x"80" => DBG_DAT_OUT <= DATA_RAM_Q_B;
 			when others => DBG_DAT_OUT <= x"00";

@@ -246,13 +246,13 @@ ARCHITECTURE rtl OF ascal IS
   SIGNAL i_hsize,i_hmin,i_hmax,i_hcpt : uint12;
   SIGNAL i_hrsize,i_vrsize : uint12;
   SIGNAL i_himax,i_vimax : uint12;
-  SIGNAL i_vsize,i_vmin,i_vmax,i_i_vimaxc,i_vcpt : uint12;
+  SIGNAL i_vsize,i_vmin,i_vmax,i_vimaxc,i_vcpt : uint12;
   SIGNAL i_iauto : std_logic;
   SIGNAL i_mode : unsigned(4 DOWNTO 0);
   SIGNAL i_ven,i_sof : std_logic;
   SIGNAL i_wr : std_logic;
   SIGNAL i_de_pre,i_hs_pre,i_vs_pre,i_fl_pre : std_logic;
-  SIGNAL i_hs_delay : natural RANGE 0 TO 31;
+  SIGNAL i_hs_delay : natural RANGE 0 TO 15;
   SIGNAL i_intercnt : natural RANGE 0 TO 7;
   SIGNAL i_inter,i_flm : std_logic;
   SIGNAL i_write,i_write_pre,i_walt : std_logic;
@@ -264,7 +264,7 @@ ARCHITECTURE rtl OF ascal IS
   SIGNAL i_acpt : natural RANGE 0 TO 15;
   SIGNAL i_dpram : arr_dw(0 TO BLEN*2-1);
   ATTRIBUTE ramstyle OF i_dpram : SIGNAL IS "no_rw_check";
-  SIGNAL i_syncline : std_logic;
+  SIGNAL i_endframe,i_syncline : std_logic;
   SIGNAL i_wad : natural RANGE  0 TO BLEN*2-1;
   SIGNAL i_dw : unsigned(N_DW-1 DOWNTO 0);
   SIGNAL i_adrs,i_adrsi : unsigned(31 DOWNTO 0); -- Avalon address
@@ -303,22 +303,18 @@ ARCHITECTURE rtl OF ascal IS
   SIGNAL avl_write_i,avl_write_sync,avl_write_sync2 : std_logic;
   SIGNAL avl_read_i,avl_read_sync,avl_read_sync2 : std_logic;
   SIGNAL avl_read_pulse,avl_write_pulse : std_logic;
-  SIGNAL avl_i_vs,avl_i_vs_sync : std_logic;
-  SIGNAL avl_o_vs,avl_o_vs_sync : std_logic;
   SIGNAL avl_reading : std_logic;
   SIGNAL avl_read_sr,avl_write_sr,avl_read_clr,avl_write_clr : std_logic;
   SIGNAL avl_rad,avl_rad_c,avl_wad : natural RANGE 0 TO 2*BLEN-1;
   SIGNAL avl_walt : std_logic;
-  SIGNAL avl_fl,avl_inter : std_logic;
   SIGNAL avl_dw,avl_dr : unsigned(N_DW-1 DOWNTO 0);
   SIGNAL avl_wr : std_logic;
   SIGNAL avl_readack : std_logic;
   SIGNAL avl_radrs,avl_wadrs : unsigned(31 DOWNTO 0);
   SIGNAL avl_rbib : std_logic;
-  SIGNAL avl_i_buf,avl_o_buf : natural RANGE 0 TO 2;
   SIGNAL avl_i_offset,avl_o_offset : unsigned(31 DOWNTO 0);
-  SIGNAL avl_bufup : std_logic;
   SIGNAL avl_reset_na : std_logic;
+  SIGNAL avl_o_vs_sync,avl_o_vs : std_logic;
   
   FUNCTION buf_next(a,b : natural RANGE 0 TO 2) RETURN natural IS
   BEGIN
@@ -345,10 +341,12 @@ ARCHITECTURE rtl OF ascal IS
   SIGNAL o_divcpt : natural RANGE 0 TO 36;
   SIGNAL o_divstart : std_logic;
   SIGNAL o_divrun : std_logic;
+  SIGNAL o_iendframe,o_iendframe2,o_bufup : std_logic;
+  SIGNAL o_ibuf,o_obuf : natural RANGE 0 TO 2;
   TYPE type_o_state IS (sDISP,sHSYNC,sREAD,sWAITREAD);
   SIGNAL o_state : type_o_state;
   SIGNAL o_copy,o_readack,o_readack_sync,o_readack_sync2 : std_logic;
-  SIGNAL o_copyw,o_copy1,o_copy2,o_copy3,o_copy4,o_copy5 : std_logic;
+  SIGNAL o_copyw,o_copy1,o_copy2,o_copy3,o_copy4,o_copy5,o_copy6 : std_logic;
   SIGNAL o_adrs : unsigned(31 DOWNTO 0); -- Avalon address
   SIGNAL o_adrs_pre : natural RANGE 0 TO 32*4096-1;
   SIGNAL o_ad : natural RANGE 0 TO 2*BLEN-1;
@@ -397,11 +395,12 @@ ARCHITECTURE rtl OF ascal IS
   SIGNAL o_hdown,o_vdown : std_logic;
   SIGNAL o_primv,o_lastv ,o_bibv : unsigned(0 TO 2);
   SIGNAL o_bibu,o_bib : std_logic :='0';
-  SIGNAL o_dcpt,o_dcpt1,o_dcpt2,o_dcpt3,o_dcpt4,o_dcpt5 : uint12;
+  SIGNAL o_dcpt,o_dcpt1,o_dcpt2,o_dcpt3,o_dcpt4,o_dcpt5,o_dcpt6 : uint12;
   SIGNAL o_hpix0,o_hpix1,o_hpix2,o_hpix3 : type_pix;
   SIGNAL o_hpix01,o_hpix11,o_hpix21,o_hpix31 : type_pix;
   SIGNAL o_hpix02,o_hpix12,o_hpix22,o_hpix32 : type_pix;
-  SIGNAL o_hpix13,o_hpix23 : type_pix;
+  SIGNAL o_hpix03,o_hpix13,o_hpix23,o_hpix33 : type_pix;
+  SIGNAL o_hpix14,o_hpix24 : type_pix;
 
   SIGNAL o_vpixm2,o_vpix02,o_vpix12,o_vpix22 : type_pix;
   SIGNAL o_vpixm3,o_vpix03,o_vpix13,o_vpix23 : type_pix;
@@ -410,15 +409,16 @@ ARCHITECTURE rtl OF ascal IS
   SIGNAL o_isyncline,o_isyncline2 : std_logic;
   SIGNAL o_dosync,o_msync,o_msync2,o_syncpend : std_logic;
   SIGNAL o_vpe : std_logic;
-
-  SIGNAL o_hdivi2,o_vdivi2   : unsigned(11 DOWNTO 0);
-  SIGNAL o_hdivr2,o_vdivr2   : unsigned(23 DOWNTO 0);
-  SIGNAL o_hdiv,o_vpos_lob   : unsigned(11 DOWNTO 0);
+  SIGNAL o_div : unsigned(11 DOWNTO 0); --uint12;
+  SIGNAL o_dir : unsigned(11 DOWNTO 0);
+  SIGNAL o_vdivi2 : unsigned(11 DOWNTO 0);
+  SIGNAL o_vdivr2 : unsigned(23 DOWNTO 0);
+  SIGNAL o_vpos_lob   : unsigned(11 DOWNTO 0);
   SIGNAL o_vpos_b,o_vpos_a : unsigned(23 DOWNTO 0);
   SIGNAL o_divcpt2 : natural RANGE 0 TO 36;
   SIGNAL o_divstart2 : std_logic;
   SIGNAL o_divrun2 : std_logic;
-  SIGNAL o_hacpt,o_vacpt : unsigned(11 DOWNTO 0);
+  SIGNAL o_hacpt,o_hacpt1,o_vacpt : unsigned(11 DOWNTO 0);
   SIGNAL o_phacc : boolean := false; -- <TEST> False=Delta True=Phase acc.
 
   -----------------------------------------------------------------------------
@@ -1024,11 +1024,16 @@ BEGIN
         i_ven<=to_std_logic(i_hcpt>=i_hmin AND i_hcpt<=i_hmax+1 AND
                             i_vcpt>=i_vmin AND i_vcpt<=i_vmax AND i_de='1');
         
+        -- Detects end of frame for triple buffering.
+        -- Waits for second frame of interleaved video
+        i_endframe<=to_std_logic(i_vcpt=i_vmax + 1 AND
+                     (i_inter='0' OR i_fl='1'));
+        -- Detects third line for synchronized mode.
         i_syncline<=to_std_logic(i_vcpt=i_vmin + 3);
         
         ----------------------------------------------------
         IF i_de='1' AND i_de_pre='0' THEN
-          i_i_vimaxc<=i_vcpt;
+          i_vimaxc<=i_vcpt;
           i_hcpt<=0;
         ELSE
           i_hcpt<=(i_hcpt+1) MOD 4096;
@@ -1039,7 +1044,7 @@ BEGIN
         END IF;
         
         IF i_vs='1' THEN
-          i_vimax<=i_i_vimaxc;
+          i_vimax<=i_vimaxc;
         END IF;
         
         IF i_iauto='1' THEN
@@ -1060,9 +1065,9 @@ BEGIN
         
         ----------------------------------------------------
         -- TEST : Scan image properties
-        IF i_hs='1'AND i_hs_pre='0'AND i_vcpt=1 THEN i_hsstart<=i_hcpt+1; END IF;
-        IF i_hs='0'AND i_hs_pre='1'AND i_vcpt=1 THEN i_hsend<=i_hcpt+1;   END IF;
-        IF i_de='1'AND i_de_pre='0'AND i_vcpt=1 THEN i_htotal<=i_hcpt+1;  END IF;
+        IF i_hs='1' AND i_hs_pre='0' AND i_vcpt=1 THEN i_hsstart<=i_hcpt+1; END IF;
+        IF i_hs='0' AND i_hs_pre='1' AND i_vcpt=1 THEN i_hsend<=i_hcpt+1;   END IF;
+        IF i_de='1' AND i_de_pre='0' AND i_vcpt=1 THEN i_htotal<=i_hcpt+1;  END IF;
         
         IF i_vs='1' AND i_vs_pre='0' THEN i_vsstart<=i_vcpt;  END IF;
         IF i_vs='0' AND i_vs_pre='1' THEN i_vsend<=i_vcpt;    END IF;
@@ -1406,7 +1411,7 @@ BEGIN
       
     ELSIF rising_edge(avl_clk) THEN
       ----------------------------------
-      avl_mode<=mode; -- <ASYNC> ?
+      --avl_mode<=mode; -- <ASYNC> ?
       avl_write_sync<=i_write; -- <ASYNC>
       avl_write_sync2<=avl_write_sync;
       avl_write_pulse<=avl_write_sync XOR avl_write_sync2;
@@ -1421,39 +1426,11 @@ BEGIN
       avl_radrs <=o_adrs AND (RAMSIZE - 1); -- <ASYNC>
       
       --------------------------------------------
-      avl_i_vs_sync<=i_vs; -- <ASYNC>
-      avl_i_vs<=avl_i_vs_sync;
-      avl_o_vs_sync<=o_vs0; -- <ASYNC>
+      avl_o_offset<=buf_offset(o_obuf);  -- <ASYNC>
+      avl_i_offset<=buf_offset(o_ibuf);  -- <ASYNC>
+      
+      avl_o_vs_sync<=o_vs0; -- <SYNC>
       avl_o_vs<=avl_o_vs_sync;
-
-      avl_inter<=i_inter; -- <ASYNC>
-      avl_fl   <=i_fl;    -- <ASYNC>
-      
-      --------------------------------------------
-      -- Triple buffering.
-      IF avl_i_vs_sync='1' AND avl_i_vs='0' AND
-        (avl_inter='0' OR avl_fl='1') THEN
-        -- Input : Frees framebuffer at begin of VSYNC pulse
-        -- Waits for second frame of interleaved video
-        avl_i_buf<=buf_next(avl_i_buf,avl_o_buf);
-        avl_bufup<='1';
-      END IF;
-      
-      IF avl_o_vs_sync='0' AND avl_o_vs='1' THEN
-        -- Output : Pick new framebuffer at end of VSYNC pulse
-        IF avl_bufup='1' THEN
-          avl_o_buf<=buf_next(avl_o_buf,avl_i_buf);
-          avl_bufup<='0';
-        END IF;
-      END IF;
-      
-      IF avl_mode(3)='0' THEN
-        -- Triple buffer disabled
-        avl_o_buf<=0;
-        avl_i_buf<=0;
-      END IF;
-      avl_o_offset<=buf_offset(avl_o_buf);
-      avl_i_offset<=buf_offset(avl_i_buf);
       
       --------------------------------------------
       avl_dw<=unsigned(avl_readdata);
@@ -1622,14 +1599,11 @@ BEGIN
   BEGIN
     IF o_reset_na='0' THEN
 --pragma synthesis_off
-      o_hdiv<=x"000"; -- Simu !
       o_vpos_lob<=x"000";
 --pragma synthesis_on
       
     ELSIF rising_edge(o_clk) THEN
-      o_hdivi2<=to_unsigned(o_hsize,12);
       o_vdivi2<=to_unsigned(o_vsize,12);
-      o_hdivr2<=to_unsigned(4096,24);
       o_vdivr2<=to_unsigned(o_vacc*4096,24);
       
       ------------------------------------------------------
@@ -1641,20 +1615,12 @@ BEGIN
         ----------------------------------------------------
         IF o_divcpt2=12 THEN
           o_divrun2<='0';
-          o_hdiv<=o_hdivr2(10 DOWNTO 0) & NOT o_hdivr2(23);
           o_vpos_lob<=o_vdivr2(10 DOWNTO 0) & NOT o_vdivr2(23);
         ELSE
           o_divcpt2<=o_divcpt2+1;
         END IF;
         
         ----------------------------------------------------
-        IF o_hdivr2(23)='0' THEN
-          o_hdivr2(23 DOWNTO 12)<=o_hdivr2(22 DOWNTO 11) - o_hdivi2;
-        ELSE
-          o_hdivr2(23 DOWNTO 12)<=o_hdivr2(22 DOWNTO 11) + o_hdivi2;
-        END IF;
-        o_hdivr2(11 DOWNTO 0)<=o_hdivr2(10 DOWNTO 0) & NOT o_hdivr2(23);
-        
         IF o_vdivr2(23)='0' THEN
           o_vdivr2(23 DOWNTO 12)<=o_vdivr2(22 DOWNTO 11) - o_vdivi2;
         ELSE
@@ -1701,13 +1667,24 @@ BEGIN
       o_vdisp  <=vdisp; -- <ASYNC> ?
       o_vmin   <=vmin; -- <ASYNC> ?
       o_vmax   <=vmax; -- <ASYNC> ?
-
+      
       o_hsize  <=o_hmax - o_hmin + 1;
       o_vsize  <=o_vmax - o_vmin + 1;
       
-      ------------------------------------------------------
-      -- Propagate input frame parameters to output part
-      IF o_vs0='1' THEN
+      --------------------------------------------
+      -- Triple buffering.
+      -- Input : Toggle buffer at end of input frame
+      o_iendframe<=i_endframe; -- <ASYNC>
+      o_iendframe2<=o_iendframe;
+      IF o_iendframe='1' AND o_iendframe2='0' THEN
+        o_ibuf<=buf_next(o_ibuf,o_obuf);
+        o_bufup<='1';
+      END IF;
+
+      -- Output : Change framebuffer, and image properties, at VS falling edge
+      IF o_vs1='1' AND o_vs0='0' AND o_bufup='1' THEN
+        o_obuf<=buf_next(o_obuf,o_ibuf);
+        o_bufup<='0';
         o_hburst <=i_hburst; -- <ASYNC> Bursts per line
         o_ihsize<=i_hrsize; -- <ASYNC>
         o_ivsize<=i_vrsize; -- <ASYNC>
@@ -1715,6 +1692,12 @@ BEGIN
         o_vdown<=i_vdown; -- <ASYNC>
       END IF;
       
+      -- Triple buffer disabled
+      IF o_mode(3)='0' THEN
+        o_obuf<=0;
+        o_ibuf<=0;
+      END IF;
+
       ------------------------------------------------------
       o_hmode<=o_mode; 
       IF o_hdown='1' AND DOWNSCALE THEN
@@ -2011,13 +1994,13 @@ BEGIN
   --o_v_poly_a<=to_integer(o_vpos(11 DOWNTO 12-FRAC));
 
   -- <TEST> Test phase rounding
-  Round:PROCESS(o_hpos1,o_vpos,o_poly_round) IS
+  Round:PROCESS(o_hpos2,o_vpos,o_poly_round) IS
     VARIABLE t : unsigned(FRAC+1 DOWNTO 0);
   BEGIN
     IF o_poly_round='1' THEN
-      t:=('0' & o_hpos1(11 DOWNTO 11-FRAC)) + 1;
+      t:=('0' & o_hpos2(11 DOWNTO 11-FRAC)) + 1;
       IF t(FRAC+1)='1' THEN
-        t:=('0' & o_hpos1(11 DOWNTO 11-FRAC));
+        t:=('0' & o_hpos2(11 DOWNTO 11-FRAC));
       END IF;
       o_h_poly_a<=to_integer(t(FRAC DOWNTO 1));
 
@@ -2028,7 +2011,7 @@ BEGIN
       o_v_poly_a<=to_integer(t(FRAC DOWNTO 1));
       
     ELSE
-      o_h_poly_a<=to_integer(o_hpos1(11 DOWNTO 12-FRAC));
+      o_h_poly_a<=to_integer(o_hpos2(11 DOWNTO 12-FRAC));
       o_v_poly_a<=to_integer(o_vpos(11 DOWNTO 12-FRAC));
     END IF;
     
@@ -2069,49 +2052,85 @@ BEGIN
   -- Horizontal Scaler
   HSCAL:PROCESS(o_clk) IS
     CONSTANT Z : unsigned(FRAC-1 DOWNTO 0):=(OTHERS =>'0');
+    VARIABLE div_v,divt_v : unsigned(11 DOWNTO 0); --uint12;
+    VARIABLE dir_v : unsigned(11 DOWNTO 0);
   BEGIN
     IF rising_edge(o_clk) THEN
       -- Pipeline signals
       o_hpos1<=o_hpos;
+      o_hpos2<=o_hpos1;
+      o_hacpt1<=o_hacpt;
+      
+      -----------------------------------
+      -- Pipelined 5 bits divider. Cycle 1
+      dir_v:=x"000";
+      div_v:=to_unsigned(o_hacc,12);
+
+      divt_v:=div_v-o_hsize/2;
+      dir_v(11):=NOT divt_v(11);
+      IF divt_v(11)='0' THEN div_v:=divt_v; END IF;
+      divt_v:=div_v-o_hsize/4;
+      dir_v(10):=NOT divt_v(11);
+      IF divt_v(11)='0' THEN div_v:=divt_v; END IF;
+      divt_v:=div_v-o_hsize/8;
+      dir_v( 9):=NOT divt_v(11);
+      IF divt_v(11)='0' THEN div_v:=divt_v; END IF;
+      
+      o_div<=div_v;
+      o_dir<=dir_v;
+
+      -- Cycle 2
+      div_v:=o_div;
+      dir_v:=o_dir;
+      divt_v:=div_v-o_hsize/16;
+      dir_v( 8):=NOT divt_v(11);
+      IF divt_v(11)='0' THEN div_v:=divt_v; END IF;
+      divt_v:=div_v-o_hsize/32;
+      dir_v( 7):=NOT divt_v(11);
+      IF divt_v(11)='0' THEN div_v:=divt_v; END IF;
+      
+      -----------------------------------
       IF o_phacc THEN
-        o_hpos1<=o_hacc * o_hdiv; -- 12 * 0.12
-        o_hpos1(23 DOWNTO 12)<=o_hacpt;
+        o_hpos2(11 DOWNTO 0) <=dir_v;
+        o_hpos2(23 DOWNTO 12)<=o_hacpt1;
       END IF;
-      o_hpos2<=o_hpos1; o_hpos3<=o_hpos2; o_hpos4<=o_hpos3;
-      o_copy1<=o_copyw;
-      o_copy2<=o_copy1; o_copy3<=o_copy2; o_copy4<=o_copy3; o_copy5<=o_copy4;
+      
+      o_hpos3<=o_hpos2; o_hpos4<=o_hpos3; o_hpos5<=o_hpos4;
+      o_copy1<=o_copyw; o_copy2<=o_copy1; o_copy3<=o_copy2; o_copy4<=o_copy3; o_copy5<=o_copy4;
+      o_copy6<=o_copy5;
       
       o_dcpt1<=o_dcpt;
       IF o_dcpt1>o_hsize THEN
         o_copy2<='0';
       END IF;
       o_dcpt2<=o_dcpt1 MOD OHRES;
-      o_dcpt3<=o_dcpt2; o_dcpt4<=o_dcpt3; o_dcpt5<=o_dcpt4;
+      o_dcpt3<=o_dcpt2; o_dcpt4<=o_dcpt3; o_dcpt5<=o_dcpt4; o_dcpt6<=o_dcpt5;
       o_acpt1<=o_acpt;
       
       o_hpix01<=o_hpix3;  o_hpix11<=o_hpix2;  o_hpix21<=o_hpix1;  o_hpix31<=o_hpix0;
-      --o_hpix02<=o_hpix01;
-		o_hpix12<=o_hpix11; o_hpix22<=o_hpix21; --o_hpix32<=o_hpix31;
-      o_hpix13<=o_hpix12; o_hpix23<=o_hpix22;
+      o_hpix02<=o_hpix01; o_hpix12<=o_hpix11; o_hpix22<=o_hpix21; o_hpix32<=o_hpix31;
+      --o_hpix03<=o_hpix02;
+		o_hpix13<=o_hpix12; o_hpix23<=o_hpix22; --o_hpix33<=o_hpix32;
+      o_hpix14<=o_hpix13; o_hpix24<=o_hpix23;
       
       -- NEAREST / BILINEAR / SHARP BILINEAR ---------------
       -- C1 : Pre-calc Sharp Bilinear
-      o_h_sbil_t<=sbil_frac1(o_hpos1(11 DOWNTO 0));
+      o_h_sbil_t<=sbil_frac1(o_hpos2(11 DOWNTO 0));
       
       -- C2 : Select
       o_h_frac2<=(OTHERS =>'0');
       CASE o_hmode(1 DOWNTO 0) IS
         WHEN "00" => -- Nearest
           IF MASK(MASK_NEAREST)='1' THEN
-            o_h_frac2<=near_frac(o_hpos2(11 DOWNTO 0));
+            o_h_frac2<=near_frac(o_hpos3(11 DOWNTO 0));
           END IF;
         WHEN "01" => -- Bilinear
           IF MASK(MASK_BILINEAR)='1' THEN
-            o_h_frac2<=bil_frac(o_hpos2(11 DOWNTO 0));
+            o_h_frac2<=bil_frac(o_hpos3(11 DOWNTO 0));
           END IF;
         WHEN "10" => -- Sharp Bilinear
           IF MASK(MASK_SHARP_BILINEAR)='1' THEN
-            o_h_frac2<=sbil_frac2(o_hpos2(11 DOWNTO 0),o_h_sbil_t);
+            o_h_frac2<=sbil_frac2(o_hpos3(11 DOWNTO 0),o_h_sbil_t);
           END IF;
         WHEN OTHERS =>
           NULL;
@@ -2122,28 +2141,28 @@ BEGIN
       o_h_fracn3<=('1' & Z) - ('0' & o_h_frac2);
       
       -- C4 : Nearest / Bilinear / Sharp Bilinear
-      o_h_bil_pix<=bil_calc(o_h_frac3,o_h_fracn3,o_hpix13,o_hpix23);
+      o_h_bil_pix<=bil_calc(o_h_frac3,o_h_fracn3,o_hpix14,o_hpix24);
       
       -- BICUBIC -------------------------------------------
       -- C1 : Bicubic coefficients A,B,C,D
-      o_h_bic_abcd<=bic_calc0(o_hpos1(11 DOWNTO 0),o_hpix3,o_hpix2,o_hpix1,o_hpix0);
+      o_h_bic_abcd<=bic_calc0(o_hpos2(11 DOWNTO 0),o_hpix01,o_hpix11,o_hpix21,o_hpix31);
       
       -- C2 : Bicubic calc T1 = X.D + C
       o_h_bic_abcd1<=o_h_bic_abcd;
-      o_h_bic_tt1<=bic_calc1(o_hpos2(11 DOWNTO 0),o_h_bic_abcd);
+      o_h_bic_tt1<=bic_calc1(o_hpos3(11 DOWNTO 0),o_h_bic_abcd);
 
       -- C3 : Bicubic calc T2 = X.T1 + B
       o_h_bic_abcd2<=o_h_bic_abcd1;
-      o_h_bic_tt2<=bic_calc2(o_hpos3(11 DOWNTO 0),o_h_bic_tt1,o_h_bic_abcd1);
+      o_h_bic_tt2<=bic_calc2(o_hpos4(11 DOWNTO 0),o_h_bic_tt1,o_h_bic_abcd1);
       
       -- C4 : Bicubic final Y = X.T2 + A
-      o_h_bic_pix<=bic_calc3(o_hpos4(11 DOWNTO 0),o_h_bic_tt2,o_h_bic_abcd2);
+      o_h_bic_pix<=bic_calc3(o_hpos5(11 DOWNTO 0),o_h_bic_tt2,o_h_bic_abcd2);
       
       -- POLYPHASE -----------------------------------------
       -- C1 : Read memory
       
       -- C2 : Filter calc
-      o_h_poly_t<=poly_calc1(o_h_poly_dr,o_hpix01,o_hpix11,o_hpix21,o_hpix31);
+      o_h_poly_t<=poly_calc1(o_h_poly_dr,o_hpix02,o_hpix12,o_hpix22,o_hpix32);
       
       -- C3 : Add
       o_h_poly_t2<=poly_calc2(o_h_poly_t);
@@ -2152,8 +2171,8 @@ BEGIN
       o_h_poly_pix<=poly_calc3(o_h_poly_t2);
       
       -- C4 : Select interpoler ----------------------------
-      o_wadl<=o_dcpt5;
-      o_wr<=o_alt AND (o_copy5 & o_copy5 & o_copy5 & o_copy5);
+      o_wadl<=o_dcpt6;
+      o_wr<=o_alt AND (o_copy6 & o_copy6 & o_copy6 & o_copy6);
       o_ldw<=(x"00",x"00",x"00");
       
       CASE o_hmode(2 DOWNTO 0) IS
@@ -2224,7 +2243,9 @@ BEGIN
         o_pe0<=to_std_logic(o_hcpt>=o_hmin AND o_hcpt<=o_hmax AND
                             o_vcpt>=o_vmin AND o_vcpt<=o_vmax);
         o_hs0<=to_std_logic(o_hcpt>=o_hsstart AND o_hcpt<o_hsend);
-        o_vs0<=to_std_logic(o_vcpt>=o_vsstart AND o_vcpt<o_vsend);
+        o_vs0<=to_std_logic((o_vcpt=o_vsstart AND o_hcpt>=o_hsstart) OR
+                            (o_vcpt>o_vsstart AND o_vcpt<o_vsend) OR
+                            (o_vcpt=o_vsend   AND o_hcpt<o_hsstart));
         
         IF o_run='0' THEN
           o_de0<='0';
@@ -2235,7 +2256,7 @@ BEGIN
         
         ----------------------------------------------------
         -- SYNCHRONIZED LOW LATENCY MODE
-        -- Measure delay between input Vsync and third displayed line
+        -- Trigger start of output frame after third line of input frame.
         o_isyncline<=i_syncline; -- <ASYNC>
         --o_isyncline2<=o_isyncline;
 
@@ -2522,8 +2543,8 @@ BEGIN
     CC(' ') & -- 1
     CN(to_unsigned(i_intercnt,4)) & -- 1
     CC(' ') & -- 1
-    CN(to_unsigned(avl_i_buf,4)) & -- 1
-    CN(to_unsigned(avl_o_buf,4)) & -- 1
+    CN(to_unsigned(o_ibuf,4)) & -- 1
+    CN(to_unsigned(o_obuf,4)) & -- 1
     CS("       ") &
     CS("       ");
   ----------------------------------------------------------------------------  

@@ -529,8 +529,8 @@ ascal
 	.i_r    (r_out),
 	.i_g    (g_out),
 	.i_b    (b_out),
-	.i_hs   (hs_emu),
-	.i_vs   (vs_emu),
+	.i_hs   (hs),
+	.i_vs   (vs),
 	.i_fl   (f1),
 	.i_de   (de),
 	.iauto  (1),
@@ -901,8 +901,8 @@ wire  [1:0] led_power;
 wire  [1:0] led_disk;
 
 wire vs_emu, hs_emu;
-sync_fix sync_v(FPGA_CLK3_50, vs_emu, vs);
-sync_fix sync_h(FPGA_CLK3_50, hs_emu, hs);
+sync_fix sync_v(clk_vid, vs_emu, vs);
+sync_fix sync_h(clk_vid, hs_emu, hs);
 
 wire        uart_dtr;
 wire        uart_dsr;

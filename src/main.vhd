@@ -8,9 +8,9 @@ use IEEE.STD_LOGIC_TEXTIO.all;
 
 entity main is
 	port(
-		MCLK_50M		: in  std_logic;
 		RESET_N		: in  std_logic;
 
+		MEM_CLK		: in  std_logic;
 		MCLK			: in  std_logic;
 		ACLK			: in  std_logic;
 
@@ -19,7 +19,7 @@ entity main is
 		RAM_MASK		: in  std_logic_vector(23 downto 0);
 
 		ROM_ADDR		: out std_logic_vector(22 downto 0);
-		ROM_Q			: in  std_logic_vector(7 downto 0);
+		ROM_Q			: in  std_logic_vector(15 downto 0);
 		ROM_CE_N		: out std_logic;
 		ROM_OE_N		: out std_logic;
 
@@ -30,29 +30,29 @@ entity main is
 		BSRAM_OE_N	: out std_logic;
 		BSRAM_WE_N	: out std_logic;
 
-		WSRAM_ADDR	: out std_logic_vector(16 downto 0);
-		WSRAM_D		: out std_logic_vector(7 downto 0);
-		WSRAM_Q		: in  std_logic_vector(7 downto 0);
-		WSRAM_CE_N	: out std_logic;
-		WSRAM_OE_N	: out std_logic;
-		WSRAM_WE_N	: out std_logic;
+		WRAM_ADDR	: out std_logic_vector(16 downto 0);
+		WRAM_D		: out std_logic_vector(7 downto 0);
+		WRAM_Q		: in  std_logic_vector(7 downto 0);
+		WRAM_CE_N	: out std_logic;
+		WRAM_OE_N	: out std_logic;
+		WRAM_WE_N	: out std_logic;
 
-		VSRAM_ADDRA	: out std_logic_vector(15 downto 0);
-		VSRAM_DAI	: in  std_logic_vector(7 downto 0);
-		VSRAM_DAO	: out std_logic_vector(7 downto 0);
-		VSRAM_WEA_N	: out std_logic;
-		VSRAM_ADDRB	: out std_logic_vector(15 downto 0);
-		VSRAM_DBI	: in  std_logic_vector(7 downto 0);
-		VSRAM_DBO	: out std_logic_vector(7 downto 0);
-		VSRAM_WEB_N	: out std_logic;
-		VSRAM_OE_N	: out std_logic;
+		VRAM1_ADDR	: out std_logic_vector(15 downto 0);
+		VRAM1_DI		: in  std_logic_vector(7 downto 0);
+		VRAM1_DO		: out std_logic_vector(7 downto 0);
+		VRAM1_WE_N	: out std_logic;
+		VRAM2_ADDR	: out std_logic_vector(15 downto 0);
+		VRAM2_DI		: in  std_logic_vector(7 downto 0);
+		VRAM2_DO		: out std_logic_vector(7 downto 0);
+		VRAM2_WE_N	: out std_logic;
+		VRAM_OE_N	: out std_logic;
 
-		ASRAM_ADDR	: out std_logic_vector(15 downto 0);
-		ASRAM_D		: out std_logic_vector(7 downto 0);
-		ASRAM_Q		: in  std_logic_vector(7 downto 0);
-		ASRAM_CE_N	: out std_logic;
-		ASRAM_OE_N	: out std_logic;
-		ASRAM_WE_N	: out std_logic;
+		ARAM_ADDR	: out std_logic_vector(15 downto 0);
+		ARAM_D		: out std_logic_vector(7 downto 0);
+		ARAM_Q		: in  std_logic_vector(7 downto 0);
+		ARAM_CE_N	: out std_logic;
+		ARAM_OE_N	: out std_logic;
+		ARAM_WE_N	: out std_logic;
 
 		PAL			: in  std_logic;
 		HIGH_RES		: out std_logic;
@@ -89,14 +89,47 @@ architecture rtl of main is
 	signal PA 		: std_logic_vector(7 downto 0);
 	signal PARD_N 	: std_logic;
 	signal PAWR_N 	: std_logic;
-	signal SYSCLK 	: std_logic;
 	signal REFRESH : std_logic;
+	signal SYSCLKF_CE	: std_logic;
+	signal SYSCLKR_CE	: std_logic;
 
 	signal HBLANKn	: std_logic;
 	signal VBLANKn	: std_logic;
 
 	signal RGB_OUT : std_logic_vector(14 downto 0);
 
+	signal DLH_DO				: std_logic_vector(7 downto 0);
+	signal DLH_IRQ_N			: std_logic;
+	signal DLH_ROM_ADDR		: std_logic_vector(22 downto 0);
+	signal DLH_ROM_CE_N		: std_logic;
+	signal DLH_ROM_OE_N		: std_logic;
+	signal DLH_BSRAM_ADDR	: std_logic_vector(19 downto 0);
+	signal DLH_BSRAM_D		: std_logic_vector(7 downto 0);
+	signal DLH_BSRAM_CE_N	: std_logic;
+	signal DLH_BSRAM_OE_N	: std_logic;
+	signal DLH_BSRAM_WE_N	: std_logic;
+
+	signal CX4_DO				: std_logic_vector(7 downto 0);
+	signal CX4_IRQ_N			: std_logic;
+	signal CX4_ROM_ADDR		: std_logic_vector(22 downto 0);
+	signal CX4_ROM_CE_N		: std_logic;
+	signal CX4_ROM_OE_N		: std_logic;
+	signal CX4_BSRAM_ADDR	: std_logic_vector(19 downto 0);
+	signal CX4_BSRAM_D		: std_logic_vector(7 downto 0);
+	signal CX4_BSRAM_CE_N	: std_logic;
+	signal CX4_BSRAM_OE_N	: std_logic;
+	signal CX4_BSRAM_WE_N	: std_logic;
+
+	signal SDD_DO				: std_logic_vector(7 downto 0);
+	signal SDD_IRQ_N			: std_logic;
+	signal SDD_ROM_ADDR		: std_logic_vector(22 downto 0);
+	signal SDD_ROM_CE_N		: std_logic;
+	signal SDD_ROM_OE_N		: std_logic;
+	signal SDD_BSRAM_ADDR	: std_logic_vector(19 downto 0);
+	signal SDD_BSRAM_D		: std_logic_vector(7 downto 0);
+	signal SDD_BSRAM_CE_N	: std_logic;
+	signal SDD_BSRAM_OE_N	: std_logic;
+	signal SDD_BSRAM_WE_N	: std_logic;
 begin
 
 	SNES : entity work.SNES
@@ -119,35 +152,36 @@ begin
 			
 		RAMSEL_N		=> RAMSEL_N,
 		ROMSEL_N		=> ROMSEL_N,
-			
-		SYSCLK		=> SYSCLK,
+		
+		SYSCLKF_CE	=> SYSCLKF_CE,
+		SYSCLKR_CE	=> SYSCLKR_CE,
 		REFRESH		=> REFRESH,
 			
 		IRQ_N			=> IRQ_N,
 			
-		WSRAM_ADDR	=> WSRAM_ADDR,
-		WSRAM_D		=> WSRAM_D,
-		WSRAM_Q		=> WSRAM_Q,
-		WSRAM_CE_N	=> WSRAM_CE_N,
-		WSRAM_OE_N	=> WSRAM_OE_N,
-		WSRAM_WE_N	=> WSRAM_WE_N,
+		WSRAM_ADDR	=> WRAM_ADDR,
+		WSRAM_D		=> WRAM_D,
+		WSRAM_Q		=> WRAM_Q,
+		WSRAM_CE_N	=> WRAM_CE_N,
+		WSRAM_OE_N	=> WRAM_OE_N,
+		WSRAM_WE_N	=> WRAM_WE_N,
 			
-		VRAM_ADDRA	=> VSRAM_ADDRA,
-		VRAM_ADDRB	=> VSRAM_ADDRB,
-		VRAM_DAI		=> VSRAM_DAI,
-		VRAM_DBI		=> VSRAM_DBI,
-		VRAM_DAO		=> VSRAM_DAO,
-		VRAM_DBO		=> VSRAM_DBO,
-		VRAM_RD_N	=> VSRAM_OE_N,
-		VRAM_WRA_N	=> VSRAM_WEA_N,
-		VRAM_WRB_N	=> VSRAM_WEB_N,
+		VRAM_ADDRA	=> VRAM1_ADDR,
+		VRAM_ADDRB	=> VRAM2_ADDR,
+		VRAM_DAI		=> VRAM1_DI,
+		VRAM_DBI		=> VRAM2_DI,
+		VRAM_DAO		=> VRAM1_DO,
+		VRAM_DBO		=> VRAM2_DO,
+		VRAM_RD_N	=> VRAM_OE_N,
+		VRAM_WRA_N	=> VRAM1_WE_N,
+		VRAM_WRB_N	=> VRAM2_WE_N,
 
-		ARAM_ADDR	=> ASRAM_ADDR,
-		ARAM_D		=> ASRAM_D,
-		ARAM_Q		=> ASRAM_Q,
-		ARAM_CE_N	=> ASRAM_CE_N,
-		ARAM_OE_N	=> ASRAM_OE_N,
-		ARAM_WE_N	=> ASRAM_WE_N,
+		ARAM_ADDR	=> ARAM_ADDR,
+		ARAM_D		=> ARAM_D,
+		ARAM_Q		=> ARAM_Q,
+		ARAM_CE_N	=> ARAM_CE_N,
+		ARAM_OE_N	=> ARAM_OE_N,
+		ARAM_WE_N	=> ARAM_WE_N,
 
 		JOY1_DI		=> JOY1_DI,
 		JOY2_DI		=> JOY2_DI,
@@ -176,22 +210,20 @@ begin
 		AUDIO_R		=> AUDIO_R
 	);
 
+	R <= RGB_OUT(4 downto 0);
+	G <= RGB_OUT(9 downto 5);
+	B <= RGB_OUT(14 downto 10);
 	HBLANK <= not HBLANKn;
 	VBLANK <= not VBLANKn;
 
-	SMAP : entity work.LHRomMap
-	--SMAP : entity work.SDD1Map
-	--SMAP : entity work.DSPMap
-	--SMAP : entity work.CX4Map
+	DSP_LHRomMap : entity work.DSP_LHRomMap
 	port map(
-		MCLK50		=> MCLK_50M,
 		MCLK			=> MCLK,
 		RST_N			=> RESET_N,
-		ENABLE		=> '1',
 		
 		CA				=> CA,
 		DI				=> DO,
-		DO				=> DI,
+		DO				=> DLH_DO,
 		CPURD_N		=> CPURD_N,
 		CPUWR_N		=> CPUWR_N,
 		
@@ -202,34 +234,121 @@ begin
 		ROMSEL_N		=> ROMSEL_N,
 		RAMSEL_N		=> RAMSEL_N,
 		
-		SYSCLK		=> SYSCLK,
+		SYSCLKF_CE	=> SYSCLKF_CE,
+		SYSCLKR_CE	=> SYSCLKR_CE,
 		REFRESH		=> REFRESH,
 
-		IRQ_N			=> IRQ_N,
+		IRQ_N			=> DLH_IRQ_N,
 		
-		ROM_ADDR		=> ROM_ADDR,
+		ROM_ADDR		=> DLH_ROM_ADDR,
 		ROM_Q			=> ROM_Q,
-		ROM_CE_N		=> ROM_CE_N,
-		ROM_OE_N		=> ROM_OE_N,
+		ROM_CE_N		=> DLH_ROM_CE_N,
+		ROM_OE_N		=> DLH_ROM_OE_N,
 
-		BSRAM_ADDR	=> BSRAM_ADDR,
-		BSRAM_D		=> BSRAM_D,
+		BSRAM_ADDR	=> DLH_BSRAM_ADDR,
+		BSRAM_D		=> DLH_BSRAM_D,
 		BSRAM_Q		=> BSRAM_Q,
-		BSRAM_CE_N	=> BSRAM_CE_N,
-		BSRAM_OE_N	=> BSRAM_OE_N,
-		BSRAM_WE_N	=> BSRAM_WE_N,
+		BSRAM_CE_N	=> DLH_BSRAM_CE_N,
+		BSRAM_OE_N	=> DLH_BSRAM_OE_N,
+		BSRAM_WE_N	=> DLH_BSRAM_WE_N,
 
 		MAP_CTRL		=> ROM_TYPE,
 		ROM_MASK		=> ROM_MASK,
-		BSRAM_MASK	=> RAM_MASK,
-		
-		DBG_REG  	=> (others =>'0'),
-		DBG_DAT_IN	=> (others =>'0'),
-		DBG_DAT_WR	=> '0'
+		BSRAM_MASK	=> RAM_MASK
 	);
 
-	R <= RGB_OUT(4 downto 0);
-	G <= RGB_OUT(9 downto 5);
-	B <= RGB_OUT(14 downto 10);
+	CX4Map : entity work.CX4Map
+	port map(
+		MEM_CLK		=> MEM_CLK,
+		MCLK			=> MCLK,
+		RST_N			=> RESET_N,
+		
+		CA				=> CA,
+		DI				=> DO,
+		DO				=> CX4_DO,
+		CPURD_N		=> CPURD_N,
+		CPUWR_N		=> CPUWR_N,
+		
+		PA				=> PA,
+		PARD_N		=> PARD_N,
+		PAWR_N		=> PAWR_N,
+		
+		ROMSEL_N		=> ROMSEL_N,
+		RAMSEL_N		=> RAMSEL_N,
+		
+		SYSCLKF_CE	=> SYSCLKF_CE,
+		SYSCLKR_CE	=> SYSCLKR_CE,
+		REFRESH		=> REFRESH,
+
+		IRQ_N			=> CX4_IRQ_N,
+		
+		ROM_ADDR		=> CX4_ROM_ADDR,
+		ROM_Q			=> ROM_Q,
+		ROM_CE_N		=> CX4_ROM_CE_N,
+		ROM_OE_N		=> CX4_ROM_OE_N,
+
+		BSRAM_ADDR	=> CX4_BSRAM_ADDR,
+		BSRAM_D		=> CX4_BSRAM_D,
+		BSRAM_Q		=> BSRAM_Q,
+		BSRAM_CE_N	=> CX4_BSRAM_CE_N,
+		BSRAM_OE_N	=> CX4_BSRAM_OE_N,
+		BSRAM_WE_N	=> CX4_BSRAM_WE_N,
+
+		MAP_CTRL		=> ROM_TYPE,
+		ROM_MASK		=> ROM_MASK,
+		BSRAM_MASK	=> RAM_MASK
+	);
 	
+	SDD1Map : entity work.SDD1Map
+	port map(
+		MCLK			=> MCLK,
+		RST_N			=> RESET_N,
+
+		CA				=> CA,
+		DI				=> DO,
+		DO				=> SDD_DO,
+		CPURD_N		=> CPURD_N,
+		CPUWR_N		=> CPUWR_N,
+
+		PA				=> PA,
+		PARD_N		=> PARD_N,
+		PAWR_N		=> PAWR_N,
+
+		ROMSEL_N		=> ROMSEL_N,
+		RAMSEL_N		=> RAMSEL_N,
+
+		SYSCLKF_CE	=> SYSCLKF_CE,
+		SYSCLKR_CE	=> SYSCLKR_CE,
+		REFRESH		=> REFRESH,
+
+		IRQ_N			=> SDD_IRQ_N,
+
+		ROM_ADDR		=> SDD_ROM_ADDR,
+		ROM_Q			=> ROM_Q,
+		ROM_CE_N		=> SDD_ROM_CE_N,
+		ROM_OE_N		=> SDD_ROM_OE_N,
+
+		BSRAM_ADDR	=> SDD_BSRAM_ADDR,
+		BSRAM_D		=> SDD_BSRAM_D,
+		BSRAM_Q		=> BSRAM_Q,
+		BSRAM_CE_N	=> SDD_BSRAM_CE_N,
+		BSRAM_OE_N	=> SDD_BSRAM_OE_N,
+		BSRAM_WE_N	=> SDD_BSRAM_WE_N,
+
+		MAP_CTRL		=> ROM_TYPE,
+		ROM_MASK		=> ROM_MASK,
+		BSRAM_MASK	=> RAM_MASK
+	);
+
+	DI          <= DLH_DO         and CX4_DO         and SDD_DO;
+	IRQ_N       <= DLH_IRQ_N      and CX4_IRQ_N      and SDD_IRQ_N;
+	ROM_ADDR    <= DLH_ROM_ADDR   and CX4_ROM_ADDR   and SDD_ROM_ADDR;
+	ROM_CE_N    <= DLH_ROM_CE_N   and CX4_ROM_CE_N   and SDD_ROM_CE_N;
+	ROM_OE_N    <= DLH_ROM_OE_N   and CX4_ROM_OE_N   and SDD_ROM_OE_N;
+	BSRAM_ADDR  <= DLH_BSRAM_ADDR and CX4_BSRAM_ADDR and SDD_BSRAM_ADDR;
+	BSRAM_D     <= DLH_BSRAM_D    and CX4_BSRAM_D    and SDD_BSRAM_D;
+	BSRAM_CE_N  <= DLH_BSRAM_CE_N and CX4_BSRAM_CE_N and SDD_BSRAM_CE_N;
+	BSRAM_OE_N  <= DLH_BSRAM_OE_N and CX4_BSRAM_OE_N and SDD_BSRAM_OE_N;
+	BSRAM_WE_N  <= DLH_BSRAM_WE_N and CX4_BSRAM_WE_N and SDD_BSRAM_WE_N;
+
 end rtl;

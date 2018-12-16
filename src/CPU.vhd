@@ -141,7 +141,6 @@ architecture rtl of SCPU is
 
 	type ds_t is (
 		DS_IDLE,
-		DS_INIT,
 		DS_CH_SEL,
 		DS_TRANSFER
 	);
@@ -419,7 +418,7 @@ begin
 	end process;
 	
 	process(P65_A, EN, CPU_RD, CPU_WR, DMA_B, DMA_B_RD, DMA_B_WR, DMA_A_RD, DMA_A_WR, 
-			  HDMA_B, HDMA_A_RD, HDMA_A_WR, HDMA_B_RD, HDMA_B_WR, DMA_RUN, HDMA_RUN)
+			  HDMA_B, HDMA_A_RD, HDMA_A_WR, HDMA_B_RD, HDMA_B_WR, DMA_RUN, HDMA_RUN, P65_EN)
 	begin
 		if HDMA_RUN = '1' and EN = '1' then
 			PA <= HDMA_B;
@@ -429,7 +428,7 @@ begin
 			PA <= DMA_B;
 			PARD_N <= not DMA_B_RD;
 			PAWR_N <= not DMA_B_WR;
-		elsif P65_A(22) = '0' and P65_A(15 downto 8) = x"21" then
+		elsif P65_A(22) = '0' and P65_A(15 downto 8) = x"21" and P65_EN = '1' then
 			PA <= P65_A(7 downto 0);
 			PARD_N <= not CPU_RD;
 			PAWR_N <= not CPU_WR;
@@ -445,11 +444,14 @@ begin
 		elsif DMA_RUN = '1' and EN = '1' then
 			INT_CPURD_N <= not DMA_A_RD;
 			INT_CPUWR_N <= not DMA_A_WR;
-		else
+		elsif P65_EN = '1' then
 			INT_CPURD_N <= not CPU_RD;
 			INT_CPUWR_N <= not CPU_WR; 
+		else
+			INT_CPURD_N <= '1';
+			INT_CPUWR_N <= '1'; 
 		end if;
-	end process; 
+	end process;
 	
 	CPURD_N <= INT_CPURD_N;
 	CPUWR_N <= INT_CPUWR_N; 
@@ -818,7 +820,7 @@ begin
 			HDMA_INIT_EXEC <= '1';
 			HDMA_RUN_EXEC <= '0';
 		elsif rising_edge(CLK) then
-			if P65_R_WN = '0' and IO_SEL = '1' then
+			if P65_R_WN = '0' and IO_SEL = '1' and INT_CLKF_CE = '1' then
 				if P65_A(15 downto 8) = x"42" then
 					case P65_A(7 downto 0) is
 						when x"0B" =>
@@ -865,12 +867,9 @@ begin
 					case DS is
 						when DS_IDLE =>
 							if MDMAEN /= x"00" then
-								DS <= DS_INIT;
+								DMA_RUN <= '1';
+								DS <= DS_CH_SEL;
 							end if;
-						
-						when DS_INIT =>
-							DMA_RUN <= '1';
-							DS <= DS_CH_SEL;
 							
 						when DS_CH_SEL =>
 							if MDMAEN /= x"00" then
@@ -1056,7 +1055,7 @@ begin
 			HDMA_B_WR <= '0';
 			HDMA_B_RD <= '0';	
 		elsif rising_edge(CLK) then
-			if ENABLE = '1' then
+			if EN = '1' then
 				if DS = DS_TRANSFER and INT_CLKR_CE = '1' then
 					DMA_A_WR <= DMAP(DCH)(7);
 					DMA_A_RD <= not DMAP(DCH)(7);

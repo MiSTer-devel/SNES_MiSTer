@@ -190,8 +190,7 @@ begin
 		DBG_CPU_WR 	=> CPU_DBG_WR
 	);
 
-	BUSA_SEL <= '1' when INT_CA(22) = '0' and INT_CA(15 downto 8) = x"20" else
-					'1' when INT_CA(22) = '0' and INT_CA(15 downto 8) >= x"22" else
+	BUSA_SEL <= '1' when INT_CA(22) = '0' and INT_CA(15 downto 8) /= x"21" else
 					'1' when INT_CA(23 downto 16) >= x"40" and INT_CA(23 downto 16) <= x"7D" else 
 					'1' when INT_CA(23 downto 16) >= x"C0" else
 					'0';
@@ -402,7 +401,7 @@ begin
 	RAMSEL_N	<= INT_RAMSEL_N;
 	ROMSEL_N	<= INT_ROMSEL_N;
 	
-	DO <= CPU_DO when BUSA_SEL = '1' else BUSB_DO;
+	DO <= BUSB_DO when INT_PARD_N = '0' else CPU_DO;
 	
 	SYSCLKF_CE <= INT_SYSCLKF_CE;
 	SYSCLKR_CE <= INT_SYSCLKR_CE;

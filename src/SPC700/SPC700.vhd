@@ -82,7 +82,6 @@ begin
 			nBit <= 0;
 		elsif rising_edge(CLK) then
 			if EN = '1' then
-				JumpTaken <= '0';
 				if STATE = "0000" and D_IN(3 downto 0) = x"0" then
 					case D_IN(7 downto 4) is
 						when x"1" => JumpTaken <= not PSW(7); -- BPL
@@ -117,12 +116,14 @@ begin
 					end case; 
 				elsif STATE = "0010" and IR = x"FE" then -- DBNZ
 					JumpTaken <= not ZO;
-				elsif STATE = "0011" and IR = x"6E" then 
+				elsif STATE = "0010" and IR = x"6E" then 
 					JumpTaken <= not ZO;
 				elsif STATE = "0011" and IR = x"2E" then -- CBNE
 					JumpTaken <= not ZO;
 				elsif STATE = "0100" and IR = x"DE" then
 					JumpTaken <= not ZO;
+				elsif MC.STATE_CTRL = "10" then
+					JumpTaken <= '0';
 				end if;
 				
 				if STATE = "0001" and IR(3 downto 0) = x"2" then
@@ -209,22 +210,22 @@ begin
 	BitToC <= std_logic_vector(unsigned(D_IN) srl nBit);
 	CToBit <= std_logic_vector(unsigned(PSW and x"01") sll nBit);
 
-	SB <= A                   when MC.BUS_CTRL(4 downto 2) = "000" else
-		   X                   when MC.BUS_CTRL(4 downto 2) = "001" else
-		   Y                   when MC.BUS_CTRL(4 downto 2) = "010" else
-		   T                   when MC.BUS_CTRL(4 downto 2) = "011" else
-			D_IN                when MC.BUS_CTRL(4 downto 2) = "100" else
-			"0000000"&PSW(0)    when MC.BUS_CTRL(4 downto 2) = "101" else
-			MulDivR(7 downto 0) when MC.BUS_CTRL(4 downto 2) = "110" else
-			SP                  when MC.BUS_CTRL(4 downto 2) = "111" else
+	SB <= A                   when MC.BUS_CTRL(5 downto 3) = "000" else
+		   X                   when MC.BUS_CTRL(5 downto 3) = "001" else
+		   Y                   when MC.BUS_CTRL(5 downto 3) = "010" else
+		   T                   when MC.BUS_CTRL(5 downto 3) = "011" else
+			D_IN                when MC.BUS_CTRL(5 downto 3) = "100" else
+			"0000000"&PSW(0)    when MC.BUS_CTRL(5 downto 3) = "101" else
+			MulDivR(7 downto 0) when MC.BUS_CTRL(5 downto 3) = "110" else
+			SP                  when MC.BUS_CTRL(5 downto 3) = "111" else
 			x"00";
 	
-	DB <= D_IN    when MC.BUS_CTRL(1 downto 0) = "00" and MC.BUS_CTRL(4) = '0' else
-			T       when MC.BUS_CTRL(1 downto 0) = "00" and MC.BUS_CTRL(4) = '1' else
-		   SB      when MC.BUS_CTRL(1 downto 0) = "01" else
-		   BitMask when MC.BUS_CTRL(1 downto 0) = "10" else
-			BitToC  when MC.BUS_CTRL(1 downto 0) = "11" and MC.BUS_CTRL(4 downto 2) /= "111" else
-			CToBit  when MC.BUS_CTRL(1 downto 0) = "11" and MC.BUS_CTRL(4 downto 2) = "111" else
+	DB <= D_IN    when MC.BUS_CTRL(2 downto 0) = "000" else
+		   SB      when MC.BUS_CTRL(2 downto 0) = "001" else
+		   BitMask when MC.BUS_CTRL(2 downto 0) = "010" else
+			BitToC  when MC.BUS_CTRL(2 downto 0) = "011" else
+			CToBit  when MC.BUS_CTRL(2 downto 0) = "100" else
+			T       when MC.BUS_CTRL(2 downto 0) = "101" else
 			x"00";
 			
 	w16 <= '1' when (IR = x"BA" and STATE = "0100") or 

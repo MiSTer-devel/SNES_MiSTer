@@ -9,7 +9,7 @@ package SPC700_pkg is
 		addrCtrl     : std_logic_vector(5 downto 0);
 		regMode      : std_logic_vector(4 downto 0);
 		regAXY       : std_logic_vector(1 downto 0);
-		busCtrl      : std_logic_vector(4 downto 0); 
+		busCtrl      : std_logic_vector(5 downto 0); 
 		ALUCtrl      : std_logic_vector(5 downto 0);
 		outBus       : std_logic_vector(2 downto 0);
 	end record;
@@ -39,7 +39,7 @@ package SPC700_pkg is
 		LOAD_AXY		: std_logic_vector(1 downto 0);
 		LOAD_P		: std_logic_vector(2 downto 0);
 		LOAD_T		: std_logic_vector(1 downto 0);
-		BUS_CTRL		: std_logic_vector(4 downto 0); 
+		BUS_CTRL		: std_logic_vector(5 downto 0); 
 		OUT_BUS		: std_logic_vector(2 downto 0);
 	end record;
 	

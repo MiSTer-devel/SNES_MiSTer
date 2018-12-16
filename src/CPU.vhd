@@ -921,7 +921,7 @@ begin
 								DBG_HDMA_CNT <= (others => '0'); 
 							end if;
 							HDMA_RUN_EXEC <= '1';
-						elsif H_CNT < 275 and HDMA_RUN_EXEC = '1' then
+						elsif H_CNT < 275 and VBLANK = '0' and HDMA_RUN_EXEC = '1' then
 							HDMA_RUN_EXEC <= '0';
 						end if;
 

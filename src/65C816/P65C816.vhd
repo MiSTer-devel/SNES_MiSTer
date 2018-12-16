@@ -332,9 +332,17 @@ begin
 							SP(7 downto 0) <= std_logic_vector(unsigned(SP(7 downto 0)) - 1);
 						end if;
 					when "100" => 
-						SP <= A;
+						if EF = '0' then
+							SP <= A;
+						else
+							SP <= x"01" & A(7 downto 0);
+						end if;
 					when "101" => 
-						SP <= X;
+						if EF = '0' then
+							SP <= X;
+						else
+							SP <= x"01" & X(7 downto 0);
+						end if;
 					when others => null;
 				end case;
 			end if; 

@@ -306,6 +306,8 @@ main main
 	.MCLK(clk_sys), // 21.47727 / 21.28137
 	.ACLK(clk_sys),
 
+	.REFRESH(REFRESH),
+
 	.ROM_TYPE(rom_type),
 	.ROM_MASK(rom_mask),
 	.RAM_MASK(ram_mask),
@@ -315,6 +317,7 @@ main main
 	.ROM_Q(ROM_Q),
 	.ROM_CE_N(ROM_CE_N),
 	.ROM_OE_N(ROM_OE_N),
+	.ROM_WORD(ROM_WORD),
 
 	.BSRAM_ADDR(BSRAM_ADDR),
 	.BSRAM_D(BSRAM_D),			
@@ -373,10 +376,9 @@ main main
 wire[22:0] ROM_ADDR;
 wire       ROM_CE_N;
 wire       ROM_OE_N;
+wire       ROM_WORD;
 wire[15:0] ROM_Q;
-
-reg [1:0] sdram_clr;
-always @(posedge clk_sys) sdram_clr <= {sdram_clr[0], ioctl_download & ioctl_wr};
+wire       REFRESH;
 
 sdram sdram
 (
@@ -384,19 +386,14 @@ sdram sdram
 	.init(~clock_locked),
 	.clk(clk_mem),
 	
-	.ch0_addr(ioctl_download ? ioctl_addr-10'd512 : ROM_ADDR),
-	.ch0_din(ioctl_dout),
-	.ch0_dout(ROM_Q),
-	.ch0_rd(~ioctl_download & ~ROM_CE_N & ~ROM_OE_N),
-	.ch0_wr(ioctl_wr),
-	.ch0_busy(),
-
-	.ch1_addr(0),
-	.ch1_din(0),
-	.ch1_dout(),
-	.ch1_rd(0),
-	.ch1_wr(0),
-	.ch1_busy()
+	.refresh(REFRESH),
+	.addr(ioctl_download ? ioctl_addr-10'd512 : ROM_ADDR),
+	.din(ioctl_dout),
+	.dout(ROM_Q),
+	.rd(~ioctl_download & ~ROM_CE_N & ~ROM_OE_N),
+	.wr(ioctl_wr),
+	.word(ioctl_download | ROM_WORD),
+	.busy()
 );
 
 wire[16:0] WRAM_ADDR;

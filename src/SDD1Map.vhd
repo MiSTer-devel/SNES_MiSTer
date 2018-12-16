@@ -27,7 +27,7 @@ entity SDD1Map is
 		
 		SYSCLKF_CE	: in std_logic;
 		SYSCLKR_CE	: in std_logic;
-		REFRESH		: in std_logic;
+		REFRESH		: out std_logic;
 		
 		IRQ_N			: out std_logic;
 
@@ -35,6 +35,7 @@ entity SDD1Map is
 		ROM_Q			: in  std_logic_vector(15 downto 0);
 		ROM_CE_N		: out std_logic;
 		ROM_OE_N		: out std_logic;
+		ROM_WORD		: out std_logic;
 		
 		BSRAM_ADDR	: out std_logic_vector(19 downto 0);
 		BSRAM_D		: out std_logic_vector(7 downto 0);
@@ -92,8 +93,9 @@ begin
 	);
 
 	ROM_ADDR <= (others => '1') when MAP_SEL = '0' else SDD1_ROM_A(22 downto 0) and ROM_MASK(22 downto 0);
-	ROM_CE_N <= '0' or not MAP_SEL;
+	ROM_CE_N <= not MAP_SEL;
 	ROM_OE_N <= ROM_RD_N or not MAP_SEL;
+	ROM_WORD <= MAP_SEL;
 
 	BSRAM_CS_N <= '0' when CA(23 downto 18) = x"7" & "00" or (CA(22) = '0' and CA(15 downto 13) = "011") else '1';
 	BSRAM_ADDR <= (others => '1') when MAP_SEL = '0' else ("0" & CA(19 downto 16) & CA(14 downto 0)) and BSRAM_MASK(19 downto 0);
@@ -106,4 +108,5 @@ begin
 	
 	IRQ_N <= '1';
 	BRK_OUT <= '0';
+	REFRESH <= '0';
 end rtl;

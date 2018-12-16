@@ -1,6 +1,5 @@
 //
 // sdram.v
-// This version issues refresh only when channel reads the same 16bit word 2 times
 //
 // sdram controller implementation
 // Copyright (c) 2018 Sorgelig
@@ -38,19 +37,15 @@ module sdram
 	input             init,			// init signal after FPGA config to initialize RAM
 	input             clk,			// sdram is accessed at up to 128MHz
 
-	input      [24:0] ch0_addr,
-	input             ch0_rd,
-	input             ch0_wr,
-	input      [15:0] ch0_din,
-	output reg [15:0] ch0_dout,
-	output reg        ch0_busy,
+	input             refresh,
 
-	input      [24:0] ch1_addr,
-	input             ch1_rd,
-	input             ch1_wr,
-	input       [7:0] ch1_din,
-	output reg  [7:0] ch1_dout,
-	output reg        ch1_busy
+	input      [24:0] addr,
+	input             rd,
+	input             wr,
+	input             word,
+	input      [15:0] din,
+	output reg [15:0] dout,
+	output reg        busy
 );
 
 assign SDRAM_CKE = ~init;
@@ -71,63 +66,52 @@ localparam STATE_READY = STATE_CONT+CAS_LATENCY+1'd1;
 localparam STATE_LAST  = STATE_READY;      // last state in cycle
 
 reg  [2:0] state;
-reg [22:0] a;
-reg  [1:0] bank;
+reg [24:0] a;
 reg [15:0] data;
 reg        we;
 reg        ds;
 reg        ram_req=0;
 
-wire [1:0] rd,wr;
-
-assign rd = {ch1_rd, ch0_rd};
-assign wr = {ch1_wr, ch0_wr};
-
 // access manager
 always @(posedge clk) begin
 	reg old_ref;
-	reg  [1:0] old_rd,old_wr;
-	reg [24:1] last_a[2] = '{{24{1'b1}},{24{1'b1}}};
+	reg old_rd,old_wr,old_rfsh;
+	reg [15:0] last_data;
 
 	old_rd <= old_rd & rd;
 	old_wr <= old_wr & wr;
+	old_rfsh <= refresh;
 
 	if(state == STATE_IDLE && mode == MODE_NORMAL) begin
-		ram_req <= 0;
-		we <= 0;
-		ch0_busy <= 0;
-		ch1_busy <= 0;
-		if((~old_rd[0] & rd[0]) | (~old_wr[0] & wr[0])) begin
-			old_rd[0] <= rd[0];
-			old_wr[0] <= wr[0];
-			we <= wr[0];
-			ds <= 1;
-			{bank,a} <= ch0_addr;
-			data <= ch0_din;
-			ram_req <= wr[0] || (last_a[0] != ch0_addr[24:1]);
-			last_a[0] <= ch0_addr[24:1];
-			if(wr[0]) last_a <= '{{24{1'b1}},{24{1'b1}}};
-			ch0_busy <= 1;
+		if((~old_rd & rd) | (~old_wr & wr)) begin
+			old_rd <= rd;
+			old_wr <= wr;
+			we <= wr;
+			a <= addr;
+			ds <= word;
+			data <= word ? din : {din[7:0],din[7:0]};
+			ram_req <= wr || (a[24:1] != addr[24:1]);
+			busy <= 1;
 			state <= STATE_START;
 		end
-		else if((~old_rd[1] & rd[1]) | (~old_wr[1] & wr[1])) begin
-			old_rd[1] <= rd[1];
-			old_wr[1] <= wr[1];
-			we <= wr[1];
-			ds <= 0;
-			{bank,a} <= ch1_addr;
-			data <= {ch1_din,ch1_din};
-			ram_req <= wr[1] || (last_a[1] != ch1_addr[24:1]);
-			last_a[1] <= ch1_addr[24:1];
-			if(wr[1]) last_a <= '{{24{1'b1}},{24{1'b1}}};
-			ch1_busy <= 1;
-			state <= STATE_START;
-		end
+		else if(~old_rfsh & refresh) state <= STATE_START;
 	end
 
-	if (state == STATE_READY) begin
-		ch0_busy <= 0;
-		ch1_busy <= 0;
+	if(state == STATE_READY && busy) begin
+		ram_req <= 0;
+		we <= 0;
+		busy <= 0;
+		if(ram_req) begin
+			if(we) begin
+				dout <= data;
+				a <= '1;
+			end
+			else begin
+				dout <= ds ? SDRAM_DQ : a[0] ? {SDRAM_DQ[15:8],SDRAM_DQ[15:8]} : {SDRAM_DQ[7:0],SDRAM_DQ[7:0]};
+				last_data <= SDRAM_DQ;
+			end
+		end
+		else dout <= ds ? last_data : a[0] ? {last_data[15:8],last_data[15:8]} : {last_data[7:0],last_data[7:0]};
 	end
 
 	if(mode != MODE_NORMAL || state != STATE_IDLE || reset) begin
@@ -172,8 +156,6 @@ localparam CMD_LOAD_MODE       = 4'b0000;
 
 // SDRAM state machines
 always @(posedge clk) begin
-	reg [15:0] last_data[2];
-
 	casex({ram_req,we,mode,state})
 		{2'b1X, MODE_NORMAL, STATE_START}: {SDRAM_nCS, SDRAM_nRAS, SDRAM_nCAS, SDRAM_nWE} <= CMD_ACTIVE;
 		{2'b11, MODE_NORMAL, STATE_CONT }: {SDRAM_nCS, SDRAM_nRAS, SDRAM_nCAS, SDRAM_nWE} <= CMD_WRITE;
@@ -199,33 +181,12 @@ always @(posedge clk) begin
 	endcase
 
 	if(state == STATE_START) begin
-		SDRAM_BA <= (mode == MODE_NORMAL) ? bank : 2'b00;
-		SDRAM_DQ <= we ? data : 16'bZZZZZZZZZZZZZZZZ;
+		SDRAM_BA <= (mode == MODE_NORMAL) ? a[24:23] : 2'b00;
 		{SDRAM_DQMH,SDRAM_DQML} <= (~we | ds) ? 2'b00 : {~a[0], a[0]};
 	end
 
-	if(state == STATE_READY) begin
-		if(ch0_busy) begin
-			if(ram_req) begin
-				if(we) ch0_dout <= data;
-				else begin
-					ch0_dout <= SDRAM_DQ;
-					last_data[0] <= SDRAM_DQ;
-				end
-			end
-			else ch0_dout <= last_data[0];
-		end
-		if(ch1_busy) begin
-			if(ram_req) begin
-				if(we) ch1_dout <= data[7:0];
-				else begin
-					ch1_dout <= a[0] ? SDRAM_DQ[15:8] : SDRAM_DQ[7:0];
-					last_data[1] <= SDRAM_DQ;
-				end
-			end
-			else ch1_dout <= a[0] ? last_data[1][15:8] : last_data[1][7:0];
-		end
-	end
+	SDRAM_DQ <= 'Z;
+	if((state >= (STATE_CONT-1) && state <= (STATE_CONT+1)) && we) SDRAM_DQ <= data;
 end
 
 endmodule

@@ -112,7 +112,7 @@ architecture rtl of SCPU is
 	signal RDDIV, RDMPY : std_logic_vector(15 downto 0);
 
 	signal IRQ_FLAG_RST, IRQ_FLAG_RSTr : std_logic;
-	signal NMI_FLAG, IRQ_FLAG, NMI_LINE : std_logic;
+	signal NMI_FLAG, IRQ_FLAG, NMI : std_logic;
 	signal MUL_REQ, DIV_REQ : std_logic;
 	signal REFRESHED : std_logic;
 	signal MUL_CNT	: unsigned(3 downto 0);
@@ -405,7 +405,7 @@ begin
 			CPU_WR <= '0';
 			CPU_RD <= '0';
 		elsif rising_edge(CLK) then
-			if ENABLE = '1' then
+			if EN = '1' then
 				if P65_EN = '1' and (P65_VPA = '1' or P65_VDA = '1') and INT_CLKR_CE = '1' then
 					CPU_WR <= not P65_R_WN;
 					CPU_RD <= P65_R_WN;
@@ -478,7 +478,7 @@ begin
 			VTIME <= (others => '1');
 
 			NMI_FLAG <= '0'; 
-			NMI_LINE <= '0';
+			NMI <= '0';
 			VBLANKrr <= '0';
 			IRQ_FLAG_RST <= '0';
 			
@@ -495,14 +495,14 @@ begin
 					NMI_FLAG <= '1';
 				elsif VBLANK = '0' and VBLANKrr = '1' then
 					NMI_FLAG <= '0';
+					NMI <= '0';
 				elsif P65_R_WN = '1' and P65_A(15 downto 0) = x"4210" and IO_SEL = '1' then
 					NMI_FLAG <= '0'; 
+					NMI <= '0';
 				end if;
 				
-				if NMI_FLAG = '1' and DMA_ACTIVE = '0' then
-					NMI_LINE <= '1';
-				elsif NMI_FLAG = '0' then
-					NMI_LINE <= '0';
+				if NMI_FLAG = '1' and NMI = '0' and DMA_ACTIVE = '0' and NMI_EN = '1' then
+					NMI <= '1';
 				end if;
 
 				if MUL_REQ = '1' then
@@ -744,7 +744,7 @@ begin
 			if ENABLE = '1' and DOT_CLK_CE = '1' then
 				if HVIRQ_EN = "01" and H_CNT = unsigned(HTIME) + 2 then--H-IRQ:  every scanline, H=HTIME+~3.5
 					IRQ_VALID := '1';
-				elsif HVIRQ_EN = "10" and H_CNT = 2 and V_CNT = unsigned(VTIME) then--V-IRQ:  V=VTIME, H=~2.5--H_CNT <= 4 and
+				elsif HVIRQ_EN = "10" and H_CNT >= 2 and V_CNT = unsigned(VTIME) then--V-IRQ:  V=VTIME, H=~2.5--H_CNT <= 4 and
 					IRQ_VALID := '1';
 				elsif HVIRQ_EN = "11" and H_CNT = unsigned(HTIME) + 2 and V_CNT = unsigned(VTIME) then--HV-IRQ: V=VTIME, H=HTIME+~3.5
 					IRQ_VALID := '1';
@@ -763,7 +763,7 @@ begin
 		end if;
 	end process; 
 
-	P65_NMI_N <= not (NMI_EN and NMI_LINE);
+	P65_NMI_N <= not NMI;
 	P65_IRQ_N <= not IRQ_FLAG and IRQ_N; 
 
 
@@ -1035,13 +1035,13 @@ begin
 	DCH <= NextDMACh(MDMAEN);
 
 	DMA_A <= A1B(DCH) & A1T(DCH) when DS = DS_TRANSFER else (others => '1');
-	DMA_B <= std_logic_vector( unsigned(BBAD(DCH)) + DMA_TRMODE_TAB(to_integer(unsigned(DMAP(DCH)(2 downto 0))),to_integer(DMA_TRMODE_STEP)) );
+	DMA_B <= std_logic_vector( unsigned(BBAD(DCH)) + DMA_TRMODE_TAB(to_integer(unsigned(DMAP(DCH)(2 downto 0))),to_integer(DMA_TRMODE_STEP)) ) when DS = DS_TRANSFER else (others => '1');
 					
 	HDMA_A <= DASB(HCH) & std_logic_vector(unsigned(DAS(HCH))) when DMAP(HCH)(6) = '1' and HDS = HDS_TRANSFER else 
 				 A1B(HCH) & std_logic_vector(unsigned(A2A(HCH))) when DMAP(HCH)(6) = '0' and HDS = HDS_TRANSFER else 
 				 A1B(HCH) & std_logic_vector(unsigned(A2A(HCH))) when HDS = HDS_INIT or HDS = HDS_INIT_IND else 
 				 (others => '1');
-	HDMA_B <= std_logic_vector( unsigned(BBAD(HCH)) + DMA_TRMODE_TAB(to_integer(unsigned(DMAP(HCH)(2 downto 0))),to_integer(HDMA_TRMODE_STEP)) );
+	HDMA_B <= std_logic_vector( unsigned(BBAD(HCH)) + DMA_TRMODE_TAB(to_integer(unsigned(DMAP(HCH)(2 downto 0))),to_integer(HDMA_TRMODE_STEP)) ) when HDS = HDS_TRANSFER else (others => '1');
 
 	process( RST_N, CLK )
 	begin

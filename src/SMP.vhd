@@ -10,6 +10,7 @@ entity SMP is
 		RST_N 			: in std_logic; 
 		CE 				: in std_logic;
 		ENABLE 			: in std_logic;
+		SYSCLKF_CE		: in std_logic;
 		
 		A     			: out std_logic_vector(15 downto 0);
 		DI       		: in std_logic_vector(7 downto 0);
@@ -65,9 +66,7 @@ architecture rtl of SMP is
 	signal TM01_CNT : unsigned(8 downto 0);
 	signal TM2_CNT : unsigned(5 downto 0);
 	signal T0_CNT, T1_CNT, T2_CNT : unsigned(7 downto 0);
-	
-	signal PAWR_Nr : std_logic_vector(3 downto 0);
-	
+		
 	type IplRom_t is array(0 to 63) of std_logic_vector(7 downto 0);
 	constant  IPLROM: IplRom_t := (
 	x"cd",
@@ -144,7 +143,6 @@ begin
 	begin
 		if RST_N = '0' then
 			CPUI <= (others => (others => '0'));
-			PAWR_Nr <= (others => '1');
 		elsif rising_edge(CLK) then
 			if ENABLE = '0' then
 				if DBG_SMP_DAT_WR = '1' then
@@ -167,11 +165,8 @@ begin
 				end if;
 			end if;
 			
-			PAWR_Nr <= PAWR_Nr(2 downto 0) & PAWR_N;
-			if PAWR_Nr = "1100" then
-				if CS = '1' and CS_N = '0' then
-					CPUI(to_integer(unsigned(PA))) <= CPU_DI;
-				end if;
+			if PAWR_N = '0' and CS = '1' and CS_N = '0' and SYSCLKF_CE = '1' then
+				CPUI(to_integer(unsigned(PA))) <= CPU_DI;
 			end if;
 		end if;
 	end process;

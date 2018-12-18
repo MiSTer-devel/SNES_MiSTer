@@ -127,7 +127,7 @@ architecture rtl of SNES is
 	signal SMP_DO : std_logic_vector(7 downto 0);
 	signal SMP_DI : std_logic_vector(7 downto 0);
 	signal SMP_WE : std_logic;
-	signal SMP_CPU_DO, SMP_CPU_DO_TEMP : std_logic_vector(7 downto 0);
+	signal SMP_CPU_DO : std_logic_vector(7 downto 0);
 	signal SMP_CPU_DI	: std_logic_vector(7 downto 0);
 	signal SMP_EN : std_logic;
 
@@ -137,11 +137,9 @@ architecture rtl of SNES is
 	signal APU_RAM_CE, APU_RAM_OE, APU_RAM_WE : std_logic;
 
 	-- DEBUG
-	signal DBG_CPU_DAT, DBG_SCPU_DAT, DBG_WRAM_DAT, DBG_PPU_DAT, DBG_SMP_DAT, DBG_SPC700_DAT, DBG_DSP_DAT, APU_DBG_REG : std_logic_vector(7 downto 0);
-	signal CPU_BRK, SMP_BRK, SMP_BRK_TEMP, PPU_DBG_BRK	: std_logic;
+	signal DBG_CPU_DAT, DBG_SCPU_DAT, DBG_WRAM_DAT, DBG_PPU_DAT, DBG_SMP_DAT, DBG_SPC700_DAT, DBG_DSP_DAT : std_logic_vector(7 downto 0);
+	signal CPU_BRK, SMP_BRK, PPU_DBG_BRK	: std_logic;
 	signal CPU_DBG_WR, WRAM_DBG_WR, SPC700_DAT_WR, SMP_DAT_WR, PPU_DBG_WR, DSP_DBG_WR : std_logic;
-	signal APU_ENABLE : std_logic;
-	signal DBG_CPU_TEMP : std_logic_vector(7 downto 0);
 
 begin
 
@@ -308,6 +306,8 @@ begin
 		RST_N			=> RST_N,
 		CE				=> SMP_CE,
 		ENABLE		=> SMP_EN,
+		SYSCLKF_CE	=> INT_SYSCLKF_CE,
+		
 		A				=> SMP_A,
 		DI				=> SMP_DI,
 		DO				=> SMP_DO,
@@ -317,37 +317,26 @@ begin
 		PARD_N		=> INT_PARD_N,
 		PAWR_N		=> INT_PAWR_N,
 		CPU_DI		=> SMP_CPU_DI,
-		CPU_DO		=> SMP_CPU_DO_TEMP,
+		CPU_DO		=> SMP_CPU_DO,
 		CS				=> INT_PA(6),
 		CS_N			=> INT_PA(7),
 		
-		DBG_REG			=> APU_DBG_REG,
+		DBG_REG			=> DBG_REG,
 		DBG_DAT_IN		=> DBG_DAT_IN,
 		DBG_CPU_DAT 	=> DBG_SPC700_DAT,
 		DBG_SMP_DAT		=> DBG_SMP_DAT,
 		DBG_CPU_DAT_WR	=> SPC700_DAT_WR,
 		DBG_SMP_DAT_WR	=> SMP_DAT_WR,
-		BRK_OUT    		=> SMP_BRK_TEMP
+		BRK_OUT    		=> SMP_BRK
 		
 	);
-
-	process( MCLK, RST_N )
-	begin
-		if RST_N = '0' then
-			SMP_CPU_DO <= (others => '0'); 
-			SMP_BRK <= '0';
-		elsif rising_edge( MCLK ) then
-			SMP_CPU_DO <= SMP_CPU_DO_TEMP;
-			SMP_BRK <= SMP_BRK_TEMP;
-		end if;
-	end process;
 
 	-- DSP 
 	DSP: entity work.DSP 
 	port map (
 		CLK			=> DSPCLK,
 		RST_N			=> RST_N,
-		ENABLE		=> APU_ENABLE,
+		ENABLE		=> ENABLE,
 		PAL			=> PAL,
 				
 		SMP_EN    	=> SMP_EN,
@@ -368,7 +357,7 @@ begin
 		BCK 			=> BCK,
 		SDAT 			=> SDAT,
 		
-		DBG_REG		=> APU_DBG_REG,
+		DBG_REG		=> DBG_REG,
 		DBG_DAT_IN  => DBG_DAT_IN,
 		DBG_DAT_OUT => DBG_DSP_DAT,
 		DBG_DAT_WR	=> DSP_DBG_WR,
@@ -376,19 +365,6 @@ begin
 		AUDIO_L		=> AUDIO_L,
 		AUDIO_R		=> AUDIO_R
 	);
-
-
-	process( DSPCLK, RST_N )
-	begin
-		if RST_N = '0' then
-			APU_DBG_REG <= (others => '0'); 
-			APU_ENABLE <= '0'; 
-		elsif rising_edge( DSPCLK ) then
-			APU_DBG_REG <= DBG_REG;
-			APU_ENABLE <= ENABLE;
-		end if;
-	end process;
-
 
 	CA <= INT_CA;
 	CPURD_N <= INT_CPURD_N;

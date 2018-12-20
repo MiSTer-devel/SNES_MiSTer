@@ -206,7 +206,7 @@ begin
 
 	-- WRAM
 	WRAM_DI <= DI when BUSA_SEL = '1' else
-				  PPU_DO when INT_PA(7 downto 6) = "00" else
+				  BUSB_DO when INT_PARD_N = '0' else
 				  CPU_DO;
 
 	WRAM : entity work.SWRAM

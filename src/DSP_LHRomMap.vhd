@@ -68,6 +68,8 @@ architecture rtl of DSP_LHRomMap is
 	signal DSP_A0	  : std_logic;
 	signal DSP_CS_N  : std_logic;
 	signal DSP_CE	  : std_logic;
+	
+	signal OPENBUS   : std_logic_vector(7 downto 0);
 
 	signal MAP_SEL	  : std_logic;
 begin
@@ -168,11 +170,23 @@ begin
 	BSRAM_OE_N <= CPURD_N or not MAP_SEL;
 	BSRAM_WE_N <= CPUWR_N or not MAP_SEL;
 	BSRAM_D    <= (others => '1') when MAP_SEL = '0' else DI;
+	
+	process(MCLK, RST_N)
+	begin
+		if RST_N = '0' then
+			OPENBUS <= (others => '1');
+		elsif rising_edge(MCLK) then
+			if SYSCLKR_CE = '1' then
+				OPENBUS <= DI;
+			end if;
+		end if;
+	end process;
 
 	DO <= (others => '1') when MAP_SEL = '0' else
 			DSP_DO when DSP_SEL = '1' else
 			BSRAM_Q when BSRAM_SEL = '1' else
-			ROM_Q(7 downto 0);
+			ROM_Q(7 downto 0) when ROMSEL_N = '0' else
+			OPENBUS;
 
 	IRQ_N <= '1';
 

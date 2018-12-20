@@ -28,7 +28,7 @@ entity CX4Map is
 		
 		SYSCLKF_CE	: in std_logic;
 		SYSCLKR_CE	: in std_logic;
-		REFRESH		: in std_logic;
+		REFRESH		: out std_logic;
 		
 		IRQ_N			: out std_logic;
 
@@ -36,6 +36,7 @@ entity CX4Map is
 		ROM_Q			: in  std_logic_vector(15 downto 0);
 		ROM_CE_N		: out std_logic;
 		ROM_OE_N		: out std_logic;
+		ROM_WORD		: out std_logic;
 		
 		BSRAM_ADDR	: out std_logic_vector(19 downto 0);
 		BSRAM_D		: out std_logic_vector(7 downto 0);
@@ -122,10 +123,10 @@ begin
 	CART_ADDR <= "0" & not ROM_CE2_N & CX4_A(20 downto 16) & CX4_A(14 downto 0);
 	BRAM_ADDR <= CX4_A(20 downto 16) & CX4_A(14 downto 0);
 
-	RD_PULSE <= SYSCLKR_CE when rising_edge(MCLK);
 	ROM_ADDR <= (others => '1') when MAP_SEL = '0' else "0" & (CART_ADDR and ROM_MASK(21 downto 0));
-	ROM_CE_N <= (ROM_CE1_N and ROM_CE2_N) or not MAP_SEL when CX4_BUSY = '1' else not MAP_SEL;
-	ROM_OE_N <= CX4_RD_N or not MAP_SEL when CX4_BUSY = '1' else not RD_PULSE or not CPUWR_N or not MAP_SEL;
+	ROM_CE_N <= (ROM_CE1_N and ROM_CE2_N) or not MAP_SEL;
+	ROM_OE_N <= CX4_RD_N or not MAP_SEL;
+	ROM_WORD	<= '0';
 
 	BSRAM_ADDR <= (others => '1') when MAP_SEL = '0' else (BRAM_ADDR and BSRAM_MASK(19 downto 0));
 	BSRAM_CE_N <= SRAM_CE_N or not MAP_SEL;
@@ -133,9 +134,10 @@ begin
 	BSRAM_WE_N <= CX4_WE_N or not MAP_SEL;
 	BSRAM_D    <= (others => '1') when MAP_SEL = '0' else CX4_DO;
 
-	CX4_DI <= BSRAM_Q when SRAM_CE_N = '0' else
-			ROM_Q(7 downto 0) when CART_ADDR(0)='0' else
-			ROM_Q(15 downto 8);
+	CX4_DI <= BSRAM_Q when SRAM_CE_N = '0' else ROM_Q(7 downto 0);
 
 	DO <= (others => '1') when MAP_SEL = '0' else CPU_DO;
+
+	RD_PULSE <= SYSCLKR_CE when rising_edge(MCLK);
+	REFRESH <= RD_PULSE and not CX4_BUSY and MAP_SEL;
 end rtl;

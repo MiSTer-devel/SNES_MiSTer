@@ -1710,7 +1710,7 @@ variable MOBJPR0EN,MOBJPR1EN,MOBJPR2EN,MOBJPR3EN,SOBJPR0EN,SOBJPR1EN,SOBJPR2EN,S
 variable OBJ_PRIO : std_logic_vector(1 downto 0);
 variable win1, win2, win1en, win2en, bglog0, bglog1, winres : std_logic_vector(5 downto 0);
 variable main_dis, sub_dis : std_logic_vector(4 downto 0);
-variable MAIN_EN, SUB_EN : std_logic;
+variable MAIN_EN, SUB_EN, SUB_MATH_EN : std_logic;
 variable MAIN_DCM, SUB_DCM, SUB_BD, MATH : std_logic;
 variable MAIN_COLOR, SUB_COLOR	: std_logic_vector(14 downto 0);
 variable MATH_R, MATH_G, MATH_B	: unsigned(4 downto 0);
@@ -2265,8 +2265,8 @@ begin
 					MAIN_COLOR := CRAM_MAIN_Q ;
 				end if;
 				
-				if SUB_BD = '1' and HIRES = '0' then
-					SUB_COLOR := SUBCOL;
+				if MAIN_EN = '0' then
+					SUB_COLOR := (others => '0');
 				elsif SUB_DCM = '1' then
 					SUB_COLOR := GetDCM(BG1_PIX_DATA(10 downto 0));
 				else
@@ -2274,42 +2274,54 @@ begin
 				end if;
 				
 				HALF := CGADSUB(6) and MAIN_EN and not (SUB_BD and CGWSEL(1));
-				if CGWSEL(1) = '1' then
-					MATH_R := AddSub(unsigned(MAIN_COLOR(4 downto 0)),unsigned(SUB_COLOR(4 downto 0)),not CGADSUB(7),HALF);
-					MATH_G := AddSub(unsigned(MAIN_COLOR(9 downto 5)),unsigned(SUB_COLOR(9 downto 5)),not CGADSUB(7),HALF);
-					MATH_B := AddSub(unsigned(MAIN_COLOR(14 downto 10)),unsigned(SUB_COLOR(14 downto 10)),not CGADSUB(7),HALF);
-				else
-					MATH_R := AddSub(unsigned(MAIN_COLOR(4 downto 0)),unsigned(SUBCOL(4 downto 0)),not CGADSUB(7),HALF);
-					MATH_G := AddSub(unsigned(MAIN_COLOR(9 downto 5)),unsigned(SUBCOL(9 downto 5)),not CGADSUB(7),HALF);
-					MATH_B := AddSub(unsigned(MAIN_COLOR(14 downto 10)),unsigned(SUBCOL(14 downto 10)),not CGADSUB(7),HALF);
-				end if;
+				SUB_MATH_EN := CGWSEL(1) and not SUB_BD;
 
-				if FORCE_BLANK = '1' or (MAIN_EN = '0' and SUB_EN = '0') then
+				if FORCE_BLANK = '1' then
 					SUB_R <= (others => '0');
 					SUB_G <= (others => '0');
 					SUB_B <= (others => '0');
-				elsif HIRES = '1' then
+				elsif HIRES = '0' and PSEUDOHIRES = '0' then
+					SUB_R <= MAIN_R;
+					SUB_G <= MAIN_G;
+					SUB_B <= MAIN_B;
+				elsif MATH = '1' and SUB_EN = '1' then
+					if SUB_MATH_EN = '1' then
+						SUB_R <= AddSub(unsigned(SUB_COLOR(4 downto 0)), unsigned(MAIN_COLOR(4 downto 0)), not CGADSUB(7), HALF);
+						SUB_G <= AddSub(unsigned(SUB_COLOR(9 downto 5)), unsigned(MAIN_COLOR(9 downto 5)), not CGADSUB(7), HALF);
+						SUB_B <= AddSub(unsigned(SUB_COLOR(14 downto 10)), unsigned(MAIN_COLOR(14 downto 10)), not CGADSUB(7), HALF);
+					else
+						SUB_R <= AddSub(unsigned(SUB_COLOR(4 downto 0)), unsigned(SUBCOL(4 downto 0)), not CGADSUB(7), HALF);
+						SUB_G <= AddSub(unsigned(SUB_COLOR(9 downto 5)), unsigned(SUBCOL(9 downto 5)), not CGADSUB(7), HALF);
+						SUB_B <= AddSub(unsigned(SUB_COLOR(14 downto 10)), unsigned(SUBCOL(14 downto 10)), not CGADSUB(7), HALF);
+					end if;
+				elsif MAIN_EN = '0' then
+					SUB_R <= (others => '0');
+					SUB_G <= (others => '0');
+					SUB_B <= (others => '0');
+				else
 					SUB_R <= unsigned(SUB_COLOR(4 downto 0));
 					SUB_G <= unsigned(SUB_COLOR(9 downto 5));
 					SUB_B <= unsigned(SUB_COLOR(14 downto 10));
-				elsif MATH = '1' and SUB_EN = '1' then
-					SUB_R <= MATH_R;
-					SUB_G <= MATH_G;
-					SUB_B <= MATH_B;
-				else
-					SUB_R <= unsigned(MAIN_COLOR(4 downto 0));
-					SUB_G <= unsigned(MAIN_COLOR(9 downto 5));
-					SUB_B <= unsigned(MAIN_COLOR(14 downto 10));
 				end if;
 
-				if FORCE_BLANK = '1' or (MAIN_EN = '0' and SUB_EN = '0') then
+				if FORCE_BLANK = '1' then
 					MAIN_R <= (others => '0');
 					MAIN_G <= (others => '0');
 					MAIN_B <= (others => '0');
-				elsif MATH = '1' and SUB_EN = '1' and HIRES = '0' then
-					MAIN_R <= MATH_R;
-					MAIN_G <= MATH_G;
-					MAIN_B <= MATH_B;
+				elsif MATH = '1' and SUB_EN = '1' then
+					if SUB_MATH_EN = '1' then
+						MAIN_R <= AddSub(unsigned(MAIN_COLOR(4 downto 0)), unsigned(SUB_COLOR(4 downto 0)), not CGADSUB(7), HALF);
+						MAIN_G <= AddSub(unsigned(MAIN_COLOR(9 downto 5)), unsigned(SUB_COLOR(9 downto 5)), not CGADSUB(7), HALF);
+						MAIN_B <= AddSub(unsigned(MAIN_COLOR(14 downto 10)), unsigned(SUB_COLOR(14 downto 10)), not CGADSUB(7), HALF);
+					else
+						MAIN_R <= AddSub(unsigned(MAIN_COLOR(4 downto 0)), unsigned(SUBCOL(4 downto 0)), not CGADSUB(7), HALF);
+						MAIN_G <= AddSub(unsigned(MAIN_COLOR(9 downto 5)), unsigned(SUBCOL(9 downto 5)), not CGADSUB(7), HALF);
+						MAIN_B <= AddSub(unsigned(MAIN_COLOR(14 downto 10)), unsigned(SUBCOL(14 downto 10)), not CGADSUB(7), HALF);
+					end if;
+				elsif MAIN_EN = '0' then
+					MAIN_R <= (others => '0');
+					MAIN_G <= (others => '0');
+					MAIN_B <= (others => '0');
 				else
 					MAIN_R <= unsigned(MAIN_COLOR(4 downto 0));
 					MAIN_G <= unsigned(MAIN_COLOR(9 downto 5));

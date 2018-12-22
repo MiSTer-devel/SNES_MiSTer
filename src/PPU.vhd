@@ -369,7 +369,7 @@ begin
 		BGINTERLACE <= '0';
 		OBJINTERLACE <= '0';
 		OVERSCAN <= '0';
-		--PSEUDOHIRES <= '0';
+		PSEUDOHIRES <= '0';
 		M7EXTBG <= '0';
 		BG_MODE <= (others => '0'); 
 		BG3PRIO <= '0';
@@ -629,7 +629,7 @@ begin
 					BGINTERLACE <= DI(0);
 					OBJINTERLACE <= DI(1);
 					OVERSCAN <= DI(2);
-					--PSEUDOHIRES <= DI(3);		--Always out H512
+					PSEUDOHIRES <= DI(3);		--Always out H512
 					M7EXTBG <= DI(6);
 				when others => null;
 			end case;
@@ -795,7 +795,7 @@ VRAM_WRB_N <= '1' when ENABLE = '0' else not VRAM2_WRITE;
 
 LAST_VIS_LINE <= '0' & x"E0" when OVERSCAN = '0' else '0' & x"EF";
 
-HIGH_RES <= HIRES;
+HIGH_RES <= HIRES or PSEUDOHIRES;
 
 --HV counters
 process( RST_N, CLK )
@@ -2332,7 +2332,7 @@ begin
 	end if;
 end process;
 
-process( RST_N, CLK, MAIN_B, MAIN_G, MAIN_R, SUB_B, SUB_G, SUB_R, MB)
+process( RST_N, CLK)
 begin
 	if RST_N = '0' then
 		OUT_Y <= (others => '0');
@@ -2354,8 +2354,9 @@ begin
 	end if;
 end process;
 
-COLOR_OUT <= Bright(MB, SUB_B) & Bright(MB, SUB_G) & Bright(MB, SUB_R) when DOT_CLK = '1'
-        else Bright(MB, MAIN_B) & Bright(MB, MAIN_G) & Bright(MB, MAIN_R);
+COLOR_OUT <= Bright(MB, SUB_B) & Bright(MB, SUB_G) & Bright(MB, SUB_R) when DOT_CLK = '1' else
+				 Bright(MB, MAIN_B) & Bright(MB, MAIN_G) & Bright(MB, MAIN_R);
+
 
 DOTCLK <= DOT_CLK;
 HBLANK <= IN_HBL;

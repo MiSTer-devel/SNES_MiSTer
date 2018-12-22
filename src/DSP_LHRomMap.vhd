@@ -108,7 +108,7 @@ begin
 					DSP_A0 <= CA(14);
 				else
 					BSRAM_SEL <= '0';
-					if CA(22 downto 19) = "1101" and ROMSEL_N = '0' and BSRAM_MASK(10) = '1' then --68-6F/E8-EF:0000-0FFF
+					if CA(22 downto 19) = "1101" and ROMSEL_N = '0' then --68-6F/E8-EF:0000-0FFF
 						DP_SEL <= '1';
 					end if;
 					

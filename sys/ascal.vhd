@@ -1063,6 +1063,7 @@ BEGIN
           i_vmax<=vimax; -- <ASYNC>
         END IF;
         
+--pragma synthesis_off
         ----------------------------------------------------
         -- TEST : Scan image properties
         IF i_hs='1' AND i_hs_pre='0' AND i_vcpt=1 THEN i_hsstart<=i_hcpt+1; END IF;
@@ -1072,6 +1073,7 @@ BEGIN
         IF i_vs='1' AND i_vs_pre='0' THEN i_vsstart<=i_vcpt;  END IF;
         IF i_vs='0' AND i_vs_pre='1' THEN i_vsend<=i_vcpt;    END IF;
         IF i_de='1' AND i_sof='1'    THEN i_vtotal<=i_vcpt;   END IF;
+--pragma synthesis_on
         
         ----------------------------------------------------
         i_mode<=mode; -- <ASYNC>
@@ -2430,11 +2432,13 @@ BEGIN
           o_b<=x"00";
         END IF;
         
+--pragma synthesis_off
         IF o_mode(2 DOWNTO 0)="111" AND o_vcpt<2*8 THEN
           o_r<=(OTHERS => o_debug_set);
           o_g<=(OTHERS => o_debug_set);
           o_b<=(OTHERS => o_debug_set);
         END IF;
+--pragma synthesis_on
         
         ----------------------------------------------------
       END IF;
@@ -2442,6 +2446,7 @@ BEGIN
 
   END PROCESS VSCAL;
   
+--pragma synthesis_off
   -----------------------------------------------------------------------------
   -- DEBUG
   Debug:PROCESS(o_clk) IS
@@ -2548,4 +2553,5 @@ BEGIN
     CS("       ") &
     CS("       ");
   ----------------------------------------------------------------------------  
+--pragma synthesis_on
 END ARCHITECTURE rtl;

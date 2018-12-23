@@ -32,7 +32,8 @@ entity SPPU is
 		EXTLATCH		: in std_logic;
 		
 		PAL			: in std_logic;
-		
+		BLEND			: in std_logic;
+
 		HIGH_RES		: out std_logic;
 		DOTCLK		: out std_logic;
 		
@@ -2280,7 +2281,7 @@ begin
 					MATH_R := (others => '0');
 					MATH_G := (others => '0');
 					MATH_B := (others => '0');
-				elsif PSEUDOHIRES = '1' then
+				elsif PSEUDOHIRES = '1' and BLEND = '1' then
 					MATH_R := AddSub(unsigned(SUB_COLOR(4 downto 0)), unsigned(MAIN_COLOR(4 downto 0)), '1', '1');
 					MATH_G := AddSub(unsigned(SUB_COLOR(9 downto 5)), unsigned(MAIN_COLOR(9 downto 5)), '1', '1');
 					MATH_B := AddSub(unsigned(SUB_COLOR(14 downto 10)), unsigned(MAIN_COLOR(14 downto 10)), '1', '1');
@@ -2308,7 +2309,7 @@ begin
 					SUB_R <= (others => '0');
 					SUB_G <= (others => '0');
 					SUB_B <= (others => '0');
-				elsif HIRES = '0' then
+				elsif HIRES = '0' and (PSEUDOHIRES = '0' or BLEND = '1') then
 					SUB_R <= MATH_R;
 					SUB_G <= MATH_G;
 					SUB_B <= MATH_B;

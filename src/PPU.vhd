@@ -796,7 +796,7 @@ VRAM_WRB_N <= '1' when ENABLE = '0' else not VRAM2_WRITE;
 
 LAST_VIS_LINE <= '0' & x"E0" when OVERSCAN = '0' else '0' & x"EF";
 
-HIGH_RES <= HIRES or PSEUDOHIRES;
+HIGH_RES <= HIRES or (PSEUDOHIRES and not BLEND);
 
 --HV counters
 process( RST_N, CLK )

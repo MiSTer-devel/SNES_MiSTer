@@ -255,6 +255,8 @@ ARCHITECTURE rtl OF ascal IS
   
   ----------------------------------------------------------
   -- Input image
+  SIGNAL i_phs,i_pvs,i_pfl,i_pde,i_pce : std_logic;
+  SIGNAL i_pr,i_pg,i_pb : unsigned(7 DOWNTO 0);
   SIGNAL i_freeze : std_logic;
   SIGNAL i_hsize,i_hmin,i_hmax,i_hcpt : uint12;
   SIGNAL i_hrsize,i_vrsize : uint12;
@@ -411,7 +413,7 @@ ARCHITECTURE rtl OF ascal IS
   SIGNAL o_llicpt,o_llisize,o_llipos : natural RANGE 0 TO 2**24-1;
   SIGNAL o_llocpt,o_llosize : natural RANGE 0 TO 2**24-1;
   SIGNAL o_lldiff : integer RANGE -2**23 TO 2**23-1 :=0;
-  SIGNAL o_llup,o_llos,o_llop : std_logic;
+  SIGNAL o_llup,o_llos,o_llop,o_llfl : std_logic;
   SIGNAL o_lltune_i : unsigned(15 DOWNTO 0);
   SIGNAL o_llssh : natural RANGE 0 TO 2**24-1;
   SIGNAL o_llcpt : natural RANGE 0 TO 31;
@@ -958,7 +960,7 @@ BEGIN
       i_head(111 DOWNTO 96)<=to_unsigned(N_BURST,16); -- Header size
       i_head(95 DOWNTO 80)<=x"0000"; -- Attributes. TBD
       i_head(80)<=i_inter;
-      i_head(81)<=i_fl;
+      i_head(81)<=i_pfl;
       i_head(82)<=i_hdown;
       i_head(83)<=i_vdown;
       i_head(79 DOWNTO 64)<=to_unsigned(i_hrsize,16); -- Image width
@@ -966,32 +968,42 @@ BEGIN
       i_head(47 DOWNTO 32)<=
         to_unsigned(N_BURST * i_hburst,16); -- Line Length. Bytes
       i_head(31 DOWNTO  0)<=x"0000_0000"; -- TBD
+
+      ------------------------------------------------------
+      i_pr <=i_r;
+      i_pg <=i_g;
+      i_pb <=i_b;
+      i_phs<=i_hs;
+      i_pvs<=i_vs;
+      i_pfl<=i_fl;
+      i_pde<=i_de;
+      i_pce<=i_ce;
       
       ------------------------------------------------------
-      IF i_ce='1' THEN
+      IF i_pce='1' THEN
         ----------------------------------------------------
-        i_hs_pre<=i_hs;
-        i_vs_pre<=i_vs;
-        i_de_pre<=i_de;
-        i_fl_pre<=i_fl;
+        i_hs_pre<=i_phs;
+        i_vs_pre<=i_pvs;
+        i_de_pre<=i_pde;
+        i_fl_pre<=i_pfl;
         
         ----------------------------------------------------
         -- Detect interlaced video
         IF NOT INTER THEN
           i_intercnt<=0;
-        ELSIF i_fl/=i_fl_pre THEN
+        ELSIF i_pfl/=i_fl_pre THEN
           i_intercnt<=3;
-        ELSIF i_vs='1' AND i_vs_pre='0' AND i_intercnt>0 THEN
+        ELSIF i_pvs='1' AND i_vs_pre='0' AND i_intercnt>0 THEN
           i_intercnt<=i_intercnt-1;
         END IF;
         i_inter<=to_std_logic(i_intercnt>0);
         
         ----------------------------------------------------
-        IF i_vs='1' AND i_vs_pre='0' THEN
+        IF i_pvs='1' AND i_vs_pre='0' THEN
           i_sof<='1';
         END IF;
         
-        IF i_de='1' AND i_sof='1' THEN
+        IF i_pde='1' AND i_sof='1' THEN
           i_sof<='0';
           i_vcpt<=0;
           IF i_inter='1' AND i_flm='1' AND i_half='0' AND INTER THEN
@@ -1004,33 +1016,33 @@ BEGIN
           END IF;
         END IF;
         
-        IF i_de='1' THEN
-          i_flm<=NOT i_fl;
+        IF i_pde='1' THEN
+          i_flm<=NOT i_pfl;
         END IF;
         
         i_ven<=to_std_logic(i_hcpt>=i_hmin AND i_hcpt<=i_hmax+1 AND
-                            i_vcpt>=i_vmin AND i_vcpt<=i_vmax AND i_de='1');
+                            i_vcpt>=i_vmin AND i_vcpt<=i_vmax AND i_pde='1');
         
         -- Detects end of frame for triple buffering.
         -- Waits for second frame of interlaced video
         i_endframe<=to_std_logic(i_vcpt=i_vmax + 1 AND
-                     (i_inter='0' OR i_fl='1'));
+                     (i_inter='0' OR i_pfl='1'));
         -- Detects third line for low lag mode
         i_syncline<=to_std_logic(i_vcpt=i_vmin + 3);
         
         ----------------------------------------------------
-        IF i_de='1' AND i_de_pre='0' THEN
+        IF i_pde='1' AND i_de_pre='0' THEN
           i_vimaxc<=i_vcpt;
           i_hcpt<=0;
         ELSE
           i_hcpt<=(i_hcpt+1) MOD 4096;
         END IF;
         
-        IF i_de='0' AND i_de_pre='1' THEN
+        IF i_pde='0' AND i_de_pre='1' THEN
           i_himax<=i_hcpt;
         END IF;
         
-        IF i_vs='1' THEN
+        IF i_pvs='1' THEN
           i_vimax<=i_vimaxc;
         END IF;
         
@@ -1039,7 +1051,7 @@ BEGIN
           i_hmin<=0;
           i_hmax<=i_himax;
           i_vmin<=0;
-          IF i_inter='0' OR i_fl='0' THEN
+          IF i_inter='0' OR i_pfl='0' THEN
             i_vmax<=i_vimax;
           END IF;
         ELSE
@@ -1053,13 +1065,13 @@ BEGIN
 --pragma synthesis_off
         ----------------------------------------------------
         -- TEST : Scan image properties
-        IF i_hs='1' AND i_hs_pre='0' AND i_vcpt=1 THEN i_hsstart<=i_hcpt+1; END IF;
-        IF i_hs='0' AND i_hs_pre='1' AND i_vcpt=1 THEN i_hsend<=i_hcpt+1;   END IF;
-        IF i_de='1' AND i_de_pre='0' AND i_vcpt=1 THEN i_htotal<=i_hcpt+1;  END IF;
+        IF i_phs='1' AND i_hs_pre='0' AND i_vcpt=1 THEN i_hsstart<=i_hcpt+1; END IF;
+        IF i_phs='0' AND i_hs_pre='1' AND i_vcpt=1 THEN i_hsend<=i_hcpt+1;   END IF;
+        IF i_pde='1' AND i_de_pre='0' AND i_vcpt=1 THEN i_htotal<=i_hcpt+1;  END IF;
         
-        IF i_vs='1' AND i_vs_pre='0' THEN i_vsstart<=i_vcpt;  END IF;
-        IF i_vs='0' AND i_vs_pre='1' THEN i_vsend<=i_vcpt;    END IF;
-        IF i_de='1' AND i_sof='1'    THEN i_vtotal<=i_vcpt;   END IF;
+        IF i_pvs='1' AND i_vs_pre='0' THEN i_vsstart<=i_vcpt;  END IF;
+        IF i_pvs='0' AND i_vs_pre='1' THEN i_vsend<=i_vcpt;    END IF;
+        IF i_pde='1' AND i_sof='1'    THEN i_vtotal<=i_vcpt;   END IF;
 --pragma synthesis_on
         
         ----------------------------------------------------
@@ -1131,7 +1143,7 @@ BEGIN
         
         ----------------------------------------------------
         -- Downscaling interpolation
-        i_hpixp<=(i_r,i_g,i_b);
+        i_hpixp<=(i_pr,i_pg,i_pb);
         i_hpix0<=i_hpixp;
         i_hpix1<=i_hpix0;
         i_hpix2<=i_hpix1;
@@ -1236,7 +1248,7 @@ BEGIN
         END IF;
         
         -- Delay I_HS raising for a few cycles, finish ongoing mem. access
-        IF i_hs='1' AND i_hs_pre='0' THEN
+        IF i_phs='1' AND i_hs_pre='0' THEN
           i_hs_delay<=0;
         ELSIF i_hs_delay<15 THEN
           i_hs_delay<=i_hs_delay+1;
@@ -1256,24 +1268,24 @@ BEGIN
           END IF;
         END IF;
         
-        IF i_vs='0' AND i_vs_pre='1' THEN
+        IF i_pvs='0' AND i_vs_pre='1' THEN
           i_vacc<=i_ovsize/2 + i_vsize/2;
           -- Push header
           i_pushhead<=to_std_logic(HEADER);
           i_hbfix<='0';
         END IF;
         
-      END IF; -- IF i_ce='1'
+      END IF; -- IF i_pce='1'
       
       ------------------------------------------------------
       -- Push pixels to downscaling line buffer
-      i_lwr<=i_hnp4 AND i_ven5;
+      i_lwr<=i_hnp4 AND i_ven5 AND i_pce;
       IF i_lwr='1' THEN
         i_lwad<=(i_lwad+1) MOD OHRES;
       END IF;
       i_ldw<=i_hpix;
       
-      IF i_hnp3='1' AND i_ven4='1' THEN
+      IF i_hnp3='1' AND i_ven4='1' AND i_pce='1' THEN
         i_lrad<=(i_lrad+1) MOD OHRES;
       END IF;
       
@@ -2205,6 +2217,7 @@ BEGIN
             o_llicpt<=0;
             o_llipos<=o_llocpt;
             o_llisize<=o_llicpt;
+            o_llfl<=i_pfl; -- <ASYNC>
           ELSE
             o_llicpt<=o_llicpt+1;
           END IF;
@@ -2222,8 +2235,8 @@ BEGIN
           -- Period difference between input and output images
           o_lldiff<=(integer(o_llosize) - integer(o_llisize));
           
-          o_lltune_i(14)<='0'; -- Unused
-          o_lltune_i(7 DOWNTO 6)<="00"; -- Unused
+          o_lltune_i(14)<='0'; -- Interleaved video field
+          o_lltune_i(7 DOWNTO 6)<=i_inter & o_llfl; -- <ASYNC>
           IF o_llup='1' THEN
             o_llcpt<=0;
             o_llssh<=o_llosize;

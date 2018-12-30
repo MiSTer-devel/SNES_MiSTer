@@ -569,7 +569,7 @@ ascal
 	.vmin   (vmin),
 	.vmax   (vmax),
 
-	.mode     ({~lowlat,scaler_flt,2'b00}),
+	.mode     ({~lowlat,|scaler_flt,2'b00}),
 	.poly_clk (clk_sys),
 	.poly_a   (coef_addr),
 	.poly_dw  (coef_data),

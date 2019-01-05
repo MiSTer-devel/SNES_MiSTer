@@ -163,6 +163,7 @@ parameter CONF_STR4 = {
 	"OEF,Video Region,Auto,NTSC,PAL;",
 	"O8,Aspect ratio,4:3,16:9;",
 	"O9B,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
+	"OG,Pseudo-transparency,Blend,Stripes;",
 	"-;",
 	"O56,Mouse,None,Port1,Port2;",
 	"O7,Swap Joysticks,No,Yes;",
@@ -229,6 +230,7 @@ hps_io #(.STRLEN(($size(CONF_STR1)>>3) + ($size(CONF_STR2)>>3) + ($size(CONF_STR
 	.img_size(img_size)
 );
 
+wire       BLEND = ~status[16];
 wire       PAL = (!status[15:14]) ? rom_region : status[15];
 wire [1:0] mouse_mode = status[6:5];
 wire       joy_swap = status[7];
@@ -312,6 +314,7 @@ main main
 	.ROM_MASK(rom_mask),
 	.RAM_MASK(ram_mask),
 	.PAL(PAL),
+	.BLEND(BLEND),
 
 	.ROM_ADDR(ROM_ADDR),
 	.ROM_Q(ROM_Q),

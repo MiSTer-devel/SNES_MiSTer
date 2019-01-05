@@ -57,6 +57,7 @@ entity main is
 		ARAM_OE_N	: out std_logic;
 		ARAM_WE_N	: out std_logic;
 
+		BLEND			: in std_logic;
 		PAL			: in  std_logic;
 		HIGH_RES		: out std_logic;
 		FIELD			: out std_logic;
@@ -196,6 +197,7 @@ begin
 		JOY1_CLK		=> JOY1_CLK,
 		JOY2_CLK		=> JOY2_CLK,
 
+		BLEND			=> BLEND,
 		PAL			=> PAL,
 		HIGH_RES		=> HIGH_RES,
 		FIELD_OUT	=> FIELD,

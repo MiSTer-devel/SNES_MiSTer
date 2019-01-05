@@ -32,7 +32,8 @@ entity SPPU is
 		EXTLATCH		: in std_logic;
 		
 		PAL			: in std_logic;
-		
+		BLEND			: in std_logic;
+
 		HIGH_RES		: out std_logic;
 		DOTCLK		: out std_logic;
 		
@@ -369,7 +370,7 @@ begin
 		BGINTERLACE <= '0';
 		OBJINTERLACE <= '0';
 		OVERSCAN <= '0';
-		--PSEUDOHIRES <= '0';
+		PSEUDOHIRES <= '0';
 		M7EXTBG <= '0';
 		BG_MODE <= (others => '0'); 
 		BG3PRIO <= '0';
@@ -629,7 +630,7 @@ begin
 					BGINTERLACE <= DI(0);
 					OBJINTERLACE <= DI(1);
 					OVERSCAN <= DI(2);
-					--PSEUDOHIRES <= DI(3);		--Always out H512
+					PSEUDOHIRES <= DI(3);		--Always out H512
 					M7EXTBG <= DI(6);
 				when others => null;
 			end case;
@@ -795,7 +796,7 @@ VRAM_WRB_N <= '1' when ENABLE = '0' else not VRAM2_WRITE;
 
 LAST_VIS_LINE <= '0' & x"E0" when OVERSCAN = '0' else '0' & x"EF";
 
-HIGH_RES <= HIRES;
+HIGH_RES <= HIRES or (PSEUDOHIRES and not BLEND);
 
 --HV counters
 process( RST_N, CLK )
@@ -865,7 +866,7 @@ begin
 			if H_CNT = 275-1 then HDE <= '0'; end if;
 
 			if H_CNT = 296-1 then HSYNC <= '1'; end if;
-			if H_CNT = 306-1 then HSYNC <= '0'; end if;
+			if H_CNT = 320-1 then HSYNC <= '0'; end if;
 
 			if V_CNT = 1               then VDE <= '1'; end if;
 			if V_CNT = LAST_VIS_LINE+1 then VDE <= '0'; end if;
@@ -2277,13 +2278,41 @@ begin
 				SUB_MATH_EN := CGWSEL(1) and not SUB_BD;
 
 				if FORCE_BLANK = '1' then
+					MATH_R := (others => '0');
+					MATH_G := (others => '0');
+					MATH_B := (others => '0');
+				elsif PSEUDOHIRES = '1' and BLEND = '1' then
+					MATH_R := AddSub(unsigned(SUB_COLOR(4 downto 0)), unsigned(MAIN_COLOR(4 downto 0)), '1', '1');
+					MATH_G := AddSub(unsigned(SUB_COLOR(9 downto 5)), unsigned(MAIN_COLOR(9 downto 5)), '1', '1');
+					MATH_B := AddSub(unsigned(SUB_COLOR(14 downto 10)), unsigned(MAIN_COLOR(14 downto 10)), '1', '1');
+				elsif MATH = '1' and SUB_EN = '1' then
+					if SUB_MATH_EN = '1' then
+						MATH_R := AddSub(unsigned(MAIN_COLOR(4 downto 0)), unsigned(SUB_COLOR(4 downto 0)), not CGADSUB(7), HALF);
+						MATH_G := AddSub(unsigned(MAIN_COLOR(9 downto 5)), unsigned(SUB_COLOR(9 downto 5)), not CGADSUB(7), HALF);
+						MATH_B := AddSub(unsigned(MAIN_COLOR(14 downto 10)), unsigned(SUB_COLOR(14 downto 10)), not CGADSUB(7), HALF);
+					else
+						MATH_R := AddSub(unsigned(MAIN_COLOR(4 downto 0)), unsigned(SUBCOL(4 downto 0)), not CGADSUB(7), HALF);
+						MATH_G := AddSub(unsigned(MAIN_COLOR(9 downto 5)), unsigned(SUBCOL(9 downto 5)), not CGADSUB(7), HALF);
+						MATH_B := AddSub(unsigned(MAIN_COLOR(14 downto 10)), unsigned(SUBCOL(14 downto 10)), not CGADSUB(7), HALF);
+					end if;
+				elsif MAIN_EN = '0' then
+					MATH_R := (others => '0');
+					MATH_G := (others => '0');
+					MATH_B := (others => '0');
+				else
+					MATH_R := unsigned(MAIN_COLOR(4 downto 0));
+					MATH_G := unsigned(MAIN_COLOR(9 downto 5));
+					MATH_B := unsigned(MAIN_COLOR(14 downto 10));
+				end if;
+
+				if FORCE_BLANK = '1' then
 					SUB_R <= (others => '0');
 					SUB_G <= (others => '0');
 					SUB_B <= (others => '0');
-				elsif HIRES = '0' and PSEUDOHIRES = '0' then
-					SUB_R <= MAIN_R;
-					SUB_G <= MAIN_G;
-					SUB_B <= MAIN_B;
+				elsif HIRES = '0' and (PSEUDOHIRES = '0' or BLEND = '1') then
+					SUB_R <= MATH_R;
+					SUB_G <= MATH_G;
+					SUB_B <= MATH_B;
 				elsif MATH = '1' and SUB_EN = '1' then
 					if SUB_MATH_EN = '1' then
 						SUB_R <= AddSub(unsigned(SUB_COLOR(4 downto 0)), unsigned(MAIN_COLOR(4 downto 0)), not CGADSUB(7), HALF);
@@ -2304,35 +2333,15 @@ begin
 					SUB_B <= unsigned(SUB_COLOR(14 downto 10));
 				end if;
 
-				if FORCE_BLANK = '1' then
-					MAIN_R <= (others => '0');
-					MAIN_G <= (others => '0');
-					MAIN_B <= (others => '0');
-				elsif MATH = '1' and SUB_EN = '1' then
-					if SUB_MATH_EN = '1' then
-						MAIN_R <= AddSub(unsigned(MAIN_COLOR(4 downto 0)), unsigned(SUB_COLOR(4 downto 0)), not CGADSUB(7), HALF);
-						MAIN_G <= AddSub(unsigned(MAIN_COLOR(9 downto 5)), unsigned(SUB_COLOR(9 downto 5)), not CGADSUB(7), HALF);
-						MAIN_B <= AddSub(unsigned(MAIN_COLOR(14 downto 10)), unsigned(SUB_COLOR(14 downto 10)), not CGADSUB(7), HALF);
-					else
-						MAIN_R <= AddSub(unsigned(MAIN_COLOR(4 downto 0)), unsigned(SUBCOL(4 downto 0)), not CGADSUB(7), HALF);
-						MAIN_G <= AddSub(unsigned(MAIN_COLOR(9 downto 5)), unsigned(SUBCOL(9 downto 5)), not CGADSUB(7), HALF);
-						MAIN_B <= AddSub(unsigned(MAIN_COLOR(14 downto 10)), unsigned(SUBCOL(14 downto 10)), not CGADSUB(7), HALF);
-					end if;
-				elsif MAIN_EN = '0' then
-					MAIN_R <= (others => '0');
-					MAIN_G <= (others => '0');
-					MAIN_B <= (others => '0');
-				else
-					MAIN_R <= unsigned(MAIN_COLOR(4 downto 0));
-					MAIN_G <= unsigned(MAIN_COLOR(9 downto 5));
-					MAIN_B <= unsigned(MAIN_COLOR(14 downto 10));
-				end if;
+				MAIN_R <= MATH_R;
+				MAIN_G <= MATH_G;
+				MAIN_B <= MATH_B;
 			end if;
 		end if;
 	end if;
 end process;
 
-process( RST_N, CLK, MAIN_B, MAIN_G, MAIN_R, SUB_B, SUB_G, SUB_R, MB)
+process( RST_N, CLK)
 begin
 	if RST_N = '0' then
 		OUT_Y <= (others => '0');
@@ -2354,8 +2363,9 @@ begin
 	end if;
 end process;
 
-COLOR_OUT <= Bright(MB, SUB_B) & Bright(MB, SUB_G) & Bright(MB, SUB_R) when DOT_CLK = '1'
-        else Bright(MB, MAIN_B) & Bright(MB, MAIN_G) & Bright(MB, MAIN_R);
+COLOR_OUT <= Bright(MB, SUB_B) & Bright(MB, SUB_G) & Bright(MB, SUB_R) when DOT_CLK = '1' else
+				 Bright(MB, MAIN_B) & Bright(MB, MAIN_G) & Bright(MB, MAIN_R);
+
 
 DOTCLK <= DOT_CLK;
 HBLANK <= IN_HBL;

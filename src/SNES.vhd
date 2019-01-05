@@ -14,6 +14,7 @@ entity SNES is
 		RST_N			: in std_logic;
 		ENABLE		: in std_logic;
 		PAL			: in std_logic;
+		BLEND			: in std_logic;
 		
 		CA       	: out std_logic_vector(23 downto 0);
 		CPURD_N		: out std_logic;
@@ -272,6 +273,7 @@ begin
 		
 		EXTLATCH		=> JPIO67(7),
 		
+		BLEND			=> BLEND,
 		PAL			=> PAL,
 		HIGH_RES		=> HIGH_RES,
 		DOTCLK		=> DOTCLK,

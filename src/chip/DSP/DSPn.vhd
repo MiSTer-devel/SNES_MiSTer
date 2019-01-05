@@ -3,7 +3,6 @@ use IEEE.STD_LOGIC_1164.ALL;
 library STD;
 use IEEE.NUMERIC_STD.ALL;
 
-
 entity DSPn is
 	port(
 		CLK			: in std_logic;
@@ -17,7 +16,10 @@ entity DSPn is
 		RD_N			: in std_logic;
 		WR_N			: in std_logic;
 		
-		VER			: in std_logic_vector(1 downto 0);--00-DSP1B, 01-DSP2, 10-DSP3, 11-DSP4
+		DP_ADDR		: in std_logic_vector(11 downto 0);
+		DP_SEL      : in std_logic;
+
+		VER			: in std_logic_vector(2 downto 0);--00-DSP1B, 01-DSP2, 10-DSP3, 11-DSP4
 		
 		BRK_OUT		: out std_logic;
 		DBG_REG		: in std_logic_vector(7 downto 0);
@@ -46,12 +48,12 @@ architecture rtl of DSPn is
 	-- IO Registers
 	signal DR	: std_logic_vector(15 downto 0);
 	signal SR	: std_logic_vector(15 downto 0);
-	signal DP	: std_logic_vector(7 downto 0);
-	signal RP	: std_logic_vector(9 downto 0);
-	signal PC	: std_logic_vector(10 downto 0);
-	type StackRam_t is array (0 to 3) of std_logic_vector(10 downto 0);
+	signal DP	: std_logic_vector(10 downto 0);
+	signal RP	: std_logic_vector(10 downto 0);
+	signal PC	: std_logic_vector(13 downto 0);
+	type StackRam_t is array (0 to 7) of std_logic_vector(13 downto 0);
 	signal STACK_RAM	: StackRam_t;
-	signal SP	: unsigned(1 downto 0);
+	signal SP	: unsigned(2 downto 0);
 	signal K, L, M, N	: std_logic_vector(15 downto 0);
 	signal P, Q	: std_logic_vector(15 downto 0);
 	type Acc_t is array (0 to 1) of std_logic_vector(15 downto 0);
@@ -76,7 +78,7 @@ architecture rtl of DSPn is
 	signal OP_ALU		: std_logic_vector(3 downto 0);
 	signal OP_P			: std_logic_vector(1 downto 0);
 	signal OP_ID		: std_logic_vector(15 downto 0);
-	signal OP_NA		: std_logic_vector(10 downto 0);
+	signal OP_NA		: std_logic_vector(12 downto 0);
 	signal OP_BRCH		: std_logic_vector(8 downto 0);
 	signal OP_INSTR	: std_logic_vector(1 downto 0);
 	
@@ -85,9 +87,9 @@ architecture rtl of DSPn is
 	
 	signal PROG_ROM_ADDR : std_logic_vector(12 downto 0);
 	signal PROG_ROM_Q	: std_logic_vector(23 downto 0);
-	signal DATA_ROM_ADDR : std_logic_vector(11 downto 0);
+	signal DATA_ROM_ADDR : std_logic_vector(12 downto 0);
 	signal DATA_ROM_Q	: std_logic_vector(15 downto 0);
-	signal DATA_RAM_ADDR_A, DATA_RAM_ADDR_B	: std_logic_vector(7 downto 0);
+	signal DATA_RAM_ADDR_A, DATA_RAM_ADDR_B	: std_logic_vector(10 downto 0);
 	signal DATA_RAM_Q_A, DATA_RAM_Q_B : std_logic_vector(15 downto 0);
 	signal DATA_RAM_WE : std_logic;
 	
@@ -95,6 +97,7 @@ architecture rtl of DSPn is
 	signal RD_Nr, WR_Nr : std_logic_vector(2 downto 0);
 	signal PORT_ACTIVE : std_logic;
 	
+	signal DP_DO : std_logic_vector(7 downto 0);
 	--debug
 	signal DBG_RUN_LAST : std_logic;
 	signal DBG_DAT_WRr : std_logic;
@@ -115,7 +118,7 @@ begin
 	OP_SRC <= PROG_ROM_Q(7 downto 4);
 	OP_DST <= PROG_ROM_Q(3 downto 0);
 	OP_ID <= PROG_ROM_Q(21 downto 6) when OP_INSTR = INSTR_LD else IDB;
-	OP_NA <= PROG_ROM_Q(12 downto 2);
+	OP_NA <= (PROG_ROM_Q(1 downto 0) and (VER(2)&VER(2)))&PROG_ROM_Q(12 downto 2);
 	OP_BRCH <= PROG_ROM_Q(21 downto 13);
 	
 	
@@ -126,8 +129,8 @@ begin
 			 ACC(ACC_A)    when OP_SRC = x"1" else
 			 ACC(ACC_B)    when OP_SRC = x"2" else
 			 TR            when OP_SRC = x"3" else
-			 x"00" & DP    when OP_SRC = x"4" else
-			 "000000" & RP when OP_SRC = x"5" else
+			 "00000" & DP  when OP_SRC = x"4" else
+			 "00000" & RP  when OP_SRC = x"5" else
 			 DATA_ROM_Q    when OP_SRC = x"6" else
 			 SGN           when OP_SRC = x"7" else
 			 DR            when OP_SRC = x"8" else
@@ -296,6 +299,9 @@ begin
 					
 					if OP_RP = '1' then
 						RP <= std_logic_vector(unsigned(RP) - 1);
+						if VER(2)='0' then
+							RP(10) <= '0';
+						end if;
 					end if;
 				end if;
 				
@@ -308,9 +314,17 @@ begin
 						when x"3" =>
 							TR <= OP_ID;
 						when x"4" =>
-							DP <= OP_ID(7 downto 0);
+							if VER(2)='1' then
+								DP <= OP_ID(10 downto 0);
+							else
+								DP <= "000" & OP_ID(7 downto 0);
+							end if;
 						when x"5" =>
-							RP <= OP_ID(9 downto 0);
+							if VER(2)='1' then
+								RP <= OP_ID(10 downto 0);
+							else
+								RP <= '0'&OP_ID(9 downto 0);
+							end if;
 						when x"7" =>
 							USF1 <= OP_ID(14);
 							USF0 <= OP_ID(13);
@@ -343,8 +357,8 @@ begin
 	end process; 
 	
 	process(CLK, RST_N)
-		variable NEXT_SP : unsigned(1 downto 0);
-		variable NEXT_PC : std_logic_vector(10 downto 0);
+		variable NEXT_SP : unsigned(2 downto 0);
+		variable NEXT_PC : std_logic_vector(13 downto 0);
 		variable COND : std_logic;
 	begin
 		if RST_N = '0' then
@@ -354,8 +368,12 @@ begin
 		elsif rising_edge(CLK) then
 			if EN = '1' then
 				NEXT_PC := std_logic_vector(unsigned(PC) + 1);
+				if VER(2) = '0' then
+					NEXT_PC(13 downto 11) := "000";
+				end if;
 				if OP_INSTR = INSTR_RT then
 					NEXT_SP := SP - 1;
+					NEXT_SP(2) := NEXT_SP(2) and VER(2);
 					PC <= STACK_RAM(to_integer(NEXT_SP));
 					SP <= NEXT_SP;
 				elsif OP_INSTR = INSTR_JP then
@@ -398,14 +416,20 @@ begin
 					end case;
 					
 					if OP_BRCH = "000000000" then
-						PC <= SO(10 downto 0);
+						PC <= SO(13 downto 0);
+						if VER(2) = '0' then
+							PC(13 downto 11) <= "000";
+						end if;
 					elsif OP_BRCH(8 downto 6) = "010" and COND = '1' then
-						PC <= OP_NA;
-					elsif OP_BRCH(8 downto 7) = "10" and OP_BRCH(5 downto 0) = "000000" then
-						PC <= OP_NA;
+						PC(12 downto 0) <= OP_NA;
+					elsif OP_BRCH(8 downto 7) = "10" and OP_BRCH(5 downto 1) = "00000" then
+						PC <= (OP_BRCH(0) and VER(2))&OP_NA;
 						if OP_BRCH(6) = '1' then
 							STACK_RAM(to_integer(SP)) <= NEXT_PC;
 							SP <= SP + 1;
+							if VER(2) = '0' then
+								SP(2) <= '0';
+							end if;
 						end if;
 					else
 						PC <= NEXT_PC;
@@ -416,37 +440,56 @@ begin
 			end if;
 		end if;
 	end process; 
-	
-	PROG_ROM_ADDR <= VER & PC;
-	PROG_ROM : entity work.spram generic map(13, 24, "src/chip/dsp/dsp1b234_p.mif")
+
+	PROG_ROM_ADDR <= std_logic_vector(unsigned(PC(12 downto 0)) + ("0"&x"000")) when VER="000" else
+                    std_logic_vector(unsigned(PC(12 downto 0)) + ("0"&x"500")) when VER="001" else
+                    std_logic_vector(unsigned(PC(12 downto 0)) + ("0"&x"C00")) when VER="010" else
+                    std_logic_vector(unsigned(PC(12 downto 0)) + ("1"&x"254")) when VER="011" else
+                    std_logic_vector(unsigned(PC(12 downto 0)) + ("1"&x"954"));
+
+	PROG_ROM : entity work.spram_sz generic map(13, 24, 7018, "src/chip/dsp/dsp1b23410_p.mif")
 	port map(
 		clock		=> CLK,
 		address	=> PROG_ROM_ADDR,
 		q			=> PROG_ROM_Q
 	);
-	
-	DATA_ROM_ADDR <= VER & RP;
-	DATA_ROM : entity work.spram generic map(12, 16, "src/chip/dsp/dsp1b234_d.mif")
+
+	DATA_ROM_ADDR <= VER(2 downto 1) & (RP(10) and VER(2)) & RP(9 downto 0);
+	DATA_ROM : entity work.spram_sz generic map(13, 16, 6144, "src/chip/dsp/dsp1b23410_d.mif")
 	port map(
 		clock		=> CLK,
 		address	=> DATA_ROM_ADDR,
 		q			=> DATA_ROM_Q
 	);
 	
-	DATA_RAM_ADDR_A <= DP;
-	DATA_RAM_ADDR_B <= DP or x"40";
+	DATA_RAM_ADDR_A <= "000" & DP(7 downto 0) when VER(2)='0' else DP;
+	DATA_RAM_ADDR_B <= DP_ADDR(11 downto 1) when DP_SEL = '1' and (WR_N = '0' or RD_N = '0') else DATA_RAM_ADDR_A or x"40";
 	DATA_RAM_WE <= '1' when OP_INSTR /= INSTR_JP and OP_DST = x"F" and EN = '1' else '0';
-	DATA_RAM : entity work.dpram generic map(8, 16)
+
+	DATA_RAML : entity work.dpram generic map(11, 8)
 	port map(
 		clock			=> CLK,
 		address_a	=> DATA_RAM_ADDR_A,
-		data_a		=> OP_ID,
+		data_a		=> OP_ID(7 downto 0),
 		wren_a		=> DATA_RAM_WE,
-		q_a			=> DATA_RAM_Q_A,
+		q_a			=> DATA_RAM_Q_A(7 downto 0),
 		address_b	=> DATA_RAM_ADDR_B,
-		data_b		=> (others => '0'),
-		wren_b		=> '0',
-		q_b			=> DATA_RAM_Q_B
+		data_b		=> DI,
+		wren_b		=> not WR_N and DP_SEL and not DP_ADDR(0),
+		q_b			=> DATA_RAM_Q_B(7 downto 0)
+	);
+
+	DATA_RAMH : entity work.dpram generic map(11, 8)
+	port map(
+		clock			=> CLK,
+		address_a	=> DATA_RAM_ADDR_A,
+		data_a		=> OP_ID(15 downto 8),
+		wren_a		=> DATA_RAM_WE,
+		q_a			=> DATA_RAM_Q_A(15 downto 8),
+		address_b	=> DATA_RAM_ADDR_B,
+		data_b		=> DI,
+		wren_b		=> not WR_N and DP_SEL and DP_ADDR(0),
+		q_b			=> DATA_RAM_Q_B(15 downto 8)
 	);
 	
 	--I/O Ports
@@ -503,9 +546,15 @@ begin
 		end if;
 	end process; 
 
-	process( A0, SR, DR, DRC, DRS )
+	process( A0, SR, DR, DRC, DRS, DP_SEL, DP_ADDR, DATA_RAM_Q_B )
 	begin
-		if A0 = '1' then
+		if DP_SEL = '1' then
+			if DP_ADDR(0) = '0' then
+				DO <= DATA_RAM_Q_B(7 downto 0);
+			else
+				DO <= DATA_RAM_Q_B(15 downto 8);
+			end if;
+		elsif A0 = '1' then
 			DO <= SR(15 downto 8);
 		else
 			if DRC = '0' then
@@ -519,8 +568,8 @@ begin
 			end if;
 		end if;
 	end process;
-	
-		
+
+
 	--Debug
 	process(CLK, RST_N)
 	begin
@@ -532,7 +581,7 @@ begin
 				BRK_OUT <= '0';
 				if DBG_CTRL(0) = '1' then	--step
 					BRK_OUT <= '1';
-				elsif DBG_CTRL(2) = '1' and DBG_BRK_ADDR = PC then	--opcode address break
+				elsif DBG_CTRL(2) = '1' and DBG_BRK_ADDR = PC(10 downto 0) then	--opcode address break
 					BRK_OUT <= '1';
 				end if;
 			end if;
@@ -557,7 +606,7 @@ begin
 				when x"07" => DBG_DAT_OUT <= "00000"&PC(10 downto 8);
 				when x"08" => DBG_DAT_OUT <= RP(7 downto 0);
 				when x"09" => DBG_DAT_OUT <= "000000"&RP(9 downto 8);
-				when x"0A" => DBG_DAT_OUT <= DP;
+				when x"0A" => DBG_DAT_OUT <= DP(7 downto 0);
 				when x"0B" => DBG_DAT_OUT <= TR(7 downto 0);
 				when x"0C" => DBG_DAT_OUT <= TR(15 downto 8);
 				when x"0D" => DBG_DAT_OUT <= TRB(7 downto 0);
@@ -574,7 +623,7 @@ begin
 				when x"18" => DBG_DAT_OUT <= DR(15 downto 8);
 				when x"19" => DBG_DAT_OUT <= SR(7 downto 0);
 				when x"1A" => DBG_DAT_OUT <= SR(15 downto 8);
-				when x"1B" => DBG_DAT_OUT <= "000000" & std_logic_vector(SP);
+				when x"1B" => DBG_DAT_OUT <= "00000" & std_logic_vector(SP);
 				when x"1C" => DBG_DAT_OUT <= IDB(7 downto 0);
 				when x"1D" => DBG_DAT_OUT <= IDB(15 downto 8);
 				when others => DBG_DAT_OUT <= x"00";

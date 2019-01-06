@@ -53,6 +53,7 @@ architecture rtl of P65C816 is
 	signal WAIExec, STPExec : std_logic;
 	signal nmi_active, irq_active, last_nmi_active : std_logic;
 	signal lastNMI, turn_nmi_on, turn_nmi_off, nmi_remembered : std_logic;
+	signal IRQ_Nn, ABORT_Nn, NMI_Nn : std_logic;
 	signal ADDR_BUS : std_logic_vector(23 downto 0);
 	
 	-- ALU 
@@ -519,6 +520,9 @@ begin
 		if RST_N = '0' then
 			WAIExec <= '0';
 			STPExec <= '0';
+			IRQ_Nn <= '1';
+			ABORT_Nn <= '1';
+			NMI_Nn <= '1';
 		elsif rising_edge(CLK) then
 			if EN = '1' and IsResetInterrupt = '0' then
 				if STATE = "0000" then 
@@ -530,7 +534,12 @@ begin
 				end if;
 			end if;
 			
-			if (IRQ_N = '0' or ABORT_N = '0' or NMI_N = '0') and WAIExec = '1' then
+			IRQ_Nn <= IRQ_N;
+			ABORT_Nn <= ABORT_N;
+			NMI_Nn <= NMI_N;
+
+			-- Only stop WAI when interrupt goes from high to low
+			if ( (IRQ_Nn = '1' and IRQ_N = '0') or (ABORT_Nn = '1' and ABORT_N = '0') or (NMI_Nn = '1' and NMI_N = '0') ) and WAIExec = '1' then
 				WAIExec <= '0';
 			end if;
 		end if;

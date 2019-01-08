@@ -167,6 +167,7 @@ parameter CONF_STR4 = {
 	"-;",
 	"O56,Mouse,None,Port1,Port2;",
 	"O7,Swap Joysticks,No,Yes;",
+	"OH,Multitap,Disabled,Port2;",
 	"-;",
 	"R0,Reset;",
 	"J1,A,B,X,Y,LT,RT,Select,Start;",
@@ -192,7 +193,7 @@ wire [24:0] ioctl_addr;
 wire [15:0] ioctl_dout;
 wire        ioctl_wr;
 
-wire [11:0] joy0,joy1;
+wire [11:0] joy0,joy1,joy2,joy3,joy4;
 wire [24:0] ps2_mouse;
 
 hps_io #(.STRLEN(($size(CONF_STR1)>>3) + ($size(CONF_STR2)>>3) + ($size(CONF_STR3)>>3) + ($size(CONF_STR4)>>3) + 3), .WIDE(1)) hps_io
@@ -207,6 +208,9 @@ hps_io #(.STRLEN(($size(CONF_STR1)>>3) + ($size(CONF_STR2)>>3) + ($size(CONF_STR
 
 	.joystick_0(joy0),
 	.joystick_1(joy1),
+	.joystick_2(joy2),
+	.joystick_3(joy3),
+	.joystick_4(joy4),
 	.ps2_mouse(ps2_mouse),
 
 	.status(status),
@@ -369,6 +373,8 @@ main main
 	.JOY_STRB(JOY_STRB),
 	.JOY1_CLK(JOY1_CLK),
 	.JOY2_CLK(JOY2_CLK),
+	.JOY1_P6(JOY1_P6),
+	.JOY2_P6(JOY2_P6),
 	
 	.AUDIO_L(AUDIO_L),
 	.AUDIO_R(AUDIO_R)
@@ -551,30 +557,41 @@ wire       JOY_STRB;
 
 wire [1:0] JOY1_DO;
 wire       JOY1_CLK;
+wire       JOY1_P6;
 ioport port1
 (
 	.CLK(clk_sys),
 
 	.PORT_LATCH(JOY_STRB),
 	.PORT_CLK(JOY1_CLK),
+	.PORT_P6(JOY1_P6),
 	.PORT_DO(JOY1_DO),
 
-	.JOYSTICK(joy_swap ? joy1 : joy0),
+	.JOYSTICK1(joy_swap ? joy1 : joy0),
+
 	.MOUSE(ps2_mouse),
 	.MOUSE_EN(mouse_mode[0])
 );
 
 wire [1:0] JOY2_DO;
 wire       JOY2_CLK;
+wire       JOY2_P6;
 ioport port2
 (
 	.CLK(clk_sys),
 
+	.MULTITAP(status[17]),
+
 	.PORT_LATCH(JOY_STRB),
 	.PORT_CLK(JOY2_CLK),
+	.PORT_P6(JOY2_P6),
 	.PORT_DO(JOY2_DO),
 
-	.JOYSTICK(joy_swap ? joy0 : joy1),
+	.JOYSTICK1(joy_swap ? joy0 : joy1),
+	.JOYSTICK2(joy2),
+	.JOYSTICK3(joy3),
+	.JOYSTICK4(joy4),
+
 	.MOUSE(ps2_mouse),
 	.MOUSE_EN(mouse_mode[1])
 );

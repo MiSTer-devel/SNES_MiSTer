@@ -74,6 +74,8 @@ entity main is
 		JOY_STRB		: out std_logic;
 		JOY1_CLK		: out std_logic;
 		JOY2_CLK		: out std_logic;
+		JOY1_P6		: out std_logic;
+		JOY2_P6		: out std_logic;
 
 		AUDIO_L		: out std_logic_vector(15 downto 0);
 		AUDIO_R		: out std_logic_vector(15 downto 0)
@@ -196,6 +198,8 @@ begin
 		JOY_STRB		=> JOY_STRB,
 		JOY1_CLK		=> JOY1_CLK,
 		JOY2_CLK		=> JOY2_CLK,
+		JOY1_P6		=> JOY1_P6,
+		JOY2_P6		=> JOY2_P6,
 
 		BLEND			=> BLEND,
 		PAL			=> PAL,

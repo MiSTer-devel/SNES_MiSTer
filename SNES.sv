@@ -494,7 +494,7 @@ dpram_dif #(BSRAM_BITS,8,BSRAM_BITS-1,16) bsram
 
 ////////////////////////////  VIDEO  ////////////////////////////////////
 
-wire [4:0] R,G,B;
+wire [7:0] R,G,B;
 wire FIELD,INTERLACE;
 wire HSync, HSYNC;
 wire VSync, VSYNC;
@@ -546,9 +546,9 @@ video_mixer #(.LINE_LENGTH(520)) video_mixer
 	.hq2x(scale==1),
 	.mono(0),
 
-	.R({R,R[4:2]}),
-	.G({G,G[4:2]}),
-	.B({B,B[4:2]})
+	.R(R),
+	.G(G),
+	.B(B)
 );
 
 ////////////////////////////  I/O PORTS  ////////////////////////////////

@@ -169,13 +169,13 @@ package body PPU_PKG is
 
 	function Bright(mb: std_logic_vector(3 downto 0); b: unsigned(4 downto 0)) return std_logic_vector is
 		variable temp: unsigned(8 downto 0); 
-		variable res: std_logic_vector(4 downto 0); 
+		variable res: std_logic_vector(7 downto 0); 
 	begin
 		temp := b * unsigned(mb) + resize(b,temp'length);
 		if mb = x"0" then
 			res := (others => '0');
 		else
-			res := std_logic_vector(temp(8 downto 4));
+			res := std_logic_vector(temp(8 downto 1) + temp(8 downto 6));
 		end if;
 		return res;
 	end function;

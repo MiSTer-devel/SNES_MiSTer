@@ -40,7 +40,7 @@ entity SPPU is
 		HBLANK		: out std_logic;
 		VBLANK		: out std_logic;
 
-		COLOR_OUT	: out std_logic_vector(14 downto 0);	-- RGB 5:5:5
+		COLOR_OUT	: out std_logic_vector(23 downto 0);	-- RGB 8:8:8
 		X_OUT			: out std_logic_vector(8 downto 0);
 		Y_OUT			: out std_logic_vector(8 downto 0);
 		FRAME_OUT	: out std_logic;

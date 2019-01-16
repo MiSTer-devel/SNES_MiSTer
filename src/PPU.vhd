@@ -1134,9 +1134,9 @@ begin
 	end if;
 	
 	if M7SEL(1) = '0' then
-		M7_SCREEN_Y := signed(resize(SCREEN_Y, 9));
+		M7_SCREEN_Y := signed(resize(MOSAIC_Y, 9));
 	else
-		M7_SCREEN_Y := signed(resize(not SCREEN_Y, 9));
+		M7_SCREEN_Y := signed(resize(not MOSAIC_Y, 9));
 	end if;
 				
 	MPY <= resize(signed(M7A) * signed(M7B(15 downto 8)), MPY'length);

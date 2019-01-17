@@ -63,7 +63,7 @@ entity main is
 		FIELD			: out std_logic;
 		INTERLACE	: out std_logic;
 		DOTCLK		: out std_logic;
-		R,G,B			: out std_logic_vector(4 downto 0);
+		R,G,B			: out std_logic_vector(7 downto 0);
 		HBLANK		: out std_logic;
 		VBLANK		: out std_logic;
 		HSYNC			: out std_logic;
@@ -101,7 +101,7 @@ architecture rtl of main is
 	signal HBLANKn	: std_logic;
 	signal VBLANKn	: std_logic;
 
-	signal RGB_OUT : std_logic_vector(14 downto 0);
+	signal RGB_OUT : std_logic_vector(23 downto 0);
 
 	signal DLH_DO				: std_logic_vector(7 downto 0);
 	signal DLH_IRQ_N			: std_logic;
@@ -223,9 +223,9 @@ begin
 		AUDIO_R		=> AUDIO_R
 	);
 
-	R <= RGB_OUT(4 downto 0);
-	G <= RGB_OUT(9 downto 5);
-	B <= RGB_OUT(14 downto 10);
+	R <= RGB_OUT(7 downto 0);
+	G <= RGB_OUT(15 downto 8);
+	B <= RGB_OUT(23 downto 16);
 	HBLANK <= not HBLANKn;
 	VBLANK <= not VBLANKn;
 

@@ -65,7 +65,7 @@ entity SNES is
 		V224_MODE	: out std_logic;
 		DOTCLK		: out std_logic;
 
-		RGB_OUT 		: out std_logic_vector(14 downto 0);
+		RGB_OUT 		: out std_logic_vector(23 downto 0);
 		HDE			: out std_logic;
 		VDE			: out std_logic;
 		HSYNC			: out std_logic;

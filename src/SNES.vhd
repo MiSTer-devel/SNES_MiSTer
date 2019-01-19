@@ -65,7 +65,7 @@ entity SNES is
 		V224_MODE	: out std_logic;
 		DOTCLK		: out std_logic;
 
-		RGB_OUT 		: out std_logic_vector(14 downto 0);
+		RGB_OUT 		: out std_logic_vector(23 downto 0);
 		HDE			: out std_logic;
 		VDE			: out std_logic;
 		HSYNC			: out std_logic;
@@ -76,6 +76,8 @@ entity SNES is
 		JOY_STRB		: out std_logic;
 		JOY1_CLK		: out std_logic;
 		JOY2_CLK		: out std_logic;
+		JOY1_P6		: out std_logic;
+		JOY2_P6		: out std_logic;
 		
 		LRCK			: out std_logic;
 		BCK			: out std_logic;
@@ -402,6 +404,9 @@ begin
 
 
 	DBG_BREAK <= CPU_BRK or SMP_BRK or PPU_DBG_BRK;
+
+	JOY1_P6 <= JPIO67(6);
+	JOY2_P6 <= JPIO67(7);
 
 end rtl;
 

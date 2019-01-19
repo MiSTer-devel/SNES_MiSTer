@@ -40,8 +40,16 @@ module hps_io #(parameter STRLEN=0, PS2DIV=2000, WIDE=0, VDNUM=1, PS2WE=0)
 
 	output reg [15:0] joystick_0,
 	output reg [15:0] joystick_1,
+	output reg [15:0] joystick_2,
+	output reg [15:0] joystick_3,
+	output reg [15:0] joystick_4,
+	output reg [15:0] joystick_5,
 	output reg [15:0] joystick_analog_0,
 	output reg [15:0] joystick_analog_1,
+	output reg [15:0] joystick_analog_2,
+	output reg [15:0] joystick_analog_3,
+	output reg [15:0] joystick_analog_4,
+	output reg [15:0] joystick_analog_5,
 
 	output      [1:0] buttons,
 	output            forced_scandoubler,
@@ -325,6 +333,10 @@ always@(posedge clk_sys) begin
 					'h01: cfg        <= io_din[7:0];
 					'h02: joystick_0 <= io_din;
 					'h03: joystick_1 <= io_din;
+					'h10: joystick_2 <= io_din;
+					'h11: joystick_3 <= io_din;
+					'h12: joystick_4 <= io_din;
+					'h13: joystick_5 <= io_din;
 
 					// store incoming ps2 mouse bytes
 					'h04: begin
@@ -379,8 +391,14 @@ always@(posedge clk_sys) begin
 					// joystick analog
 					'h1a: case(byte_cnt)
 								1: stick_idx <= io_din[2:0]; // first byte is joystick index
-								2: if(stick_idx == 0) joystick_analog_0 <= io_din;
-									else if(stick_idx == 1) joystick_analog_1 <= io_din;
+								2: case(stick_idx)
+										0: joystick_analog_0 <= io_din;
+										1: joystick_analog_1 <= io_din;
+										2: joystick_analog_2 <= io_din;
+										3: joystick_analog_3 <= io_din;
+										4: joystick_analog_4 <= io_din;
+										5: joystick_analog_5 <= io_din;
+									endcase
 							endcase
 
 					// notify image selection

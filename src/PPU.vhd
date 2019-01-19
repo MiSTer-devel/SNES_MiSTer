@@ -40,7 +40,7 @@ entity SPPU is
 		HBLANK		: out std_logic;
 		VBLANK		: out std_logic;
 
-		COLOR_OUT	: out std_logic_vector(14 downto 0);	-- RGB 5:5:5
+		COLOR_OUT	: out std_logic_vector(23 downto 0);	-- RGB 8:8:8
 		X_OUT			: out std_logic_vector(8 downto 0);
 		Y_OUT			: out std_logic_vector(8 downto 0);
 		FRAME_OUT	: out std_logic;
@@ -1134,9 +1134,9 @@ begin
 	end if;
 	
 	if M7SEL(1) = '0' then
-		M7_SCREEN_Y := signed(resize(SCREEN_Y, 9));
+		M7_SCREEN_Y := signed(resize(MOSAIC_Y, 9));
 	else
-		M7_SCREEN_Y := signed(resize(not SCREEN_Y, 9));
+		M7_SCREEN_Y := signed(resize(not MOSAIC_Y, 9));
 	end if;
 				
 	MPY <= resize(signed(M7A) * signed(M7B(15 downto 8)), MPY'length);

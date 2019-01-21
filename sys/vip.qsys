@@ -547,7 +547,6 @@
    internal="Reset_Source.reset_ctl"
    type="conduit"
    dir="end" />
- <interface name="uart" internal="HPS.uart1" type="conduit" dir="end" />
  <module name="Controller" kind="avalon_combiner" version="17.0" enabled="1" />
  <module name="Deinterlacer" kind="alt_vip_cl_dil" version="17.0" enabled="1">
   <parameter name="AUTO_DEVICE" value="5CSEBA6U23I7" />
@@ -763,8 +762,8 @@
   <parameter name="TRACE_PinMuxing" value="Unused" />
   <parameter name="UART0_Mode" value="N/A" />
   <parameter name="UART0_PinMuxing" value="Unused" />
-  <parameter name="UART1_Mode" value="Full" />
-  <parameter name="UART1_PinMuxing" value="FPGA" />
+  <parameter name="UART1_Mode" value="N/A" />
+  <parameter name="UART1_PinMuxing" value="Unused" />
   <parameter name="USB0_Mode" value="N/A" />
   <parameter name="USB0_PinMuxing" value="Unused" />
   <parameter name="USB1_Mode" value="N/A" />

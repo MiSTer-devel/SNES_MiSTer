@@ -57,7 +57,10 @@ entity main is
 		ARAM_OE_N	: out std_logic;
 		ARAM_WE_N	: out std_logic;
 
-		BLEND			: in std_logic;
+		GSU_SLOW		: out std_logic;
+		GSU_FULL		: in  std_logic;
+
+		BLEND			: in  std_logic;
 		PAL			: in  std_logic;
 		HIGH_RES		: out std_logic;
 		FIELD			: out std_logic;
@@ -412,7 +415,10 @@ begin
 
 		MAP_CTRL		=> ROM_TYPE,
 		ROM_MASK		=> ROM_MASK,
-		BSRAM_MASK	=> RAM_MASK
+		BSRAM_MASK	=> RAM_MASK,
+
+		CLS_SLOW		=> GSU_SLOW,
+		CLS_FULL		=> GSU_FULL
 	);
 
 	DI          <= GSU_DO         and DLH_DO         and CX4_DO         and SDD_DO;

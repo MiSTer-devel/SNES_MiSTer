@@ -3,3 +3,5 @@ set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) DSP/DSPn.v
 set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) SDD1/InputMgr.vhd ]
 set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) SDD1/Decoder.vhd ]
 set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) SDD1/SDD1.vhd ]
+set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) GSU/GSU.vhd ]
+set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) GSU/GSU_PKG.vhd ]

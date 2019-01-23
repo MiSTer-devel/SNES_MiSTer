@@ -84,6 +84,8 @@ end main;
 
 architecture rtl of main is
 
+	signal RST_N	: std_logic;
+	signal ENABLE	: std_logic;
 	signal CA 		: std_logic_vector(23 downto 0);
 	signal CPURD_N	: std_logic;
 	signal CPUWR_N	: std_logic;
@@ -141,8 +143,22 @@ architecture rtl of main is
 	signal SDD_BSRAM_OE_N	: std_logic;
 	signal SDD_BSRAM_WE_N	: std_logic;
 	signal SDD_REFRESH		: std_logic;
+	
+	signal GSU_DO				: std_logic_vector(7 downto 0);
+	signal GSU_IRQ_N			: std_logic;
+	signal GSU_ROM_ADDR		: std_logic_vector(22 downto 0);
+	signal GSU_ROM_CE_N		: std_logic;
+	signal GSU_ROM_OE_N		: std_logic;
+	signal GSU_ROM_WORD		: std_logic;
+	signal GSU_BSRAM_ADDR	: std_logic_vector(19 downto 0);
+	signal GSU_BSRAM_D		: std_logic_vector(7 downto 0);
+	signal GSU_BSRAM_CE_N	: std_logic;
+	signal GSU_BSRAM_OE_N	: std_logic;
+	signal GSU_BSRAM_WE_N	: std_logic;
+	signal GSU_REFRESH		: std_logic;
+	
 begin
-
+	
 	SNES : entity work.SNES
 	port map(
 		MCLK			=> MCLK,
@@ -355,19 +371,62 @@ begin
 		ROM_MASK		=> ROM_MASK,
 		BSRAM_MASK	=> RAM_MASK
 	);
+	
+	GSUMap : entity work.GSUMap
+	port map(
+		MEM_CLK		=> MEM_CLK,
+		MCLK			=> MCLK,
+		RST_N			=> RESET_N,
 
-	DI          <= DLH_DO         and CX4_DO         and SDD_DO;
-	IRQ_N       <= DLH_IRQ_N      and CX4_IRQ_N      and SDD_IRQ_N;
-	ROM_ADDR    <= DLH_ROM_ADDR   and CX4_ROM_ADDR   and SDD_ROM_ADDR;
-	ROM_CE_N    <= DLH_ROM_CE_N   and CX4_ROM_CE_N   and SDD_ROM_CE_N;
-	ROM_OE_N    <= DLH_ROM_OE_N   and CX4_ROM_OE_N   and SDD_ROM_OE_N;
-	BSRAM_ADDR  <= DLH_BSRAM_ADDR and CX4_BSRAM_ADDR and SDD_BSRAM_ADDR;
-	BSRAM_D     <= DLH_BSRAM_D    and CX4_BSRAM_D    and SDD_BSRAM_D;
-	BSRAM_CE_N  <= DLH_BSRAM_CE_N and CX4_BSRAM_CE_N and SDD_BSRAM_CE_N;
-	BSRAM_OE_N  <= DLH_BSRAM_OE_N and CX4_BSRAM_OE_N and SDD_BSRAM_OE_N;
-	BSRAM_WE_N  <= DLH_BSRAM_WE_N and CX4_BSRAM_WE_N and SDD_BSRAM_WE_N;
+		CA				=> CA,
+		DI				=> DO,
+		DO				=> GSU_DO,
+		CPURD_N		=> CPURD_N,
+		CPUWR_N		=> CPUWR_N,
 
-	ROM_WORD    <= DLH_ROM_WORD   or  CX4_ROM_WORD   or  SDD_ROM_WORD;
-	REFRESH     <= DLH_REFRESH    or  CX4_REFRESH    or  SDD_REFRESH;
+		PA				=> PA,
+		PARD_N		=> PARD_N,
+		PAWR_N		=> PAWR_N,
+
+		ROMSEL_N		=> ROMSEL_N,
+		RAMSEL_N		=> RAMSEL_N,
+
+		SYSCLKF_CE	=> SYSCLKF_CE,
+		SYSCLKR_CE	=> SYSCLKR_CE,
+		REFRESH		=> GSU_REFRESH,
+
+		IRQ_N			=> GSU_IRQ_N,
+
+		ROM_ADDR		=> GSU_ROM_ADDR,
+		ROM_Q			=> ROM_Q,
+		ROM_CE_N		=> GSU_ROM_CE_N,
+		ROM_OE_N		=> GSU_ROM_OE_N,
+		ROM_WORD		=> GSU_ROM_WORD,
+
+		BSRAM_ADDR	=> GSU_BSRAM_ADDR,
+		BSRAM_D		=> GSU_BSRAM_D,
+		BSRAM_Q		=> BSRAM_Q,
+		BSRAM_CE_N	=> GSU_BSRAM_CE_N,
+		BSRAM_OE_N	=> GSU_BSRAM_OE_N,
+		BSRAM_WE_N	=> GSU_BSRAM_WE_N,
+
+		MAP_CTRL		=> ROM_TYPE,
+		ROM_MASK		=> ROM_MASK,
+		BSRAM_MASK	=> RAM_MASK
+	);
+
+	DI          <= GSU_DO         and DLH_DO         and CX4_DO         and SDD_DO;
+	IRQ_N       <= GSU_IRQ_N      and DLH_IRQ_N      and CX4_IRQ_N      and SDD_IRQ_N;
+	ROM_ADDR    <= GSU_ROM_ADDR   and DLH_ROM_ADDR   and CX4_ROM_ADDR   and SDD_ROM_ADDR;
+	ROM_CE_N    <= GSU_ROM_CE_N   and DLH_ROM_CE_N   and CX4_ROM_CE_N   and SDD_ROM_CE_N;
+	ROM_OE_N    <= GSU_ROM_OE_N   and DLH_ROM_OE_N   and CX4_ROM_OE_N   and SDD_ROM_OE_N;
+	BSRAM_ADDR  <= GSU_BSRAM_ADDR and DLH_BSRAM_ADDR and CX4_BSRAM_ADDR and SDD_BSRAM_ADDR;
+	BSRAM_D     <= GSU_BSRAM_D    and DLH_BSRAM_D    and CX4_BSRAM_D    and SDD_BSRAM_D;
+	BSRAM_CE_N  <= GSU_BSRAM_CE_N and DLH_BSRAM_CE_N and CX4_BSRAM_CE_N and SDD_BSRAM_CE_N;
+	BSRAM_OE_N  <= GSU_BSRAM_OE_N and DLH_BSRAM_OE_N and CX4_BSRAM_OE_N and SDD_BSRAM_OE_N;
+	BSRAM_WE_N  <= GSU_BSRAM_WE_N and DLH_BSRAM_WE_N and CX4_BSRAM_WE_N and SDD_BSRAM_WE_N;
+
+	ROM_WORD    <= GSU_ROM_WORD   or  DLH_ROM_WORD   or  CX4_ROM_WORD   or  SDD_ROM_WORD;
+	REFRESH     <= GSU_REFRESH    or  DLH_REFRESH    or  CX4_REFRESH    or  SDD_REFRESH;
 
 end rtl;

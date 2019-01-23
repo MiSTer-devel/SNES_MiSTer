@@ -1206,6 +1206,8 @@ begin
 		if ENABLE = '1' and DOT_CLKR_CE = '1' then
 			if H_CNT = 339 and V_CNT <= LAST_VIS_LINE then
 				BG_DATA <= (others => (others => '0'));
+				BG3_OPT_DATA0 <= (others => '0');
+				BG3_OPT_DATA1 <= (others => '0');
 								
 				if BG_MOSAIC_Y = unsigned(MOSAIC_SIZE) then
 					BG_MOSAIC_Y <= (others => '0');

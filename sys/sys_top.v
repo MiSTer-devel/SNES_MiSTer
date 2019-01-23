@@ -1,7 +1,7 @@
 //============================================================================
 //
 //  MiSTer hardware abstraction module
-//  (c)2017,2018 Sorgelig
+//  (c)2017-2019 Sorgelig
 //
 //  This program is free software; you can redistribute it and/or modify it
 //  under the terms of the GNU General Public License as published by the Free
@@ -298,6 +298,31 @@ always @(posedge clk_sys) begin
 	end
 end
 
+cyclonev_hps_interface_peripheral_uart uart
+(
+	.ri(0),
+	.dsr(uart_dsr),
+	.dcd(uart_dsr),
+	.dtr(uart_dtr),
+
+	.cts(uart_cts),
+	.rts(uart_rts),
+	.rxd(uart_rxd),
+	.txd(uart_txd)
+);
+
+wire aspi_sck,aspi_mosi,aspi_ss;
+cyclonev_hps_interface_peripheral_spi_master spi
+(
+	.sclk_out(aspi_sck),
+	.txd(aspi_mosi), // mosi
+	.rxd(1),         // miso
+
+	.ss_0_n(aspi_ss),
+	.ss_in_n(1)
+);
+
+
 ///////////////////////////  RESET  ///////////////////////////////////
 
 reg reset_req = 0;
@@ -318,11 +343,11 @@ always @(posedge FPGA_CLK2_50) begin
 	resetd2 <= resetd;
 end
 
-wire clk_ctl;
+wire clk_100m;
+wire clk_hdmi  = ~HDMI_TX_CLK;  // Internal HDMI clock, inverted in relation to external clock
+wire clk_audio = FPGA_CLK3_50;
 
-///////////////////////// VIP version  ///////////////////////////////
-
-wire iHdmiClk = ~HDMI_TX_CLK;			// Internal HDMI clock, inverted in relation to external clock
+////////////////////  SYSTEM MEMORY & SCALER  /////////////////////////
 
 `ifndef LITE
 
@@ -343,7 +368,7 @@ vip vip
 	.ctl_write(ctl_write),
 	.ctl_writedata(ctl_writedata),
 	.ctl_waitrequest(ctl_waitrequest),
-	.ctl_clock(clk_ctl),
+	.ctl_clock(clk_100m),
 	.ctl_reset(ctl_reset),
 
 	//64-bit DDR3 RAM access
@@ -372,16 +397,6 @@ vip vip
 	.ram2_byteenable(0),
 	.ram2_write(0),
 
-	.uart_ri(0),
-	.uart_dsr(uart_dsr),
-	.uart_dcd(uart_dsr),
-	.uart_dtr(uart_dtr),
-
-	.uart_cts(uart_cts),
-	.uart_rts(uart_rts),
-	.uart_rxd(uart_rxd),
-	.uart_txd(uart_txd), 
-
 	//Video input
 	.in_clk(clk_vid),
 	.in_data({r_out, g_out, b_out}),
@@ -392,7 +407,7 @@ vip vip
 	.in_f(f1),
 
 	//HDMI output
-	.hdmi_clk(iHdmiClk),
+	.hdmi_clk(clk_hdmi),
 	.hdmi_data(hdmi_data),
 	.hdmi_de(hdmi_de),
 	.hdmi_v_sync(HDMI_TX_VS),
@@ -407,7 +422,7 @@ wire        ctl_reset;
 
 vip_config vip_config
 (
-	.clk(clk_ctl),
+	.clk(clk_100m),
 	.reset(ctl_reset),
 
 	.ARX(ARX),
@@ -445,24 +460,21 @@ assign adj_waitrequest = cfg_waitrequest;
 `endif
 
 
-/////////////////////////  Lite version  ////////////////////////////////
-
 `ifdef LITE
 
 wire reset;
 sysmem_lite sysmem
 (
 	//Reset/Clock
-	.reset_reset_req(reset_req),
-	.reset_reset(reset),
-	.ctl_clock(clk_ctl),
+	.reset_core_req(reset_req),
+	.reset_out(reset),
+	.clock(clk_100m),
 
 	//DE10-nano has no reset signal on GPIO, so core has to emulate cold reset button.
-	.reset_cold_req(~btn_reset),
-	.reset_warm_req(0),
+	.reset_hps_cold_req(~btn_reset),
 
 	//64-bit DDR3 RAM access
-	.ramclk1_clk(ram_clk),
+	.ram1_clk(ram_clk),
 	.ram1_address(ram_address),
 	.ram1_burstcount(ram_burstcount),
 	.ram1_waitrequest(ram_waitrequest),
@@ -473,32 +485,21 @@ sysmem_lite sysmem
 	.ram1_byteenable(ram_byteenable),
 	.ram1_write(ram_write),
 
-	//Spare 64-bit DDR3 RAM access
-	//currently unused
-	//can combine with ram1 to make a wider RAM bus (although will increase the latency)
-	.ramclk2_clk(0),
-	.ram2_address(0),
-	.ram2_burstcount(0),
-	.ram2_waitrequest(),
-	.ram2_readdata(),
-	.ram2_readdatavalid(),
-	.ram2_read(0),
+	//64-bit DDR3 RAM access
+	.ram2_clk(clk_audio),
+	.ram2_address(aram_address),
+	.ram2_burstcount(aram_burstcount),
+	.ram2_waitrequest(aram_waitrequest),
+	.ram2_readdata(aram_readdata),
+	.ram2_readdatavalid(aram_readdatavalid),
+	.ram2_read(aram_read),
 	.ram2_writedata(0),
-	.ram2_byteenable(0),
+	.ram2_byteenable(8'hFF),
 	.ram2_write(0),
 
-	.uart_ri(0),
-	.uart_dsr(uart_dsr),
-	.uart_dcd(uart_dsr),
-	.uart_dtr(uart_dtr),
-
-	.uart_cts(uart_cts),
-	.uart_rts(uart_rts),
-	.uart_rxd(uart_rxd),
-	.uart_txd(uart_txd), 
-
+	//128-bit DDR3 RAM access
 	// HDMI frame buffer
-	.vbuf_clk(clk_ctl),
+	.vbuf_clk(clk_100m),
 	.vbuf_address(vbuf_address),
 	.vbuf_burstcount(vbuf_burstcount),
 	.vbuf_waitrequest(vbuf_waitrequest),
@@ -508,7 +509,6 @@ sysmem_lite sysmem
 	.vbuf_readdata(vbuf_readdata),
 	.vbuf_readdatavalid(vbuf_readdatavalid),
 	.vbuf_read(vbuf_read)
-	
 );
 
 wire  [27:0] vbuf_address;
@@ -548,7 +548,7 @@ ascal
 	.vimin  (0),
 	.vimax  (0),
 
-	.o_clk  (iHdmiClk),
+	.o_clk  (clk_hdmi),
 	.o_ce   (1),
 	.o_r    (hdmi_data[23:16]),
 	.o_g    (hdmi_data[15:8]),
@@ -575,7 +575,7 @@ ascal
 	.poly_dw  (coef_data),
 	.poly_wr  (coef_wr),
 
-	.avl_clk          (clk_ctl),
+	.avl_clk          (clk_100m),
 	.avl_waitrequest  (vbuf_waitrequest),
 	.avl_readdata     (vbuf_readdata),
 	.avl_readdatavalid(vbuf_readdatavalid),
@@ -662,9 +662,12 @@ reg  [11:0] VBP    = 36;
 wire [63:0] reconfig_to_pll;
 wire [63:0] reconfig_from_pll;
 wire        cfg_waitrequest,adj_waitrequest;
-reg         cfg_write,adj_write;
-reg   [5:0] cfg_address,adj_address;
-reg  [31:0] cfg_data,adj_data;
+wire        cfg_write;
+wire  [5:0] cfg_address;
+wire [31:0] cfg_data;
+reg         adj_write;
+reg   [5:0] adj_address;
+reg  [31:0] adj_data;
 
 pll_hdmi_cfg pll_hdmi_cfg
 (
@@ -728,7 +731,7 @@ wire        hdmi_de;
 
 scanlines #(1) HDMI_scanlines
 (
-	.clk(iHdmiClk),
+	.clk(clk_hdmi),
 
 	.scanlines(scanlines),
 	.din(hdmi_data),
@@ -745,18 +748,20 @@ osd hdmi_osd
 	.io_strobe(io_strobe),
 	.io_din(io_din),
 
-	.clk_video(iHdmiClk),
+	.clk_video(clk_hdmi),
 	.din(hdmi_data_sl),
 	.dout(HDMI_TX_D),
 	.de_in(hdmi_de),
-	.de_out(HDMI_TX_DE)
+	.de_out(HDMI_TX_DE),
+
+	.osd_status(osd_status)
 );
 
 assign HDMI_MCLK = 0;
 i2s i2s
 (
 	.reset(~cfg_ready),
-	.clk_sys(FPGA_CLK3_50),
+	.clk_sys(clk_audio),
 	.half_rate(~audio_96k),
 
 	.sclk(HDMI_SCLK),
@@ -764,8 +769,8 @@ i2s i2s
 	.sdata(HDMI_I2S),
 
 	//Could inverse the MSB but it will shift 0 level to -MAX level
-	.left_chan (audio_l >> !audio_s),
-	.right_chan(audio_r >> !audio_s)
+	.left_chan (audio_l),
+	.right_chan(audio_r)
 );
 
 
@@ -821,89 +826,114 @@ assign VGA_B  = VGA_EN ? 6'bZZZZZZ : vga_o[7:2];
 
 /////////////////////////  Audio output  ////////////////////////////////
 
-wire al, ar, aspdif;
+wire anl, anr, aspdif;
 
 sigma_delta_dac #(15) dac_l
 (
-	.CLK(FPGA_CLK3_50),
+	.CLK(clk_audio),
 	.RESET(reset),
-	.DACin({audio_l[15] ^ audio_s, audio_l[14:0]}),
-	.DACout(al)
+	.DACin({~audio_l[15], audio_l[14:0]}),
+	.DACout(anl)
 );
 
 sigma_delta_dac #(15) dac_r
 (
-	.CLK(FPGA_CLK3_50),
+	.CLK(clk_audio),
 	.RESET(reset),
-	.DACin({audio_r[15] ^ audio_s, audio_r[14:0]}),
-	.DACout(ar)
+	.DACin({~audio_r[15], audio_r[14:0]}),
+	.DACout(anr)
 );
 
 spdif toslink
 (
-	.clk_i(FPGA_CLK3_50),
+	.clk_i(clk_audio),
 
 	.rst_i(reset),
 	.half_rate(0),
 
-	.audio_l(audio_l >> !audio_s),
-	.audio_r(audio_r >> !audio_s),
+	.audio_l(audio_l),
+	.audio_r(audio_r),
 
 	.spdif_o(aspdif)
 );
 
 assign AUDIO_SPDIF = SW[0] ? HDMI_LRCLK : aspdif;
-assign AUDIO_R     = SW[0] ? HDMI_I2S   : ar;
-assign AUDIO_L     = SW[0] ? HDMI_SCLK  : al;
+assign AUDIO_R     = SW[0] ? HDMI_I2S   : anr;
+assign AUDIO_L     = SW[0] ? HDMI_SCLK  : anl;
 
-reg [15:0] audio_l; 
-reg [15:0] audio_r;
+reg signed [15:0] audio_l;
+reg signed [15:0] audio_r;
 
-always @(posedge FPGA_CLK3_50) begin
-	reg signed [15:0] al;
-	reg signed [15:0] ar;
+always @(posedge clk_audio) begin
+	reg signed [16:0] als, al, acl, apl;
+	reg signed [16:0] ars, ar, acr, apr;
 
-	case({audio_s,audio_mix})
-		'b000: al <= audio_ls;
-		'b001: al <= audio_ls - (audio_ls >> 3) + (audio_rs >> 3);
-		'b010: al <= audio_ls - (audio_ls >> 2) + (audio_rs >> 2);
-		'b011: al <= (audio_ls >> 1) + (audio_rs >> 1);
-		'b100: al <= audio_ls;
-		'b101: al <= audio_ls - (audio_ls >>> 3) + (audio_rs >>> 3);
-		'b110: al <= audio_ls - (audio_ls >>> 2) + (audio_rs >>> 2);
-		'b111: al <= (audio_ls >>> 1) + (audio_rs >>> 1);
+	{acl,acr} <= audio_s ? {audio_ls[15],audio_ls,audio_rs[15],audio_rs}: 
+	                       {2'b00,audio_ls[15:1],  2'b00,audio_rs[15:1]};
+
+	als <= acl + {alsa_l[15],alsa_l};
+	ars <= acr + {alsa_r[15],alsa_r};
+
+	case(audio_mix)
+		0: al <= als;
+		1: al <= als - (als >>> 3) + (ars >>> 3);
+		2: al <= als - (als >>> 2) + (ars >>> 2);
+		3: al <= (als >>> 1) + (ars >>> 1);
 	endcase
 
-	case({audio_s,audio_mix})
-		'b000: ar <= audio_rs;
-		'b001: ar <= audio_rs - (audio_rs >> 3) + (audio_ls >> 3);
-		'b010: ar <= audio_rs - (audio_rs >> 2) + (audio_ls >> 2);
-		'b011: ar <= (audio_rs >> 1) + (audio_ls >> 1);
-		'b100: ar <= audio_rs;
-		'b101: ar <= audio_rs - (audio_rs >>> 3) + (audio_ls >>> 3);
-		'b110: ar <= audio_rs - (audio_rs >>> 2) + (audio_ls >>> 2);
-		'b111: ar <= (audio_rs >>> 1) + (audio_ls >>> 1);
+	case(audio_mix)
+		0: ar <= ars;
+		1: ar <= ars - (ars >>> 3) + (als >>> 3);
+		2: ar <= ars - (ars >>> 2) + (als >>> 2);
+		3: ar <= (ars >>> 1) + (als >>> 1);
 	endcase
 	
 	if(vol_att[4]) begin
-		audio_l <= 0;
-		audio_r <= 0;
-	end
-	else
-	if(audio_s) begin
-		audio_l <= al >>> vol_att[3:0];
-		audio_r <= ar >>> vol_att[3:0];
+		apl <= 0;
+		apr <= 0;
 	end
 	else
 	begin
-		audio_l <= al >> vol_att[3:0];
-		audio_r <= ar >> vol_att[3:0];
+		apl <= al >>> vol_att[3:0];
+		apr <= ar >>> vol_att[3:0];
 	end
+
+	audio_l <= ($signed(apl) > $signed(17'd32767)) ? 16'd32767 : ($signed(apl) < $signed(-17'd32768)) ? -16'd32768 : apl[15:0];
+	audio_r <= ($signed(apr) > $signed(17'd32767)) ? 16'd32767 : ($signed(apr) < $signed(-17'd32768)) ? -16'd32768 : apr[15:0];
 end
+
+wire [28:0] aram_address;
+wire  [7:0] aram_burstcount;
+wire        aram_waitrequest;
+wire [63:0] aram_readdata;
+wire        aram_readdatavalid;
+wire        aram_read;
+
+wire signed [15:0] alsa_l, alsa_r;
+
+alsa alsa
+(
+	.reset(reset),
+
+	.ram_clk(clk_audio),
+	.ram_address(aram_address),
+	.ram_burstcount(aram_burstcount),
+	.ram_waitrequest(aram_waitrequest),
+	.ram_readdata(aram_readdata),
+	.ram_readdatavalid(aram_readdatavalid),
+	.ram_read(aram_read),
+
+	.spi_ss(aspi_ss),
+	.spi_sck(aspi_sck),
+	.spi_mosi(aspi_mosi),
+
+	.pcm_l(alsa_l),
+	.pcm_r(alsa_r)
+);
 
 ///////////////////  User module connection ////////////////////////////
 
-wire signed [15:0] audio_ls, audio_rs;
+wire [15:0] audio_ls, audio_rs;
 wire        audio_s;
 wire  [1:0] audio_mix;
 wire  [7:0] r_out, g_out, b_out;
@@ -937,12 +967,13 @@ wire        uart_cts;
 wire        uart_rts;
 wire        uart_rxd;
 wire        uart_txd;
+wire        osd_status;
 
 emu emu
 (
 	.CLK_50M(FPGA_CLK3_50),
 	.RESET(reset),
-	.HPS_BUS({HDMI_TX_VS, clk_ctl, clk_vid, ce_pix, de, hs, vs, io_wait, clk_sys, io_fpga, io_uio, io_strobe, io_wide, io_din, io_dout}),
+	.HPS_BUS({HDMI_TX_VS, clk_100m, clk_vid, ce_pix, de, hs, vs, io_wait, clk_sys, io_fpga, io_uio, io_strobe, io_wide, io_din, io_dout}),
 
 	.CLK_VIDEO(clk_vid),
 	.CE_PIXEL(ce_pix),
@@ -969,12 +1000,6 @@ emu emu
 	.AUDIO_MIX(audio_mix),
 	.TAPE_IN(0),
 
-	// SCK  -> CLK
-	// MOSI -> CMD
-	// MISO <- DAT0
-	//    Z -> DAT1
-	//    Z -> DAT2
-	// CS   -> DAT3
 	.SD_SCK(SDIO_CLK),
 	.SD_MOSI(SDIO_CMD),
 	.SD_MISO(SDIO_DAT[0]),
@@ -1009,7 +1034,9 @@ emu emu
 	.UART_RXD(uart_txd),
 	.UART_TXD(uart_rxd),
 	.UART_DTR(uart_dsr),
-	.UART_DSR(uart_dtr)
+	.UART_DSR(uart_dtr),
+
+	.OSD_STATUS(osd_status)
 );
 
 endmodule

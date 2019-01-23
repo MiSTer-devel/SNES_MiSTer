@@ -102,7 +102,9 @@ module emu
 	input         UART_RXD,
 	output        UART_TXD,
 	output        UART_DTR,
-	input         UART_DSR
+	input         UART_DSR,
+
+	input         OSD_STATUS
 );
 
 assign {UART_RTS, UART_TXD, UART_DTR} = 0;

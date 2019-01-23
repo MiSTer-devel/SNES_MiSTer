@@ -402,7 +402,7 @@ begin
 			end if;
 		elsif RAMIO_SEL = '1' then											--6000-6FFF
 			DO <= DATA_RAM_Q_B;
-		elsif ADDR(22) = '0' and ADDR(15 downto 5) = "11111111111" and CPU_RUN = '1' then	--FFE0-FFFF
+		elsif ADDR(23 downto 16) = x"00" and ADDR(15 downto 5) = "11111111111" and CPU_RUN = '1' then	--00:FFE0-FFFF
 			DO <= VEC_MEM(to_integer(unsigned(ADDR(4 downto 0))));
 		else
 			DO <= BUS_DI;

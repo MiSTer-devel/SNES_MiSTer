@@ -879,7 +879,7 @@ begin
 end process;
 
 
-process( H_CNT, V_CNT, LAST_VIS_LINE )
+process( H_CNT, V_CNT, LAST_VIS_LINE, FORCE_BLANK )
 begin
 	if H_CNT <= (256+16)-1 and V_CNT >= 0 and V_CNT <= LAST_VIS_LINE then
 		BG_VRAM_FETCH <= '1';
@@ -911,7 +911,7 @@ begin
 		BG_OUT <= '0';
 	end if;
 	
-	if H_CNT <= (256)-1 and V_CNT < LAST_VIS_LINE then
+	if H_CNT <= (256)-1 and V_CNT < LAST_VIS_LINE and FORCE_BLANK = '0' then
 		OBJ_RANGE <= '1';
 	else
 		OBJ_RANGE <= '0';

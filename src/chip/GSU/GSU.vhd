@@ -18,10 +18,13 @@ entity GSU is
 		DO				: out std_logic_vector(7 downto 0);
 		RD_N			: in std_logic;
 		WR_N			: in std_logic;
-		
+
 		SYSCLKF_CE	: in std_logic;
 		SYSCLKR_CE	: in std_logic;
-				
+		
+		CLS_OUT		: out std_logic;
+		CLS_FULL		: in std_logic;
+
 		IRQ_N			: out std_logic;
 		
 		ROM_A   		: out std_logic_vector(20 downto 0);
@@ -56,7 +59,7 @@ architecture rtl of GSU is
 	signal ROMDR : std_logic_vector(7 downto 0);
 	signal RAMDR : std_logic_vector(15 downto 0);
 	signal BRAMR, SCBR : std_logic_vector(7 downto 0);
-	signal MS0, IRQ_OFF, CLS : std_logic;
+	signal MS0, IRQ_OFF, CLS_INT, CLS : std_logic;
 	signal COLR : std_logic_vector(7 downto 0);
 	signal POR_TRANS, POR_DITH, POR_HN, POR_FH, POR_OBJ : std_logic;
 	signal SCMR_MD, SCMR_HT : std_logic_vector(1 downto 0);
@@ -192,7 +195,7 @@ begin
 			MS0 <= '0';
 			IRQ_OFF <= '0';
 			SCBR <= (others => '0');
-			CLS <= '0';
+			CLS_INT <= '0';
 			SCMR_MD <= (others => '0');
 			SCMR_HT <= (others => '0');
 			RAN <= '0';
@@ -241,7 +244,7 @@ begin
 							when x"8" =>						-- 3038
 								SCBR <= DI;
 							when x"9" =>						-- 3039
-								CLS <= DI(0);
+								CLS_INT <= DI(0);
 							when others => null;
 						end case;
 					end if;
@@ -390,6 +393,9 @@ begin
 			end if;
 		end if;
 	end process; 
+	
+	CLS_OUT <= CLS_INT;
+	CLS <= CLS_INT or CLS_FULL;
 	
 	EN <= ENABLE and FLAG_GO and (CLK_CE or CLS);
 	

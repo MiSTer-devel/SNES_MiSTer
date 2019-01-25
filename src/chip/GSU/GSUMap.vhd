@@ -49,6 +49,9 @@ entity GSUMap is
 		ROM_MASK		: in std_logic_vector(23 downto 0);
 		BSRAM_MASK	: in std_logic_vector(23 downto 0);
 		
+		CLS_SLOW		: out std_logic;
+		CLS_FULL		: in std_logic;
+
 		BRK_OUT		: out std_logic;
 		DBG_REG		: in std_logic_vector(7 downto 0) := (others => '0');
 		DBG_DAT_IN	: in std_logic_vector(7 downto 0) := (others => '0');
@@ -68,6 +71,7 @@ architecture rtl of GSUMap is
 	
 	signal GSU_DO 		: std_logic_vector(7 downto 0);
 	signal GSU_IRQ_N	: std_logic;
+	signal CLS			: std_logic;
 	
 	signal MAP_SEL	  	: std_logic;
 	
@@ -103,12 +107,17 @@ begin
 		RAM_WE_N		=> RAM_WE_N,
 		RAM_CE_N		=> RAM_CE_N,
 				
+		CLS_OUT		=> CLS,
+		CLS_FULL		=> CLS_FULL,
+
 		BRK_OUT		=> BRK_OUT,
 		DBG_REG  	=> DBG_REG,
 		DBG_DAT_IN	=> DBG_DAT_IN,
 		DBG_DAT_OUT	=> DBG_DAT_OUT,
 		DBG_DAT_WR	=> DBG_DAT_WR
 	);
+	
+	CLS_SLOW		<= MAP_SEL and not CLS;
 	
 	ROM_ADDR 	<= (others => '1') when MAP_SEL = '0' else ("00" & ROM_A) and ROM_MASK(22 downto 0);
 	ROM_CE_N 	<= not MAP_SEL;

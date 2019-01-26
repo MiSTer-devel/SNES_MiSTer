@@ -512,7 +512,7 @@ begin
 	
 	CACHE : entity work.dpram generic map(9, 8)
 	port map(
-		clock			=> not CLK,
+		clock			=> MEM_CLK,
 		address_a	=> BRAM_CACHE_ADDR_A,
 		data_a		=> BRAM_CACHE_DI_A,
 		wren_a		=> BRAM_CACHE_WE_A,

@@ -134,7 +134,8 @@ pll pll
 	.rst(0),
 	.outclk_0(clk_mem),
 	.outclk_1(SDRAM_CLK),
-	.outclk_2(clk_sys),
+	.outclk_2(CLK_VIDEO),
+	.outclk_3(clk_sys),
 	.locked(clock_locked)
 );
 
@@ -516,8 +517,8 @@ wire HIGH_RES;
 wire DOTCLK;
 
 reg ce_pix;
-always @(posedge clk_mem) begin
-	reg [3:0] pcnt;
+always @(posedge CLK_VIDEO) begin
+	reg [2:0] pcnt;
 	reg old_vsync;
 	reg tmp_hres, frame_hres;
 	reg old_dotclk;
@@ -534,13 +535,12 @@ always @(posedge clk_mem) begin
 	old_dotclk <= DOTCLK;
 	if(~old_dotclk & DOTCLK & ~HBlank & ~VBlank) pcnt <= 1;
 
-	ce_pix <= !pcnt[2:0] & (frame_hres | ~pcnt[3]);
+	ce_pix <= !pcnt[1:0] & (frame_hres | ~pcnt[2]);
 	
-	if(pcnt==6) {HSync, VSync} <= {HSYNC, VSYNC};
+	if(pcnt==3) {HSync, VSync} <= {HSYNC, VSYNC};
 end
 
 assign VGA_F1 = INTERLACE & FIELD;
-assign CLK_VIDEO = clk_mem;
 assign VGA_SL = {~INTERLACE,~INTERLACE}&sl[1:0];
 
 wire [2:0] scale = status[11:9];

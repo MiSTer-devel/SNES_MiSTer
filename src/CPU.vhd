@@ -996,7 +996,7 @@ begin
 
 						HDMA_FIRST_INIT <= '0';
 						
-						if HDMA_CH_DO /= x"00" then
+						if (HDMA_CH_DO and HDMAEN) /= x"00" then
 							HDMA_CH_WORK <= HDMA_CH_DO and HDMAEN;
 							HDMA_TRMODE_STEP <= (others => '0');
 							HDS <= HDS_TRANSFER;

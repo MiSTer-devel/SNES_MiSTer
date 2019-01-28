@@ -22,7 +22,7 @@ BEGIN
 		if RST_N = '0' then
 			CLK_SUM := 0;
 			CE <= '0';
-		elsif falling_edge(CLK) then
+		elsif rising_edge(CLK) then
 			CE <= '0';
 			CLK_SUM := CLK_SUM + OUT_CLK;
 			if CLK_SUM >= IN_CLK then

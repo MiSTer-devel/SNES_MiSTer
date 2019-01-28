@@ -82,7 +82,6 @@ begin
 	GSU : entity work.GSU
 	port map(
 		CLK			=> MCLK,
-		MEM_CLK		=> MEM_CLK,
 		RST_N			=> RST_N and MAP_SEL,
 		ENABLE		=> ENABLE,
 

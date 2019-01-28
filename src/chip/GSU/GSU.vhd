@@ -8,7 +8,6 @@ use work.GSU_PKG.all;
 entity GSU is
 	port(
 		CLK			: in std_logic;
-		MEM_CLK		: in std_logic;
 
 		RST_N			: in std_logic;
 		ENABLE		: in std_logic;
@@ -116,8 +115,6 @@ architecture rtl of GSU is
 	signal PCF_RAM_A, RPIX_RAM_A : std_logic_vector(16 downto 0);
 	signal PCF_RD_DATA, PCF_WR_DATA, CACHED_PCF_DATA, RPIX_DATA : std_logic_vector(7 downto 0);
 	signal PCF_RW : std_logic;
-	signal PLOT_EXEC : std_logic;
-	signal COL_DITH : std_logic_vector(7 downto 0);
 	signal PCN, PC0_FULL, PC1_FULL : std_logic;
 	signal PC0, PC1 : integer range 0 to 1;	
 	signal PC_X, PC_Y : unsigned(7 downto 0);
@@ -399,7 +396,8 @@ begin
 	
 	EN <= ENABLE and FLAG_GO and (CLK_CE or CLS);
 	
-	OP_CYCLES <= not (MS0 and not CLS) & "11" when OP.OP = OP_FMULT or OP.OP = OP_LMULT else
+	OP_CYCLES <= "000" when CLS_FULL = '1' else
+					 not (MS0 and not CLS) & "11" when OP.OP = OP_FMULT or OP.OP = OP_LMULT else
 					 "00" & not (MS0 and not CLS) when OP.OP = OP_MULT or OP.OP = OP_UMULT else
 					 "000";
 	
@@ -512,7 +510,7 @@ begin
 	
 	CACHE : entity work.dpram generic map(9, 8)
 	port map(
-		clock			=> MEM_CLK,
+		clock			=> not CLK,
 		address_a	=> BRAM_CACHE_ADDR_A,
 		data_a		=> BRAM_CACHE_DI_A,
 		wren_a		=> BRAM_CACHE_WE_A,
@@ -536,7 +534,9 @@ begin
 	
 	
 	--Memory buses
-	MEM_CYCLES <= "010" when CLS = '0' else "100";
+	MEM_CYCLES <= "011" when CLS_FULL = '1' else 
+					  "010" when CLS = '0' else 
+					  "100";
 	
 	R14_CHANGE <= '1' when MC.DREG(1) = '1' and DST_REG = 14 else '0';
 	
@@ -1060,32 +1060,6 @@ begin
 	
 	
 	--Pixel cashe
-	process(COLR, POR_TRANS, POR_DITH, SCMR_MD, POR_FH, R, COL_DITH)
-	begin
-		if POR_DITH = '1' and SCMR_MD /= "11" then
-			if (R(1)(0) xor R(2)(0)) = '1' then
-				COL_DITH <= "0000" & COLR(7 downto 4);
-			else
-				COL_DITH <= "0000" & COLR(3 downto 0);
-			end if;
-		else
-			COL_DITH <= COLR;
-		end if;
-			
-		PLOT_EXEC <= '0';
-		if POR_TRANS = '1' then
-			PLOT_EXEC <= '1';
-		elsif SCMR_MD /= "11" or POR_FH = '1' then
-			if COL_DITH(3 downto 0) /= "0000" then
-				PLOT_EXEC <= '1';
-			end if;
-		else
-			if COL_DITH /= "00000000" then
-				PLOT_EXEC <= '1';
-			end if;
-		end if;
-	end process; 
-	
 	PC_X <= unsigned(R(1)(7 downto 0));
 	PC_Y <= unsigned(R(2)(7 downto 0));
 	
@@ -1096,6 +1070,8 @@ begin
 			
 	process(CLK, RST_N)
 		variable NEW_COLOR : std_logic_vector(7 downto 0);
+		variable PLOT_EXEC : std_logic;
+		variable COL_DITH : std_logic_vector(7 downto 0);
 	begin
 		if RST_N = '0' then
 			POR_TRANS <= '0';
@@ -1133,6 +1109,29 @@ begin
 							COLR(7 downto 4) <= NEW_COLOR(7 downto 4);
 						end if;
 					elsif OP.OP = OP_PLOT then
+						if POR_DITH = '1' and SCMR_MD /= "11" then
+							if (R(1)(0) xor R(2)(0)) = '1' then
+								COL_DITH := "0000" & COLR(7 downto 4);
+							else
+								COL_DITH := "0000" & COLR(3 downto 0);
+							end if;
+						else
+							COL_DITH := COLR;
+						end if;
+							
+						PLOT_EXEC := '0';
+						if POR_TRANS = '1' then
+							PLOT_EXEC := '1';
+						elsif SCMR_MD /= "11" or POR_FH = '1' then
+							if COLR(3 downto 0) /= "0000" then
+								PLOT_EXEC := '1';
+							end if;
+						else
+							if COLR /= "00000000" then
+								PLOT_EXEC := '1';
+							end if;
+						end if;
+						
 						if PLOT_EXEC = '1' then
 							if PIX_CACHE(PC0).OFFSET /= PC_Y & PC_X(7 downto 3) or PIX_CACHE(PC0).VALID = x"FF" then
 								PCN <= not PCN;

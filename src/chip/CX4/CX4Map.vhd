@@ -67,6 +67,7 @@ architecture rtl of CX4Map is
 	signal CX4_CE : std_logic;
 	signal CX4_RD_N : std_logic;
 	signal CX4_BUSY : std_logic;
+	signal CX4_IRQ_N : std_logic;
 
 	signal MAP_SEL	  : std_logic;
 	signal RD_PULSE  : std_logic;
@@ -86,7 +87,6 @@ begin
 	CX4 : entity work.CX4
 	port map(
 		CLK			=> MCLK,
-		MEM_CLK		=> MEM_CLK,
 		CE				=> CX4_CE,
 		RST_N			=> RST_N and MAP_SEL,
 		ENABLE		=> ENABLE,
@@ -97,7 +97,10 @@ begin
 		RD_N			=> CPURD_N,
 		WR_N			=> CPUWR_N,
 		
-		IRQ_N			=> IRQ_N,
+		SYSCLKF_CE	=> SYSCLKF_CE,
+		SYSCLKR_CE	=> SYSCLKR_CE,
+		
+		IRQ_N			=> CX4_IRQ_N,
 		
 		BUS_A			=> CX4_A,
 		BUS_DI		=> CX4_DI,
@@ -108,7 +111,6 @@ begin
 		ROM_CE2_N	=> ROM_CE2_N,
 		SRAM_CE_N	=> SRAM_CE_N,
 		
-		BUS_BUSY		=> CX4_BUSY,
 		BUS_RD_N		=> CX4_RD_N,
 		
 		MAPPER		=> MAP_CTRL(0),
@@ -137,7 +139,8 @@ begin
 	CX4_DI <= BSRAM_Q when SRAM_CE_N = '0' else ROM_Q(7 downto 0);
 
 	DO <= (others => '1') when MAP_SEL = '0' else CPU_DO;
+	IRQ_N <= CX4_IRQ_N or not MAP_SEL;
 
-	RD_PULSE <= SYSCLKR_CE when rising_edge(MCLK);
-	REFRESH <= RD_PULSE and not CX4_BUSY and MAP_SEL;
+	REFRESH <= '0';
+	
 end rtl;

@@ -105,13 +105,14 @@ reg [7:0] led_state    = 0;
 wire led_p =  led_power[1] ? ~led_power[0] : 1'b0;
 wire led_d =  led_disk[1]  ? ~led_disk[0]  : ~(led_disk[0] | gp_out[29]);
 wire led_u = ~led_user;
+wire led_locked;
 
 assign LED_POWER = led_p ? 1'bZ : 1'b0;
 assign LED_HDD   = led_d ? 1'bZ : 1'b0;
 assign LED_USER  = led_u ? 1'bZ : 1'b0;
 
 //LEDs on main board
-assign LED = (led_overtake & led_state) | (~led_overtake & {3'b000, ~led_p, 1'b0, ~led_d, 1'b0, ~led_u});
+assign LED = (led_overtake & led_state) | (~led_overtake & {1'b0,led_locked,1'b0, ~led_p, 1'b0, ~led_d, 1'b0, ~led_u});
 
 
 //////////////////////////  Buttons  ///////////////////////////////////
@@ -456,6 +457,7 @@ assign cfg_write = adj_write;
 assign cfg_address = adj_address;
 assign cfg_data = adj_data;
 assign adj_waitrequest = cfg_waitrequest;
+assign led_locked = 0;
 
 `endif
 
@@ -556,6 +558,7 @@ ascal
 	.o_hs   (HDMI_TX_HS),
 	.o_vs   (HDMI_TX_VS),
 	.o_de   (hdmi_de),
+	.o_lltune (lltune),
 	.htotal (WIDTH+HFP+HBP+HS),
 	.hsstart(WIDTH + HFP),
 	.hsend  (WIDTH + HFP + HS),
@@ -618,13 +621,16 @@ always @(posedge clk_vid) begin
 	endcase
 end
 
+wire [15:0] lltune;
+
 pll_hdmi_adj pll_hdmi_adj
 (
-   .clk(FPGA_CLK1_50),
+	.clk(FPGA_CLK1_50),
 	.reset_na(~reset_req),
 
 	.llena(lowlat),
 	.lltune(lltune),
+	.locked(led_locked),
 	.i_waitrequest(adj_waitrequest),
 	.i_write(adj_write),
 	.i_address(adj_address),
@@ -939,7 +945,6 @@ wire  [1:0] audio_mix;
 wire  [7:0] r_out, g_out, b_out;
 wire        vs, hs, de, f1;
 wire  [1:0] scanlines;
-wire  [15:0] lltune;
 wire        clk_sys, clk_vid, ce_pix;
 
 wire        ram_clk;

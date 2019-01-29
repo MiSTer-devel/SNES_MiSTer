@@ -21,8 +21,7 @@ entity GSU is
 		SYSCLKF_CE	: in std_logic;
 		SYSCLKR_CE	: in std_logic;
 		
-		CLS_OUT		: out std_logic;
-		CLS_FULL		: in std_logic;
+		TURBO			: in std_logic;
 
 		IRQ_N			: out std_logic;
 		
@@ -391,12 +390,11 @@ begin
 		end if;
 	end process; 
 	
-	CLS_OUT <= CLS_INT;
-	CLS <= CLS_INT or CLS_FULL;
+	CLS <= CLS_INT or TURBO;
 	
 	EN <= ENABLE and FLAG_GO and (CLK_CE or CLS);
 	
-	OP_CYCLES <= "000" when CLS_FULL = '1' else
+	OP_CYCLES <= "000" when TURBO = '1' else
 					 not (MS0 and not CLS) & "11" when OP.OP = OP_FMULT or OP.OP = OP_LMULT else
 					 "00" & not (MS0 and not CLS) when OP.OP = OP_MULT or OP.OP = OP_UMULT else
 					 "000";
@@ -534,7 +532,7 @@ begin
 	
 	
 	--Memory buses
-	MEM_CYCLES <= "011" when CLS_FULL = '1' else 
+	MEM_CYCLES <= "011" when TURBO = '1' else 
 					  "010" when CLS = '0' else 
 					  "100";
 	

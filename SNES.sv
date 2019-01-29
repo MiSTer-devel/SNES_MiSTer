@@ -166,7 +166,7 @@ parameter CONF_STR4 = {
 };
 
 parameter CONF_STR5 = {
-	"I,SuperFX Speed,Half,Full;",
+	"I,SuperFX speed,Original,Turbo;",
 	"OEF,Video Region,Auto,NTSC,PAL;",
 	"O8,Aspect ratio,4:3,16:9;",
 	"O9B,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
@@ -207,7 +207,7 @@ hps_io #(.STRLEN(($size(CONF_STR1)>>3) + ($size(CONF_STR2)>>3) + ($size(CONF_STR
 (
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
-	.conf_str({CONF_STR1,bk_ena ? "R" : "+",CONF_STR2,bk_ena ? "R" : "+",CONF_STR3,bk_ena ? "-" : "+",CONF_STR4,GSU_SLOW ? "O" : "+",CONF_STR5}),
+	.conf_str({CONF_STR1,bk_ena ? "R" : "+",CONF_STR2,bk_ena ? "R" : "+",CONF_STR3,bk_ena ? "-" : "+",CONF_STR4,GSU_ACTIVE ? "O" : "+",CONF_STR5}),
 
 	.buttons(buttons),
 	.forced_scandoubler(forced_scandoubler),
@@ -241,7 +241,7 @@ hps_io #(.STRLEN(($size(CONF_STR1)>>3) + ($size(CONF_STR2)>>3) + ($size(CONF_STR
 	.img_size(img_size)
 );
 
-wire       GSU_FULL = status[18];
+wire       GSU_TURBO = status[18];
 wire       BLEND = ~status[16];
 wire       PAL = (!status[15:14]) ? rom_region : status[15];
 wire [1:0] mouse_mode = status[6:5];
@@ -312,7 +312,7 @@ end
 
 ////////////////////////////  SYSTEM  ///////////////////////////////////
 
-wire GSU_SLOW;
+wire GSU_ACTIVE;
 
 main main
 (
@@ -322,8 +322,8 @@ main main
 	.MCLK(clk_sys), // 21.47727 / 21.28137
 	.ACLK(clk_sys),
 
-	.GSU_SLOW(GSU_SLOW),
-	.GSU_FULL(GSU_FULL),
+	.GSU_ACTIVE(GSU_ACTIVE),
+	.GSU_TURBO(GSU_TURBO),
 
 	.REFRESH(REFRESH),
 

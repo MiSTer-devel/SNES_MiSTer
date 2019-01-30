@@ -50,8 +50,8 @@ architecture rtl of DSPn is
 	signal SR	: std_logic_vector(15 downto 0);
 	signal DP	: std_logic_vector(10 downto 0);
 	signal RP	: std_logic_vector(10 downto 0);
-	signal PC	: std_logic_vector(13 downto 0);
-	type StackRam_t is array (0 to 7) of std_logic_vector(13 downto 0);
+	signal PC	: std_logic_vector(10 downto 0);
+	type StackRam_t is array (0 to 7) of std_logic_vector(10 downto 0);
 	signal STACK_RAM	: StackRam_t;
 	signal SP	: unsigned(2 downto 0);
 	signal K, L, M, N	: std_logic_vector(15 downto 0);
@@ -78,7 +78,7 @@ architecture rtl of DSPn is
 	signal OP_ALU		: std_logic_vector(3 downto 0);
 	signal OP_P			: std_logic_vector(1 downto 0);
 	signal OP_ID		: std_logic_vector(15 downto 0);
-	signal OP_NA		: std_logic_vector(12 downto 0);
+	signal OP_NA		: std_logic_vector(10 downto 0);
 	signal OP_BRCH		: std_logic_vector(8 downto 0);
 	signal OP_INSTR	: std_logic_vector(1 downto 0);
 	
@@ -97,7 +97,6 @@ architecture rtl of DSPn is
 	signal RD_Nr, WR_Nr : std_logic_vector(2 downto 0);
 	signal PORT_ACTIVE : std_logic;
 	
-	signal DP_DO : std_logic_vector(7 downto 0);
 	--debug
 	signal DBG_RUN_LAST : std_logic;
 	signal DBG_DAT_WRr : std_logic;
@@ -118,7 +117,7 @@ begin
 	OP_SRC <= PROG_ROM_Q(7 downto 4);
 	OP_DST <= PROG_ROM_Q(3 downto 0);
 	OP_ID <= PROG_ROM_Q(21 downto 6) when OP_INSTR = INSTR_LD else IDB;
-	OP_NA <= (PROG_ROM_Q(1 downto 0) and (VER(2)&VER(2)))&PROG_ROM_Q(12 downto 2);
+	OP_NA <= PROG_ROM_Q(12 downto 2);
 	OP_BRCH <= PROG_ROM_Q(21 downto 13);
 	
 	
@@ -129,8 +128,10 @@ begin
 			 ACC(ACC_A)    when OP_SRC = x"1" else
 			 ACC(ACC_B)    when OP_SRC = x"2" else
 			 TR            when OP_SRC = x"3" else
-			 "00000" & DP  when OP_SRC = x"4" else
-			 "00000" & RP  when OP_SRC = x"5" else
+			 "00000" & DP  when OP_SRC = x"4" and VER(2) = '1' else
+			 "00000" & RP  when OP_SRC = x"5" and VER(2) = '1' else
+			 x"00" & DP(7 downto 0) when OP_SRC = x"4" else
+			 "000000" & RP(9 downto 0)  when OP_SRC = x"5" else
 			 DATA_ROM_Q    when OP_SRC = x"6" else
 			 SGN           when OP_SRC = x"7" else
 			 DR            when OP_SRC = x"8" else
@@ -299,9 +300,6 @@ begin
 					
 					if OP_RP = '1' then
 						RP <= std_logic_vector(unsigned(RP) - 1);
-						if VER(2)='0' then
-							RP(10) <= '0';
-						end if;
 					end if;
 				end if;
 				
@@ -314,17 +312,9 @@ begin
 						when x"3" =>
 							TR <= OP_ID;
 						when x"4" =>
-							if VER(2)='1' then
-								DP <= OP_ID(10 downto 0);
-							else
-								DP <= "000" & OP_ID(7 downto 0);
-							end if;
+							DP <= OP_ID(10 downto 0);
 						when x"5" =>
-							if VER(2)='1' then
-								RP <= OP_ID(10 downto 0);
-							else
-								RP <= '0'&OP_ID(9 downto 0);
-							end if;
+							RP <= OP_ID(10 downto 0);
 						when x"7" =>
 							USF1 <= OP_ID(14);
 							USF0 <= OP_ID(13);
@@ -358,7 +348,7 @@ begin
 	
 	process(CLK, RST_N)
 		variable NEXT_SP : unsigned(2 downto 0);
-		variable NEXT_PC : std_logic_vector(13 downto 0);
+		variable NEXT_PC : std_logic_vector(10 downto 0);
 		variable COND : std_logic;
 	begin
 		if RST_N = '0' then
@@ -368,13 +358,9 @@ begin
 		elsif rising_edge(CLK) then
 			if EN = '1' then
 				NEXT_PC := std_logic_vector(unsigned(PC) + 1);
-				if VER(2) = '0' then
-					NEXT_PC(13 downto 11) := "000";
-				end if;
 				if OP_INSTR = INSTR_RT then
 					NEXT_SP := SP - 1;
-					NEXT_SP(2) := NEXT_SP(2) and VER(2);
-					PC <= STACK_RAM(to_integer(NEXT_SP));
+					PC <= STACK_RAM(to_integer((NEXT_SP(2) and VER(2))&NEXT_SP(1 downto 0)));
 					SP <= NEXT_SP;
 				elsif OP_INSTR = INSTR_JP then
 					case OP_BRCH(5 downto 2) is
@@ -416,20 +402,14 @@ begin
 					end case;
 					
 					if OP_BRCH = "000000000" then
-						PC <= SO(13 downto 0);
-						if VER(2) = '0' then
-							PC(13 downto 11) <= "000";
-						end if;
+						PC <= SO(10 downto 0);
 					elsif OP_BRCH(8 downto 6) = "010" and COND = '1' then
-						PC(12 downto 0) <= OP_NA;
-					elsif OP_BRCH(8 downto 7) = "10" and OP_BRCH(5 downto 1) = "00000" then
-						PC <= (OP_BRCH(0) and VER(2))&OP_NA;
+						PC <= OP_NA;
+					elsif OP_BRCH(8 downto 7) = "10" and OP_BRCH(5 downto 0) = "000000" then
+						PC <= OP_NA;
 						if OP_BRCH(6) = '1' then
-							STACK_RAM(to_integer(SP)) <= NEXT_PC;
+							STACK_RAM(to_integer((SP(2) and VER(2))&SP(1 downto 0))) <= NEXT_PC;
 							SP <= SP + 1;
-							if VER(2) = '0' then
-								SP(2) <= '0';
-							end if;
 						end if;
 					else
 						PC <= NEXT_PC;
@@ -441,11 +421,11 @@ begin
 		end if;
 	end process; 
 
-	PROG_ROM_ADDR <= std_logic_vector(unsigned(PC(12 downto 0)) + ("0"&x"000")) when VER="000" else
-                    std_logic_vector(unsigned(PC(12 downto 0)) + ("0"&x"500")) when VER="001" else
-                    std_logic_vector(unsigned(PC(12 downto 0)) + ("0"&x"C00")) when VER="010" else
-                    std_logic_vector(unsigned(PC(12 downto 0)) + ("1"&x"254")) when VER="011" else
-                    std_logic_vector(unsigned(PC(12 downto 0)) + ("1"&x"954"));
+	PROG_ROM_ADDR <= std_logic_vector(unsigned(PC) + ("0"&x"000")) when VER="000" else
+                    std_logic_vector(unsigned(PC) + ("0"&x"500")) when VER="001" else
+                    std_logic_vector(unsigned(PC) + ("0"&x"C00")) when VER="010" else
+                    std_logic_vector(unsigned(PC) + ("1"&x"254")) when VER="011" else
+                    std_logic_vector(unsigned(PC) + ("1"&x"954"));
 
 	PROG_ROM : entity work.spram_sz generic map(13, 24, 7018, "src/chip/dsp/dsp1b23410_p.mif")
 	port map(
@@ -454,7 +434,7 @@ begin
 		q			=> PROG_ROM_Q
 	);
 
-	DATA_ROM_ADDR <= VER(2 downto 1) & (RP(10) and VER(2)) & RP(9 downto 0);
+	DATA_ROM_ADDR <= VER(2 downto 1) & (VER(0) or (RP(10) and VER(2))) & RP(9 downto 0);
 	DATA_ROM : entity work.spram_sz generic map(13, 16, 6144, "src/chip/dsp/dsp1b23410_d.mif")
 	port map(
 		clock		=> CLK,
@@ -581,7 +561,7 @@ begin
 				BRK_OUT <= '0';
 				if DBG_CTRL(0) = '1' then	--step
 					BRK_OUT <= '1';
-				elsif DBG_CTRL(2) = '1' and DBG_BRK_ADDR = PC(10 downto 0) then	--opcode address break
+				elsif DBG_CTRL(2) = '1' and DBG_BRK_ADDR = PC then	--opcode address break
 					BRK_OUT <= '1';
 				end if;
 			end if;

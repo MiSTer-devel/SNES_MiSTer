@@ -8,7 +8,6 @@ use IEEE.STD_LOGIC_TEXTIO.all;
 
 entity CX4Map is
 	port(
-		MEM_CLK		: in std_logic;	--85MHz
 		MCLK			: in std_logic;
 		RST_N			: in std_logic;
 		ENABLE		: in std_logic := '1';

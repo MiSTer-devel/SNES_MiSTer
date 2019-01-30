@@ -57,8 +57,8 @@ entity main is
 		ARAM_OE_N	: out std_logic;
 		ARAM_WE_N	: out std_logic;
 
-		GSU_SLOW		: out std_logic;
-		GSU_FULL		: in  std_logic;
+		GSU_ACTIVE	: out std_logic;
+		GSU_TURBO	: in  std_logic;
 
 		BLEND			: in  std_logic;
 		PAL			: in  std_logic;
@@ -292,7 +292,6 @@ begin
 
 	CX4Map : entity work.CX4Map
 	port map(
-		MEM_CLK		=> MEM_CLK,
 		MCLK			=> MCLK,
 		RST_N			=> RESET_N,
 		
@@ -377,7 +376,6 @@ begin
 	
 	GSUMap : entity work.GSUMap
 	port map(
-		MEM_CLK		=> MEM_CLK,
 		MCLK			=> MCLK,
 		RST_N			=> RESET_N,
 
@@ -417,8 +415,8 @@ begin
 		ROM_MASK		=> ROM_MASK,
 		BSRAM_MASK	=> RAM_MASK,
 
-		CLS_SLOW		=> GSU_SLOW,
-		CLS_FULL		=> GSU_FULL
+		MAP_ACTIVE	=> GSU_ACTIVE,
+		TURBO			=> GSU_TURBO
 	);
 
 	DI          <= GSU_DO         and DLH_DO         and CX4_DO         and SDD_DO;

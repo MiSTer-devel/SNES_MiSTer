@@ -803,6 +803,7 @@ process( RST_N, CLK )
 variable LAST_LINE: unsigned(8 downto 0);
 variable LAST_DOT: unsigned(8 downto 0);
 variable VSYNC_LINE: unsigned(8 downto 0);
+variable VSYNC_HSTART: unsigned(8 downto 0);
 begin
 	if RST_N = '0' then
 		H_CNT <= (others => '0');
@@ -835,6 +836,12 @@ begin
 				VSYNC_LINE := LINE_VSYNC_PAL;
 			end if;
 			
+			if BGINTERLACE = '1' and FIELD = '0' then
+				VSYNC_HSTART := VSYNC_I_HSTART;
+			else
+				VSYNC_HSTART := (others => '0');
+			end if;
+
 			if OVERSCAN = '1' then
 				VSYNC_LINE := VSYNC_LINE + 8;
 			end if;
@@ -872,8 +879,10 @@ begin
 			if V_CNT = LAST_VIS_LINE+1 then VDE <= '0'; end if;
 			if V_CNT = VSYNC_LINE-3    then VDE <= '0'; end if; -- make sure VDE deactivated before VSync!
 
-			if V_CNT = VSYNC_LINE    then VSYNC <= '1'; end if;
-			if V_CNT = VSYNC_LINE+4  then VSYNC <= '0'; end if;
+			if H_CNT = VSYNC_HSTART then
+				if V_CNT = VSYNC_LINE then VSYNC <= '1'; end if;
+				if V_CNT = VSYNC_LINE+4 then VSYNC <= '0'; end if;
+			end if;
 		end if;
 	end if;
 end process;

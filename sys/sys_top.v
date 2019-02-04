@@ -1088,10 +1088,10 @@ module aud_mix_top
 
 reg [15:0] ca;
 always @(posedge clk) begin
-	reg [15:0] d1,d2,d3,d4,d5,d6,d7;
+	reg [15:0] d1,d2,d3;
 
-	d1 <= core_audio; d2<=d1; d3<=d2; d4<=d3; d5<=d4; d6<=d5; d7<=d6;
-	if(d2 == d3 && d2 == d4 && d2 == d5 && d2 == d6 && d2 == d7) ca <= d2;
+	d1 <= core_audio; d2<=d1; d3<=d2;
+	if(d2 == d3) ca <= d2;
 end
 
 always @(posedge clk) begin

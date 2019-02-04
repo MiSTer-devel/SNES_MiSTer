@@ -110,7 +110,7 @@ module emu
 assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 
 assign AUDIO_S   = 1;
-assign AUDIO_MIX = 0;
+assign AUDIO_MIX = status[20:19];
 
 assign LED_USER  = ioctl_download;
 assign LED_DISK  = 0;
@@ -171,6 +171,7 @@ parameter CONF_STR5 = {
 	"O8,Aspect ratio,4:3,16:9;",
 	"O9B,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
 	"OG,Pseudo-transparency,Blend,Stripes;",
+	"OJK,Stereo mix,none,25%,50%,100%;", 
 	"-;",
 	"O56,Mouse,None,Port1,Port2;",
 	"O7,Swap Joysticks,No,Yes;",

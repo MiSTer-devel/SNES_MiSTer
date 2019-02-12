@@ -881,7 +881,7 @@ begin
 
 			if H_CNT = VSYNC_HSTART then
 				if V_CNT = VSYNC_LINE then VSYNC <= '1'; end if;
-				if V_CNT = VSYNC_LINE+4 then VSYNC <= '0'; end if;
+				if V_CNT = VSYNC_LINE+3 then VSYNC <= '0'; end if;
 			end if;
 		end if;
 	end if;

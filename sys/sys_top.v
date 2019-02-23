@@ -763,23 +763,6 @@ osd hdmi_osd
 	.osd_status(osd_status)
 );
 
-assign HDMI_MCLK = 0;
-i2s i2s
-(
-	.reset(~cfg_ready),
-	.clk_sys(clk_audio),
-	.half_rate(~audio_96k),
-
-	.sclk(HDMI_SCLK),
-	.lrclk(HDMI_LRCLK),
-	.sdata(HDMI_I2S),
-
-	//Could inverse the MSB but it will shift 0 level to -MAX level
-	.left_chan (audio_l),
-	.right_chan(audio_r)
-);
-
-
 /////////////////////////  VGA output  //////////////////////////////////
 
 wire [23:0] vga_data_sl;
@@ -832,8 +815,27 @@ assign VGA_B  = VGA_EN ? 6'bZZZZZZ : vga_o[7:2];
 
 /////////////////////////  Audio output  ////////////////////////////////
 
-wire anl, anr, aspdif;
+assign AUDIO_SPDIF = SW[0] ? HDMI_LRCLK : aspdif;
+assign AUDIO_R     = SW[0] ? HDMI_I2S   : anr;
+assign AUDIO_L     = SW[0] ? HDMI_SCLK  : anl;
 
+assign HDMI_MCLK = 0;
+i2s i2s
+(
+	.clk_sys(clk_audio),
+	.reset(reset),
+
+	.half_rate(~audio_96k),
+
+	.sclk(HDMI_SCLK),
+	.lrclk(HDMI_LRCLK),
+	.sdata(HDMI_I2S),
+
+	.left_chan (audio_l),
+	.right_chan(audio_r)
+);
+
+wire anl;
 sigma_delta_dac #(15) dac_l
 (
 	.CLK(clk_audio),
@@ -842,6 +844,7 @@ sigma_delta_dac #(15) dac_l
 	.DACout(anl)
 );
 
+wire anr;
 sigma_delta_dac #(15) dac_r
 (
 	.CLK(clk_audio),
@@ -850,6 +853,7 @@ sigma_delta_dac #(15) dac_r
 	.DACout(anr)
 );
 
+wire aspdif;
 spdif toslink
 (
 	.clk_i(clk_audio),
@@ -863,50 +867,37 @@ spdif toslink
 	.spdif_o(aspdif)
 );
 
-assign AUDIO_SPDIF = SW[0] ? HDMI_LRCLK : aspdif;
-assign AUDIO_R     = SW[0] ? HDMI_I2S   : anr;
-assign AUDIO_L     = SW[0] ? HDMI_SCLK  : anl;
+wire [15:0] audio_l, audio_l_pre;
+aud_mix_top audmix_l
+(
+	.clk(clk_audio),
+	.att(vol_att),
+	.mix(audio_mix),
+	.is_signed(audio_s),
 
-reg signed [15:0] audio_l;
-reg signed [15:0] audio_r;
+	.core_audio(audio_ls),
+	.pre_in(audio_r_pre),
+	.linux_audio(alsa_l),
 
-always @(posedge clk_audio) begin
-	reg signed [16:0] als, al, acl, apl;
-	reg signed [16:0] ars, ar, acr, apr;
+	.pre_out(audio_l_pre),
+	.out(audio_l)
+);
 
-	{acl,acr} <= audio_s ? {audio_ls[15],audio_ls,audio_rs[15],audio_rs}: 
-	                       {2'b00,audio_ls[15:1],  2'b00,audio_rs[15:1]};
+wire [15:0] audio_r, audio_r_pre;
+aud_mix_top audmix_r
+(
+	.clk(clk_audio),
+	.att(vol_att),
+	.mix(audio_mix),
+	.is_signed(audio_s),
 
-	als <= acl + {alsa_l[15],alsa_l};
-	ars <= acr + {alsa_r[15],alsa_r};
+	.core_audio(audio_rs),
+	.pre_in(audio_l_pre),
+	.linux_audio(alsa_r),
 
-	case(audio_mix)
-		0: al <= als;
-		1: al <= als - (als >>> 3) + (ars >>> 3);
-		2: al <= als - (als >>> 2) + (ars >>> 2);
-		3: al <= (als >>> 1) + (ars >>> 1);
-	endcase
-
-	case(audio_mix)
-		0: ar <= ars;
-		1: ar <= ars - (ars >>> 3) + (als >>> 3);
-		2: ar <= ars - (ars >>> 2) + (als >>> 2);
-		3: ar <= (ars >>> 1) + (als >>> 1);
-	endcase
-	
-	if(vol_att[4]) begin
-		apl <= 0;
-		apr <= 0;
-	end
-	else
-	begin
-		apl <= al >>> vol_att[3:0];
-		apr <= ar >>> vol_att[3:0];
-	end
-
-	audio_l <= ($signed(apl) > $signed(17'd32767)) ? 16'd32767 : ($signed(apl) < $signed(-17'd32768)) ? -16'd32768 : apl[15:0];
-	audio_r <= ($signed(apr) > $signed(17'd32767)) ? 16'd32767 : ($signed(apr) < $signed(-17'd32768)) ? -16'd32768 : apr[15:0];
-end
+	.pre_out(audio_r_pre),
+	.out(audio_r)
+);
 
 wire [28:0] aram_address;
 wire  [7:0] aram_burstcount;
@@ -915,7 +906,7 @@ wire [63:0] aram_readdata;
 wire        aram_readdatavalid;
 wire        aram_read;
 
-wire signed [15:0] alsa_l, alsa_r;
+wire [15:0] alsa_l, alsa_r;
 
 alsa alsa
 (
@@ -1046,6 +1037,8 @@ emu emu
 
 endmodule
 
+/////////////////////////////////////////////////////////////////////
+
 module sync_fix
 (
 	input clk,
@@ -1071,6 +1064,56 @@ always @(posedge clk) begin
 	if(s2 != s1) cnt <= 0;
 
 	pol <= pos > neg;
+end
+
+endmodule
+
+/////////////////////////////////////////////////////////////////////
+
+module aud_mix_top
+(
+	input             clk,
+
+	input       [4:0] att,
+	input       [1:0] mix,
+	input             is_signed,
+
+	input      [15:0] core_audio,
+	input      [15:0] linux_audio,
+	input      [15:0] pre_in,
+
+	output reg [15:0] pre_out,
+	output reg [15:0] out
+);
+
+reg [15:0] ca;
+always @(posedge clk) begin
+	reg [15:0] d1,d2,d3;
+
+	d1 <= core_audio; d2<=d1; d3<=d2;
+	if(d2 == d3) ca <= d2;
+end
+
+always @(posedge clk) begin
+	reg signed [16:0] a1, a2, a3, a4;
+
+	a1 <= is_signed ? {ca[15],ca} : {2'b00,ca[15:1]};
+	a2 <= a1 + {linux_audio[15],linux_audio};
+
+	pre_out <= a2[16:1];
+
+	case(mix)
+		0: a3 <= a2;
+		1: a3 <= $signed(a2) - $signed(a2[16:3]) + $signed(pre_in[15:2]);
+		2: a3 <= $signed(a2) - $signed(a2[16:2]) + $signed(pre_in[15:1]);
+		3: a3 <= {a2[16],a2[16:1]} + {pre_in[15],pre_in};
+	endcase
+
+	if(att[4]) a4 <= 0;
+	else a4 <= a3 >>> att[3:0];
+
+	//clamping
+	out <= ^a4[16:15] ? {a4[16],{15{a4[15]}}} : a4[15:0];
 end
 
 endmodule

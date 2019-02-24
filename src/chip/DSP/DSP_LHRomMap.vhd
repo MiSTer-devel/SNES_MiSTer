@@ -44,6 +44,7 @@ entity DSP_LHRomMap is
 		BSRAM_OE_N	: out std_logic;
 		BSRAM_WE_N	: out std_logic;
 
+		MAP_ACTIVE  : out std_logic;
 		MAP_CTRL		: in std_logic_vector(7 downto 0);
 		ROM_MASK		: in std_logic_vector(23 downto 0);
 		BSRAM_MASK	: in std_logic_vector(23 downto 0);
@@ -154,6 +155,8 @@ begin
 	end process;
 	
 	MAP_SEL <= not MAP_CTRL(6) and (MAP_CTRL(7) or not (MAP_CTRL(5) or MAP_CTRL(4)));
+	MAP_ACTIVE <= MAP_SEL;
+
 
 	DSP_CS_N <= not DSP_SEL;
 	
@@ -184,16 +187,16 @@ begin
 	
 	ROM_RD <= (SYSCLKF_CE or SYSCLKR_CE) when rising_edge(MCLK);
 
-	ROM_ADDR <= (others => '1') when MAP_SEL = '0' else CART_ADDR(22 downto 0) and ROM_MASK(22 downto 0);
-	ROM_CE_N <= ROMSEL_N or not MAP_SEL;
-	ROM_OE_N <= not ROM_RD or not MAP_SEL;
+	ROM_ADDR <= CART_ADDR(22 downto 0) and ROM_MASK(22 downto 0);
+	ROM_CE_N <= ROMSEL_N;
+	ROM_OE_N <= not ROM_RD;
 	ROM_WORD	<= '0';
 
-	BSRAM_ADDR <= (others => '1') when MAP_SEL = '0' else BRAM_ADDR and BSRAM_MASK(19 downto 0);
-	BSRAM_CE_N <= not BSRAM_SEL or not MAP_SEL;
-	BSRAM_OE_N <= CPURD_N or not MAP_SEL;
-	BSRAM_WE_N <= CPUWR_N or not MAP_SEL;
-	BSRAM_D    <= (others => '1') when MAP_SEL = '0' else DI;
+	BSRAM_ADDR <= BRAM_ADDR and BSRAM_MASK(19 downto 0);
+	BSRAM_CE_N <= not BSRAM_SEL;
+	BSRAM_OE_N <= CPURD_N;
+	BSRAM_WE_N <= CPUWR_N;
+	BSRAM_D    <= DI;
 	
 	process(MCLK, RST_N)
 	begin
@@ -206,8 +209,7 @@ begin
 		end if;
 	end process;
 	
-	DO <= (others => '1') when MAP_SEL = '0' else
-			DSP_DO when DSP_SEL = '1' or DP_SEL = '1' else
+	DO <= DSP_DO when DSP_SEL = '1' or DP_SEL = '1' else
 			BSRAM_Q when BSRAM_SEL = '1' else
 			ROM_Q(7 downto 0) when ROMSEL_N = '0' else
 			OPENBUS;

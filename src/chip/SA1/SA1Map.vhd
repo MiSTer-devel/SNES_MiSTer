@@ -47,6 +47,7 @@ entity SA1Map is
 		BSRAM_OE_N	: out std_logic;
 		BSRAM_WE_N	: out std_logic;
 
+		MAP_ACTIVE  : out std_logic;
 		MAP_CTRL		: in std_logic_vector(7 downto 0);
 		ROM_MASK		: in std_logic_vector(23 downto 0);
 		BSRAM_MASK	: in std_logic_vector(23 downto 0);
@@ -62,22 +63,13 @@ end SA1Map;
 architecture rtl of SA1Map is
 
 	signal ROM_A		: std_logic_vector(22 downto 0);
-	signal ROM_DI		: std_logic_vector(15 downto 0);
-	signal ROM_RD_N	: std_logic;
-	
 	signal BWRAM_A 	: std_logic_vector(17 downto 0);
-	signal BWRAM_DO 	: std_logic_vector(7 downto 0);
-	signal BWRAM_OE_N : std_logic;
-	signal BWRAM_WE_N : std_logic;
-	
-	signal SA1_DO		: std_logic_vector(7 downto 0);
-	signal SA1_IRQ_N	: std_logic;
-	
 	signal MAP_SEL		: std_logic;
 
 begin
 
 	MAP_SEL <= '1' when MAP_CTRL(7 downto 4) = X"6" else '0';
+	MAP_ACTIVE <= MAP_SEL;
 	
 	SA1 : entity work.SA1
 	port map(
@@ -86,7 +78,7 @@ begin
 		ENABLE		=> ENABLE,
 
 		SNES_A		=> CA,
-		SNES_DO		=> SA1_DO,
+		SNES_DO		=> DO,
 		SNES_DI		=> DI,
 		SNES_RD_N	=> CPURD_N,
 		SNES_WR_N	=> CPUWR_N,
@@ -100,15 +92,15 @@ begin
 		
 		ROM_A			=> ROM_A,
 		ROM_DI		=> ROM_Q,
-		ROM_RD_N		=> ROM_RD_N,
+		ROM_RD_N		=> ROM_OE_N,
 		
 		BWRAM_A		=> BWRAM_A,
 		BWRAM_DI		=> BSRAM_Q,
-		BWRAM_DO		=> BWRAM_DO,
-		BWRAM_OE_N	=> BWRAM_OE_N,
-		BWRAM_WE_N	=> BWRAM_WE_N,
+		BWRAM_DO		=> BSRAM_D,
+		BWRAM_OE_N	=> BSRAM_OE_N,
+		BWRAM_WE_N	=> BSRAM_WE_N,
 		
-		IRQ_N			=> SA1_IRQ_N,
+		IRQ_N			=> IRQ_N,
 		
 		BRK_OUT		=> BRK_OUT,
 		DBG_REG  	=> DBG_REG,
@@ -116,19 +108,12 @@ begin
 		DBG_DAT_OUT	=> DBG_DAT_OUT,
 		DBG_DAT_WR	=> DBG_DAT_WR
 	);
-	
-	ROM_ADDR 	<= (others => '1') when MAP_SEL = '0' else (ROM_A and ROM_MASK(22 downto 0));
-	ROM_CE_N 	<= not MAP_SEL;
-	ROM_OE_N 	<= ROM_RD_N or not MAP_SEL;
-	ROM_WORD		<= MAP_SEL;
-	
-	BSRAM_ADDR 	<= (others => '1') when MAP_SEL = '0' else ("0000" & BWRAM_A(15 downto 0));
-	BSRAM_CE_N 	<= not MAP_SEL;
-	BSRAM_OE_N 	<= BWRAM_OE_N or not MAP_SEL;
-	BSRAM_WE_N 	<= BWRAM_WE_N or not MAP_SEL;
-	BSRAM_D    	<= (others => '1') when MAP_SEL = '0' else BWRAM_DO;
-	
-	DO				<= (others => '1') when MAP_SEL = '0' else SA1_DO;
-	IRQ_N 		<= SA1_IRQ_N or not MAP_SEL;
+
+	ROM_ADDR 	<= ROM_A and ROM_MASK(22 downto 0);
+	ROM_CE_N 	<= '0';
+	ROM_WORD		<= '1';
+
+	BSRAM_ADDR 	<= "0000" & BWRAM_A(15 downto 0);
+	BSRAM_CE_N 	<= '0';
 
 end rtl;

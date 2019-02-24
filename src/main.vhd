@@ -165,9 +165,10 @@ architecture rtl of main is
 	signal SA1_BSRAM_CE_N	: std_logic;
 	signal SA1_BSRAM_OE_N	: std_logic;
 	signal SA1_BSRAM_WE_N	: std_logic;
-	
+
+	signal MAP_ACTIVE			: std_logic_vector(3 downto 0);
 begin
-	
+
 	SNES : entity work.SNES
 	port map(
 		MCLK			=> MCLK,
@@ -335,6 +336,7 @@ begin
 		BSRAM_OE_N	=> CX4_BSRAM_OE_N,
 		BSRAM_WE_N	=> CX4_BSRAM_WE_N,
 
+		MAP_ACTIVE  => MAP_ACTIVE(0),
 		MAP_CTRL		=> ROM_TYPE,
 		ROM_MASK		=> ROM_MASK,
 		BSRAM_MASK	=> RAM_MASK
@@ -377,6 +379,7 @@ begin
 		BSRAM_OE_N	=> SDD_BSRAM_OE_N,
 		BSRAM_WE_N	=> SDD_BSRAM_WE_N,
 
+		MAP_ACTIVE  => MAP_ACTIVE(1),
 		MAP_CTRL		=> ROM_TYPE,
 		ROM_MASK		=> ROM_MASK,
 		BSRAM_MASK	=> RAM_MASK
@@ -419,14 +422,16 @@ begin
 		BSRAM_OE_N	=> GSU_BSRAM_OE_N,
 		BSRAM_WE_N	=> GSU_BSRAM_WE_N,
 
+		MAP_ACTIVE  => MAP_ACTIVE(2),
 		MAP_CTRL		=> ROM_TYPE,
 		ROM_MASK		=> ROM_MASK,
 		BSRAM_MASK	=> RAM_MASK,
 
-		MAP_ACTIVE	=> GSU_ACTIVE,
 		TURBO			=> GSU_TURBO
 	);
 	
+	GSU_ACTIVE <= MAP_ACTIVE(2);
+
 	SA1Map : entity work.SA1Map
 	port map(
 		MCLK			=> MCLK,
@@ -466,22 +471,96 @@ begin
 		BSRAM_OE_N	=> SA1_BSRAM_OE_N,
 		BSRAM_WE_N	=> SA1_BSRAM_WE_N,
 
+		MAP_ACTIVE  => MAP_ACTIVE(3),
 		MAP_CTRL		=> ROM_TYPE,
 		ROM_MASK		=> ROM_MASK,
 		BSRAM_MASK	=> RAM_MASK
 	);
+	
+	process (
+		DLH_DO, DLH_IRQ_N, DLH_ROM_ADDR, DLH_ROM_CE_N, DLH_ROM_OE_N, DLH_ROM_WORD,
+		DLH_BSRAM_ADDR, DLH_BSRAM_D, DLH_BSRAM_CE_N, DLH_BSRAM_OE_N, DLH_BSRAM_WE_N,
 
-	DI          <= DLH_DO         and SA1_DO         and CX4_DO         and SDD_DO         and GSU_DO;
-	IRQ_N       <= DLH_IRQ_N      and SA1_IRQ_N      and CX4_IRQ_N      and SDD_IRQ_N      and GSU_IRQ_N;
-	ROM_ADDR    <= DLH_ROM_ADDR   and SA1_ROM_ADDR   and CX4_ROM_ADDR   and SDD_ROM_ADDR   and GSU_ROM_ADDR;
-	ROM_CE_N    <= DLH_ROM_CE_N   and SA1_ROM_CE_N   and CX4_ROM_CE_N   and SDD_ROM_CE_N   and GSU_ROM_CE_N;
-	ROM_OE_N    <= DLH_ROM_OE_N   and SA1_ROM_OE_N   and CX4_ROM_OE_N   and SDD_ROM_OE_N   and GSU_ROM_OE_N;
-	BSRAM_ADDR  <= DLH_BSRAM_ADDR and SA1_BSRAM_ADDR and CX4_BSRAM_ADDR and SDD_BSRAM_ADDR and GSU_BSRAM_ADDR;
-	BSRAM_D     <= DLH_BSRAM_D    and SA1_BSRAM_D    and CX4_BSRAM_D    and SDD_BSRAM_D    and GSU_BSRAM_D;
-	BSRAM_CE_N  <= DLH_BSRAM_CE_N and SA1_BSRAM_CE_N and CX4_BSRAM_CE_N and SDD_BSRAM_CE_N and GSU_BSRAM_CE_N;
-	BSRAM_OE_N  <= DLH_BSRAM_OE_N and SA1_BSRAM_OE_N and CX4_BSRAM_OE_N and SDD_BSRAM_OE_N and GSU_BSRAM_OE_N;
-	BSRAM_WE_N  <= DLH_BSRAM_WE_N and SA1_BSRAM_WE_N and CX4_BSRAM_WE_N and SDD_BSRAM_WE_N and GSU_BSRAM_WE_N;
+		CX4_DO, CX4_IRQ_N, CX4_ROM_ADDR, CX4_ROM_CE_N, CX4_ROM_OE_N, CX4_ROM_WORD,
+		CX4_BSRAM_ADDR, CX4_BSRAM_D, CX4_BSRAM_CE_N, CX4_BSRAM_OE_N, CX4_BSRAM_WE_N,
 
-	ROM_WORD    <= DLH_ROM_WORD   or  SA1_ROM_WORD   or  CX4_ROM_WORD   or  SDD_ROM_WORD   or  GSU_ROM_WORD;
+		SDD_DO, SDD_IRQ_N, SDD_ROM_ADDR, SDD_ROM_CE_N, SDD_ROM_OE_N, SDD_ROM_WORD,
+		SDD_BSRAM_ADDR, SDD_BSRAM_D, SDD_BSRAM_CE_N, SDD_BSRAM_OE_N, SDD_BSRAM_WE_N,
+
+		GSU_DO, GSU_IRQ_N, GSU_ROM_ADDR, GSU_ROM_CE_N, GSU_ROM_OE_N, GSU_ROM_WORD,
+		GSU_BSRAM_ADDR, GSU_BSRAM_D, GSU_BSRAM_CE_N, GSU_BSRAM_OE_N, GSU_BSRAM_WE_N,
+
+		SA1_DO, SA1_IRQ_N, SA1_ROM_ADDR, SA1_ROM_CE_N, SA1_ROM_OE_N, SA1_ROM_WORD,
+		SA1_BSRAM_ADDR, SA1_BSRAM_D, SA1_BSRAM_CE_N, SA1_BSRAM_OE_N, SA1_BSRAM_WE_N,
+
+		MAP_ACTIVE)
+	begin
+		case(MAP_ACTIVE) is
+			when "0001" =>
+				DI          <= CX4_DO;
+				IRQ_N       <= CX4_IRQ_N;
+				ROM_ADDR    <= CX4_ROM_ADDR;
+				ROM_CE_N    <= CX4_ROM_CE_N;
+				ROM_OE_N    <= CX4_ROM_OE_N;
+				BSRAM_ADDR  <= CX4_BSRAM_ADDR;
+				BSRAM_D     <= CX4_BSRAM_D;
+				BSRAM_CE_N  <= CX4_BSRAM_CE_N;
+				BSRAM_OE_N  <= CX4_BSRAM_OE_N;
+				BSRAM_WE_N  <= CX4_BSRAM_WE_N;
+				ROM_WORD    <= CX4_ROM_WORD;
+
+			when "0010" =>
+				DI          <= SDD_DO;
+				IRQ_N       <= SDD_IRQ_N;
+				ROM_ADDR    <= SDD_ROM_ADDR;
+				ROM_CE_N    <= SDD_ROM_CE_N;
+				ROM_OE_N    <= SDD_ROM_OE_N;
+				BSRAM_ADDR  <= SDD_BSRAM_ADDR;
+				BSRAM_D     <= SDD_BSRAM_D;
+				BSRAM_CE_N  <= SDD_BSRAM_CE_N;
+				BSRAM_OE_N  <= SDD_BSRAM_OE_N;
+				BSRAM_WE_N  <= SDD_BSRAM_WE_N;
+				ROM_WORD    <= SDD_ROM_WORD;
+
+			when "0100" =>
+				DI          <= GSU_DO;
+				IRQ_N       <= GSU_IRQ_N;
+				ROM_ADDR    <= GSU_ROM_ADDR;
+				ROM_CE_N    <= GSU_ROM_CE_N;
+				ROM_OE_N    <= GSU_ROM_OE_N;
+				BSRAM_ADDR  <= GSU_BSRAM_ADDR;
+				BSRAM_D     <= GSU_BSRAM_D;
+				BSRAM_CE_N  <= GSU_BSRAM_CE_N;
+				BSRAM_OE_N  <= GSU_BSRAM_OE_N;
+				BSRAM_WE_N  <= GSU_BSRAM_WE_N;
+				ROM_WORD    <= GSU_ROM_WORD;
+
+			when "1000" =>
+				DI          <= SA1_DO;
+				IRQ_N       <= SA1_IRQ_N;
+				ROM_ADDR    <= SA1_ROM_ADDR;
+				ROM_CE_N    <= SA1_ROM_CE_N;
+				ROM_OE_N    <= SA1_ROM_OE_N;
+				BSRAM_ADDR  <= SA1_BSRAM_ADDR;
+				BSRAM_D     <= SA1_BSRAM_D;
+				BSRAM_CE_N  <= SA1_BSRAM_CE_N;
+				BSRAM_OE_N  <= SA1_BSRAM_OE_N;
+				BSRAM_WE_N  <= SA1_BSRAM_WE_N;
+				ROM_WORD    <= SA1_ROM_WORD;
+
+			when others =>
+				DI          <= DLH_DO;
+				IRQ_N       <= DLH_IRQ_N;
+				ROM_ADDR    <= DLH_ROM_ADDR;
+				ROM_CE_N    <= DLH_ROM_CE_N;
+				ROM_OE_N    <= DLH_ROM_OE_N;
+				BSRAM_ADDR  <= DLH_BSRAM_ADDR;
+				BSRAM_D     <= DLH_BSRAM_D;
+				BSRAM_CE_N  <= DLH_BSRAM_CE_N;
+				BSRAM_OE_N  <= DLH_BSRAM_OE_N;
+				BSRAM_WE_N  <= DLH_BSRAM_WE_N;
+				ROM_WORD    <= DLH_ROM_WORD;
+		end case;
+	end process;
 
 end rtl;

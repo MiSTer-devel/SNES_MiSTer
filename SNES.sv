@@ -1,7 +1,7 @@
 //============================================================================
 //  SNES for MiSTer
-//  Copyright (C) 2017,2018 Srg320
-//  Copyright (C) 2018 Sorgelig
+//  Copyright (C) 2017-2019 Srg320
+//  Copyright (C) 2018-2019 Sorgelig
 //
 //  This program is free software; you can redistribute it and/or modify it
 //  under the terms of the GNU General Public License as published by the Free
@@ -104,9 +104,18 @@ module emu
 	output        UART_DTR,
 	input         UART_DSR,
 
+	// Open-drain User port.
+	// 0 - D+/RX
+	// 1 - D-/TX
+	// 2..5 - USR1..USR4
+	// Set USER_OUT to 1 to read from USER_IN.
+	input   [5:0] USER_IN,
+	output  [5:0] USER_OUT,
+
 	input         OSD_STATUS
 );
 
+assign USER_OUT = '1;
 assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 
 assign AUDIO_S   = 1;
@@ -319,7 +328,6 @@ main main
 (
 	.RESET_N(~reset),
 
-	.MEM_CLK(clk_mem),
 	.MCLK(clk_sys), // 21.47727 / 21.28137
 	.ACLK(clk_sys),
 
@@ -399,7 +407,6 @@ wire       ROM_CE_N;
 wire       ROM_OE_N;
 wire       ROM_WORD;
 wire[15:0] ROM_Q;
-wire       REFRESH = 0;
 
 sdram sdram
 (
@@ -407,7 +414,7 @@ sdram sdram
 	.init(~clock_locked),
 	.clk(clk_mem),
 	
-	.refresh(REFRESH),
+	.refresh(0),
 	.addr(ioctl_download ? ioctl_addr-10'd512 : ROM_ADDR),
 	.din(ioctl_dout),
 	.dout(ROM_Q),

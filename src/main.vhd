@@ -10,7 +10,6 @@ entity main is
 	port(
 		RESET_N		: in  std_logic;
 
-		MEM_CLK		: in  std_logic;
 		MCLK			: in  std_logic;
 		ACLK			: in  std_logic;
 

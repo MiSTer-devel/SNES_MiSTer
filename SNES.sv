@@ -326,8 +326,6 @@ main main
 	.GSU_ACTIVE(GSU_ACTIVE),
 	.GSU_TURBO(GSU_TURBO),
 
-	.REFRESH(REFRESH),
-
 	.ROM_TYPE(rom_type),
 	.ROM_MASK(rom_mask),
 	.RAM_MASK(ram_mask),
@@ -401,7 +399,7 @@ wire       ROM_CE_N;
 wire       ROM_OE_N;
 wire       ROM_WORD;
 wire[15:0] ROM_Q;
-wire       REFRESH;
+wire       REFRESH = 0;
 
 sdram sdram
 (

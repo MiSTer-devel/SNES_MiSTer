@@ -10,3 +10,7 @@ set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) SDD1/SDD1M
 set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) GSU/GSU.vhd ]
 set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) GSU/GSU_PKG.vhd ]
 set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) GSU/GSUMap.vhd ]
+set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) SA1/SA1.vhd ]
+set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) SA1/SA1DIV.vhd ]
+set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) SA1/SA1MULT.vhd ]
+set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) SA1/SA1Map.vhd ]

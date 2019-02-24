@@ -27,7 +27,7 @@ entity SDD1Map is
 		
 		SYSCLKF_CE	: in std_logic;
 		SYSCLKR_CE	: in std_logic;
-		REFRESH		: out std_logic;
+		REFRESH		: in std_logic;
 		
 		IRQ_N			: out std_logic;
 
@@ -108,5 +108,5 @@ begin
 	
 	IRQ_N <= '1';
 	BRK_OUT <= '0';
-	REFRESH <= '0';
+	
 end rtl;

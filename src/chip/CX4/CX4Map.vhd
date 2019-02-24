@@ -27,7 +27,7 @@ entity CX4Map is
 		
 		SYSCLKF_CE	: in std_logic;
 		SYSCLKR_CE	: in std_logic;
-		REFRESH		: out std_logic;
+		REFRESH		: in std_logic;
 		
 		IRQ_N			: out std_logic;
 
@@ -139,7 +139,5 @@ begin
 
 	DO <= (others => '1') when MAP_SEL = '0' else CPU_DO;
 	IRQ_N <= CX4_IRQ_N or not MAP_SEL;
-
-	REFRESH <= '0';
 	
 end rtl;

@@ -6,7 +6,7 @@ use IEEE.NUMERIC_STD.ALL;
 use IEEE.STD_LOGIC_UNSIGNED.ALL;
 use IEEE.STD_LOGIC_TEXTIO.all;
 
-entity GSUMap is
+entity SA1Map is
 	port(
 		MCLK			: in std_logic;
 		RST_N			: in std_logic;
@@ -27,7 +27,10 @@ entity GSUMap is
 		
 		SYSCLKF_CE	: in std_logic;
 		SYSCLKR_CE	: in std_logic;
+		
 		REFRESH		: in std_logic;
+		
+		PAL			: in std_logic;
 		
 		IRQ_N			: out std_logic;
 
@@ -48,65 +51,65 @@ entity GSUMap is
 		ROM_MASK		: in std_logic_vector(23 downto 0);
 		BSRAM_MASK	: in std_logic_vector(23 downto 0);
 		
-		MAP_ACTIVE	: out std_logic;
-		TURBO		   : in std_logic;
-
 		BRK_OUT		: out std_logic;
 		DBG_REG		: in std_logic_vector(7 downto 0) := (others => '0');
 		DBG_DAT_IN	: in std_logic_vector(7 downto 0) := (others => '0');
 		DBG_DAT_OUT	: out std_logic_vector(7 downto 0);
 		DBG_DAT_WR	: in std_logic := '0'
 	);
-end GSUMap;
+end SA1Map;
 
-architecture rtl of GSUMap is
+architecture rtl of SA1Map is
 
-	signal ROM_A 		: std_logic_vector(20 downto 0);
-	signal ROM_RD_N 	: std_logic;
-	signal RAM_A 		: std_logic_vector(16 downto 0);
-	signal RAM_DO 		: std_logic_vector(7 downto 0);
-	signal RAM_CE_N 	: std_logic;
-	signal RAM_WE_N 	: std_logic;
+	signal ROM_A		: std_logic_vector(22 downto 0);
+	signal ROM_DI		: std_logic_vector(15 downto 0);
+	signal ROM_RD_N	: std_logic;
 	
-	signal GSU_DO 		: std_logic_vector(7 downto 0);
-	signal GSU_IRQ_N	: std_logic;
-	signal CLS			: std_logic;
+	signal BWRAM_A 	: std_logic_vector(17 downto 0);
+	signal BWRAM_DO 	: std_logic_vector(7 downto 0);
+	signal BWRAM_OE_N : std_logic;
+	signal BWRAM_WE_N : std_logic;
 	
-	signal MAP_SEL	  	: std_logic;
+	signal SA1_DO		: std_logic_vector(7 downto 0);
+	signal SA1_IRQ_N	: std_logic;
 	
+	signal MAP_SEL		: std_logic;
+
 begin
 
-	MAP_SEL <= '1' when MAP_CTRL(7 downto 4) = X"7" else '0';
+	MAP_SEL <= '1' when MAP_CTRL(7 downto 4) = X"6" else '0';
 	
-	GSU : entity work.GSU
+	SA1 : entity work.SA1
 	port map(
 		CLK			=> MCLK,
 		RST_N			=> RST_N and MAP_SEL,
 		ENABLE		=> ENABLE,
 
-		ADDR			=> CA,
-		DO				=> GSU_DO,
-		DI				=> DI,
-		RD_N			=> CPURD_N,
-		WR_N			=> CPUWR_N,
+		SNES_A		=> CA,
+		SNES_DO		=> SA1_DO,
+		SNES_DI		=> DI,
+		SNES_RD_N	=> CPURD_N,
+		SNES_WR_N	=> CPUWR_N,
 		
 		SYSCLKF_CE	=> SYSCLKF_CE,
 		SYSCLKR_CE	=> SYSCLKR_CE,
 		
-		IRQ_N			=> GSU_IRQ_N,
+		REFRESH		=> REFRESH,
+		
+		PAL			=> PAL,
 		
 		ROM_A			=> ROM_A,
-		ROM_DI		=> ROM_Q(7 downto 0),
+		ROM_DI		=> ROM_Q,
 		ROM_RD_N		=> ROM_RD_N,
 		
-		RAM_A			=> RAM_A,
-		RAM_DI		=> BSRAM_Q,
-		RAM_DO		=> RAM_DO,
-		RAM_WE_N		=> RAM_WE_N,
-		RAM_CE_N		=> RAM_CE_N,
-				
-		TURBO			=> TURBO,
-
+		BWRAM_A		=> BWRAM_A,
+		BWRAM_DI		=> BSRAM_Q,
+		BWRAM_DO		=> BWRAM_DO,
+		BWRAM_OE_N	=> BWRAM_OE_N,
+		BWRAM_WE_N	=> BWRAM_WE_N,
+		
+		IRQ_N			=> SA1_IRQ_N,
+		
 		BRK_OUT		=> BRK_OUT,
 		DBG_REG  	=> DBG_REG,
 		DBG_DAT_IN	=> DBG_DAT_IN,
@@ -114,20 +117,18 @@ begin
 		DBG_DAT_WR	=> DBG_DAT_WR
 	);
 	
-	MAP_ACTIVE	<= MAP_SEL;
-
-	ROM_ADDR 	<= (others => '1') when MAP_SEL = '0' else ("00" & ROM_A) and ROM_MASK(22 downto 0);
+	ROM_ADDR 	<= (others => '1') when MAP_SEL = '0' else (ROM_A and ROM_MASK(22 downto 0));
 	ROM_CE_N 	<= not MAP_SEL;
 	ROM_OE_N 	<= ROM_RD_N or not MAP_SEL;
-	ROM_WORD		<= '0';
+	ROM_WORD		<= MAP_SEL;
 	
-	BSRAM_ADDR 	<= (others => '1') when MAP_SEL = '0' else ("0000" & RAM_A(15 downto 0));
-	BSRAM_CE_N 	<= RAM_CE_N or not MAP_SEL;
-	BSRAM_OE_N 	<= not RAM_WE_N or not MAP_SEL;
-	BSRAM_WE_N 	<= RAM_WE_N or not MAP_SEL;
-	BSRAM_D    	<= (others => '1') when MAP_SEL = '0' else RAM_DO;
+	BSRAM_ADDR 	<= (others => '1') when MAP_SEL = '0' else ("0000" & BWRAM_A(15 downto 0));
+	BSRAM_CE_N 	<= not MAP_SEL;
+	BSRAM_OE_N 	<= BWRAM_OE_N or not MAP_SEL;
+	BSRAM_WE_N 	<= BWRAM_WE_N or not MAP_SEL;
+	BSRAM_D    	<= (others => '1') when MAP_SEL = '0' else BWRAM_DO;
 	
-	DO				<= (others => '1') when MAP_SEL = '0' else GSU_DO;
-	IRQ_N 		<= GSU_IRQ_N or not MAP_SEL;
+	DO				<= (others => '1') when MAP_SEL = '0' else SA1_DO;
+	IRQ_N 		<= SA1_IRQ_N or not MAP_SEL;
 
 end rtl;

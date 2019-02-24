@@ -783,7 +783,7 @@ begin
 		end if;
 	end process;
 
-	REFRESH <= REFRESHED and INT_CLK;
+	REFRESH <= REFRESHED;
 
 
 	--DMA/HDMA

@@ -91,7 +91,6 @@ USE ieee.numeric_std.ALL;
 --             Must be a power of two
 -- INTER     : True=Autodetect interlaced video False=Force progressive scan
 -- HEADER    : True=Add image properties header
--- SYNCHRO   : True=Support synchronized mode False=Force disabled
 -- DOWNSCALE : True=Support downscaling False=Downscaling disabled
 -- BYTESWAP  : Little/Big endian byte swap
 -- FRAC      : Fractional bits, subpixel resolution
@@ -111,7 +110,6 @@ ENTITY ascal IS
     RAMSIZE   : unsigned(31 DOWNTO 0) := x"0080_0000"; -- =8MB
     INTER     : boolean := true;
     HEADER    : boolean := true;
-    SYNCHRO   : boolean := true;
     DOWNSCALE : boolean := true;
     BYTESWAP  : boolean := true;
     FRAC      : natural RANGE 4 TO 6 :=4;
@@ -260,26 +258,26 @@ ARCHITECTURE rtl OF ascal IS
   
   ----------------------------------------------------------
   -- Input image
-  SIGNAL i_phs,i_pvs,i_pfl,i_pde,i_pce : std_logic;
+  SIGNAL i_pvs,i_pfl,i_pde,i_pce : std_logic;
   SIGNAL i_ppix : type_pix;
   SIGNAL i_freeze : std_logic;
   SIGNAL i_count : unsigned(2 DOWNTO 0);
   SIGNAL i_hsize,i_hmin,i_hmax,i_hcpt : uint12;
   SIGNAL i_hrsize,i_vrsize : uint12;
   SIGNAL i_himax,i_vimax : uint12;
-  SIGNAL i_vsize,i_vmaxmin,i_vmin,i_vmax,i_vimaxc,i_vcpt : uint12;
+  SIGNAL i_vsize,i_vmaxmin,i_vmin,i_vmax,i_vcpt : uint12;
   SIGNAL i_iauto : std_logic;
   SIGNAL i_mode : unsigned(4 DOWNTO 0);
   SIGNAL i_ven,i_sof : std_logic;
   SIGNAL i_wr : std_logic;
   SIGNAL i_divstart,i_divrun : std_logic;
-  SIGNAL i_de_pre,i_hs_pre,i_vs_pre,i_fl_pre : std_logic;
-  SIGNAL i_hs_delay : natural RANGE 0 TO 15;
+  SIGNAL i_de_pre,i_vs_pre,i_fl_pre : std_logic;
+  SIGNAL i_hs_delay : natural RANGE 0 TO 31;
   SIGNAL i_intercnt : natural RANGE 0 TO 3;
   SIGNAL i_inter,i_half,i_flm : std_logic;
-  SIGNAL i_write,i_write_pre,i_walt,i_wline : std_logic;
-  SIGNAL i_push,i_pushend,i_pushend2,i_eol,i_eol2,i_eol3,i_eol4 : std_logic;
-  SIGNAL i_pushhead,i_pushhead2,i_hbfix : std_logic;
+  SIGNAL i_write,i_walt,i_wline : std_logic;
+  SIGNAL i_push,i_pushend,i_pushend2,i_eol,i_eol2,i_eol3 : std_logic;
+  SIGNAL i_pushhead,i_pushhead2,i_pushhead3,i_hbfix : std_logic;
   SIGNAL i_hburst,i_hbcpt : natural RANGE 0 TO 31;
   SIGNAL i_shift : unsigned(0 TO 119) := (OTHERS =>'0');
   SIGNAL i_head : unsigned(127 DOWNTO 0);
@@ -304,8 +302,7 @@ ARCHITECTURE rtl OF ascal IS
   SIGNAL i_hdown,i_vdown   : std_logic;
   SIGNAL i_divcpt : natural RANGE 0 TO 36;
   SIGNAL i_lwad,i_lrad : natural RANGE 0 TO OHRES-1;
-  SIGNAL i_lwr : std_logic;
-  SIGNAL i_lpush,i_bil : std_logic;
+  SIGNAL i_lwr,i_bil : std_logic;
   SIGNAL i_ldw,i_ldrm : type_pix;
   SIGNAL i_hpixp,i_hpix0,i_hpix1,i_hpix2,i_hpix3,i_hpix4 : type_pix;
   SIGNAL i_hpix,i_pix : type_pix;
@@ -388,7 +385,7 @@ ARCHITECTURE rtl OF ascal IS
   SIGNAL o_vfrac,o_hfrac,o_hfrac1,o_hfrac2,o_hfrac3 : unsigned(11 DOWNTO 0);
   SIGNAL o_hacc,o_hacc_ini,o_hacc_next,o_vacc,o_vacc_next,o_vacc_ini : natural RANGE 0 TO 4*OHRES-1;
   SIGNAL o_hsv,o_vsv,o_dev,o_pev : unsigned(0 TO 5);
-  SIGNAL o_hsp,o_vss,o_vss1,o_vstog : std_logic;
+  SIGNAL o_hsp,o_vss : std_logic;
   SIGNAL o_read,o_read_pre : std_logic;
   SIGNAL o_readlev,o_copylev : natural RANGE 0 TO 2;
   SIGNAL o_hburst,o_hbcpt : natural RANGE 0 TO 31;
@@ -405,7 +402,6 @@ ARCHITECTURE rtl OF ascal IS
   SIGNAL o_hpix0,o_hpix1,o_hpix2,o_hpix3 : type_pix;
   SIGNAL o_hpixq,o_vpixq,o_vpixq1 : arr_pix(0 TO 3);
   
-  SIGNAL o_isyncline,o_isyncline2 : std_logic;
   SIGNAL o_vpe : std_logic;
   SIGNAL o_div,o_div2 : unsigned(18 DOWNTO 0); --uint12;
   SIGNAL o_dir,o_dir2 : unsigned(11 DOWNTO 0);
@@ -414,14 +410,6 @@ ARCHITECTURE rtl OF ascal IS
   SIGNAL o_divstart : std_logic;
   SIGNAL o_divrun : std_logic;
   SIGNAL o_hacpt,o_vacpt : unsigned(11 DOWNTO 0);
-  
-  SIGNAL o_llicpt,o_llisize,o_llipos : natural RANGE 0 TO 2**24-1;
-  SIGNAL o_llocpt,o_llosize : natural RANGE 0 TO 2**24-1;
-  SIGNAL o_lldiff : integer RANGE -2**23 TO 2**23-1 :=0;
-  SIGNAL o_llup,o_llos,o_llop,o_llfl : std_logic;
-  SIGNAL o_lltune_i : unsigned(15 DOWNTO 0);
-  SIGNAL o_llssh : natural RANGE 0 TO 2**24-1;
-  SIGNAL o_llcpt : natural RANGE 0 TO 31;
   
   -----------------------------------------------------------------------------
   -- ACPT 012345678901234---  128bits DATA
@@ -801,12 +789,7 @@ ARCHITECTURE rtl OF ascal IS
   
   TYPE arr_uv36 IS ARRAY (natural RANGE <>) OF unsigned(35 DOWNTO 0);
   TYPE arr_int9 IS ARRAY (natural RANGE <>) OF integer RANGE -256 TO 255;
-  --CONSTANT POLY16 : arr_int9 := (
-  --  -24,-20,-16,-11,-6,-1,2,5,6,6,5,4,2,1,0,0,
-  --  176,174,169,160,147,129,109,84,58,22,3,-12,-20,-25,-26,-25,
-  --  -24,-26,-26,-23,-16,-4,11,32,58,96,119,140,154,165,172,175,
-  --  0,0,1,2,3,4,6,7,6,4,1,-4,-8,-13,-18,-22);
-
+  
   CONSTANT POLY16 : arr_int9 := (
   -24,-21,-15,-9,-5,-1,4,8,6,8,5,4,3,1,0,0,
   176,174,169,160,150,131,115,85,58,27,4,-6,-20,-24,-26,-25,
@@ -899,13 +882,13 @@ BEGIN
     VARIABLE bil_t_v : type_bil_t;
   BEGIN
     IF i_reset_na='0' THEN
-      i_write_pre<='0';
+      i_write<='0';
       
     ELSIF rising_edge(i_clk) THEN
       i_push<='0';
       i_eol<='0'; -- End Of Line
       i_freeze <=freeze; -- <ASYNC>
-      i_iauto<=iauto; -- <ASYNC> ?
+      i_iauto<=iauto; -- <ASYNC>
       
       ------------------------------------------------------
       i_head(127 DOWNTO 120)<=x"01"; -- Header type
@@ -924,10 +907,9 @@ BEGIN
         to_unsigned(N_BURST * i_hburst,16); -- Line Length. Bytes
       i_head(31 DOWNTO 16)<="0000" & to_unsigned(i_ohsize,12);
       i_head(15 DOWNTO 0) <="0000" & to_unsigned(i_ovsize,12);
-
+      
       ------------------------------------------------------
       i_ppix<=(i_r,i_g,i_b);
-      i_phs<=i_hs;
       i_pvs<=i_vs;
       i_pfl<=i_fl;
       i_pde<=i_de;
@@ -936,7 +918,6 @@ BEGIN
       ------------------------------------------------------
       IF i_pce='1' THEN
         ----------------------------------------------------
-        i_hs_pre<=i_phs;
         i_vs_pre<=i_pvs;
         i_de_pre<=i_pde;
         i_fl_pre<=i_pfl;
@@ -980,18 +961,17 @@ BEGIN
                             i_vcpt>=i_vmin AND i_vcpt<=i_vmax);
         
         -- Detects end of frame for triple buffering.
-        -- Waits for second frame of interlaced video
         i_endframe0<=to_std_logic(i_vcpt=i_vmax + 1 AND
-                     (i_inter='0' OR i_pfl='0'));
+                     (i_inter='0' OR i_flm='0'));
         i_endframe1<=to_std_logic(i_vcpt=i_vmax + 1 AND
-                     (i_inter='0' OR i_pfl='1'));
+                     (i_inter='0' OR i_flm='1'));
+        
         -- Detects third line for low lag mode
-        i_syncline<=to_std_logic(i_vcpt=i_vmin + 3
-                                 AND (i_inter='0' OR i_flm='1'));
+        i_syncline<=to_std_logic(i_vcpt=i_vmin + 4);
         
         ----------------------------------------------------
         IF i_pde='1' AND i_de_pre='0' THEN
-          i_vimaxc<=i_vcpt;
+          i_vimax<=i_vcpt;
           i_hcpt<=0;
         ELSE
           i_hcpt<=(i_hcpt+1) MOD 4096;
@@ -1001,16 +981,12 @@ BEGIN
           i_himax<=i_hcpt;
         END IF;
         
-        IF i_pvs='1' THEN
-          i_vimax<=i_vimaxc;
-        END IF;
-        
         IF i_iauto='1' THEN
           -- Auto-size
           i_hmin<=0;
           i_hmax<=i_himax;
           i_vmin<=0;
-          IF i_inter='0' OR i_pfl='0' THEN
+          IF i_pvs='1' AND i_vs_pre='0' AND (i_inter='0' OR i_pfl='0') THEN
             i_vmax<=i_vimax;
           END IF;
         ELSE
@@ -1054,8 +1030,8 @@ BEGIN
         ----------------------------------------------------
         -- Downscaling vertical
         i_divstart<='0';
-        IF i_hs_delay=14 THEN
-          IF i_vacc + 2*i_ovsize < 2*i_vsize THEN
+        IF i_hs_delay=7 THEN
+          IF (i_vacc + 2*i_ovsize) < 2*i_vsize THEN
             i_vacc<=(i_vacc + 2*i_ovsize) MOD 8192;
             i_vnp<='0';
           ELSE
@@ -1070,17 +1046,17 @@ BEGIN
           END IF;
         END IF;
         
-        IF i_vdown='0' THEN
-          i_vnp<='1';
-        END IF;
+        --IF i_vdown='0' THEN
+        --  i_vnp<='1';
+        --END IF;
         
         -- Downscaling horizontal
         IF i_ven='1' THEN
           IF i_hacc + 2*i_ohsize < 2*i_hsize THEN
-            i_hacc<=(i_hacc + 2*i_ohsize) MOD 4096;
+            i_hacc<=(i_hacc + 2*i_ohsize) MOD 8192;
             i_hnp<='0'; -- Skip. pix.
           ELSE
-            i_hacc<=(i_hacc + 2*i_ohsize - 2*i_hsize + 4096) MOD 4096;
+            i_hacc<=(i_hacc + 2*i_ohsize - 2*i_hsize + 8192) MOD 8192;
             i_hnp<='1';
           END IF;
         END IF;
@@ -1194,24 +1170,29 @@ BEGIN
         END IF;
         i_pushend2<=i_pushend;
         
-        IF ((i_ven6='0' AND i_ven7='1') OR i_pushend2='1')AND i_pushend='0' THEN
+        IF ((i_ven7='1' AND i_ven6='0') OR i_pushend2='1')
+          AND i_pushend='0' THEN
+          -- EOL après fin PUSHEND.
+          -- - Soit il n'y a pas eu de pushend (à cause de VNP)
+          -- - Soit front descendant pushend
           i_eol<='1';
         END IF;
-        
-        -- Delay I_HS raising for a few cycles, finish ongoing mem. access
-        IF i_phs='1' AND i_hs_pre='0' THEN
+
+        IF i_pde='0' AND i_de_pre='1' THEN
           i_hs_delay<=0;
-        ELSIF i_hs_delay<15 THEN
+        ELSIF i_hs_delay<18 THEN
           i_hs_delay<=i_hs_delay+1;
         END IF;
         
-        IF i_hs_delay=14 THEN -- i_hs='1' AND i_hs_pre='0' THEN
-          i_acpt<=0;
-          i_hacc<=(i_hsize - i_ohsize + 8192) MOD 8192;
+        IF i_hs_delay=7 THEN
           i_lwad<=0;
           i_lrad<=0;
-          i_wad<=2*BLEN-1;
           i_vcpt<=i_vcpt+1;
+          i_hacc<=(i_hsize - i_ohsize + 8192) MOD 8192;
+        END IF;
+        IF i_hs_delay=17 THEN
+          i_acpt<=0;
+          i_wad<=2*BLEN-1;
           i_hbcpt<=0; -- Bursts per line counter
           IF i_vnp='1' AND i_hbcpt>0 AND i_hbfix='0' THEN
             i_hburst<=i_hbcpt;
@@ -1246,43 +1227,40 @@ BEGIN
       IF i_push='1' AND i_freeze='0' THEN
         i_wr<='1';
         i_wad<=(i_wad+1) MOD (BLEN*2);
-        IF ((i_wad+1) MOD BLEN=BLEN-1) THEN
+        IF (i_wad+1) MOD BLEN=BLEN-1 THEN
           i_hbcpt<=(i_hbcpt+1) MOD 32;
-          i_write_pre<=NOT i_write_pre;
-          IF (i_wad+1)/BLEN=0 THEN
-            i_walt<='0';
-          ELSE
-            i_walt<='1';
-          END IF;
+          i_write<=i_write XOR NOT i_freeze;
+          i_walt<=to_std_logic((i_wad+1)/BLEN /= 0);
           i_adrs<=i_adrsi;
           i_adrsi<=i_adrsi+N_BURST;
         END IF;
       END IF;
       
+      i_pushhead3<=i_pushhead2;
+      
       IF i_pushhead2='1' AND i_freeze='0' THEN
         i_wr<='1';
         i_wad<=0;
-        i_write_pre<=NOT i_write;
+        i_write<=i_write XOR NOT i_freeze;
         i_walt<='0';
         i_adrs<=(OTHERS =>'0');
         i_pushhead2<='0';
       END IF;
+      IF i_pushhead3='1' THEN
+        i_wad<=BLEN-1;
+      END IF;
       
       -- Delay a bit EOL : Async. AVL/I clocks...
-      i_eol2<=i_eol; i_eol3<=i_eol2; i_eol4<=i_eol3;
+      i_eol2<=i_eol; i_eol3<=i_eol2;
       
       -- End of line
-      IF i_eol4='1' AND i_freeze='0' THEN
+      IF i_eol3='1' AND i_freeze='0' THEN
         IF (i_wad MOD BLEN)/=BLEN-1 THEN
           -- Some pixels are in the partially filled buffer
           i_hbcpt<=(i_hbcpt+1) MOD 32;
-          i_write_pre<=NOT i_write_pre;
-          IF i_wad/BLEN=0 THEN
-            i_walt<='0';
-          ELSE
-            i_walt<='1';
-          END IF;
-          i_adrs<=i_adrsi;
+          i_write<=i_write XOR NOT i_freeze;
+          i_walt <=to_std_logic(i_wad/BLEN /= 0);
+          i_adrs <=i_adrsi;
           IF i_inter='1' AND i_half='0' THEN
             -- Skip every other line for interlaced video
             i_adrsi<=i_adrsi + N_BURST * (i_hburst + 1);
@@ -1296,21 +1274,16 @@ BEGIN
           END IF;
         END IF;
       END IF;
-      i_write<=i_write_pre AND NOT i_freeze;
-      
     END IF;
   END PROCESS;
-
+  
   -- If downscaling, export to the output part the downscaled size
   i_hrsize<=i_hsize WHEN i_hdown='0' ELSE i_ohsize;
   i_vrsize<=i_vsize WHEN i_vdown='0' ELSE i_ovsize;                    
   
   -----------------------------------------------------------------------------
   -- Input Divider. For downscaling.
-  
   -- Vfrac = IVacc / IVsize 12 / 12 --> 12
-  
-  -- Division
   IDividers:PROCESS (i_clk,i_reset_na) IS
   BEGIN
     IF i_reset_na='0' THEN
@@ -1329,9 +1302,9 @@ BEGIN
         
       ELSIF i_divrun='1' THEN
         ----------------------------------------------------
-        IF i_divcpt=12 THEN
+        IF i_divcpt=6 THEN
           i_divrun<='0';
-          i_v_frac<=i_vdivr(10 DOWNTO 0) & NOT i_vdivr(24);
+          i_v_frac<=i_vdivr(4 DOWNTO 0) & NOT i_vdivr(24) & "000000";
         ELSE
           i_divcpt<=i_divcpt+1;
         END IF;
@@ -1349,8 +1322,7 @@ BEGIN
   END PROCESS IDividers;
 
   -----------------------------------------------------------------------------
-  -- DPRAM INPUT
-  
+  -- DPRAM Input. Double buffer for RAM bursts.
   PROCESS (i_clk) IS
   BEGIN
     IF rising_edge(i_clk) THEN
@@ -1368,10 +1340,10 @@ BEGIN
     BEGIN
       IF rising_edge(i_clk) THEN
         IF i_lwr='1' THEN
-          i_line(i_lwad)<=i_ldw;
+          i_line(i_lwad MOD IHRES)<=i_ldw;
         END IF;
         IF i_pce='1' THEN
-          i_ldrm<=i_line(i_lrad);
+          i_ldrm<=i_line(i_lrad MOD IHRES);
         END IF;
       END IF;
     END PROCESS ILBUF;
@@ -1513,7 +1485,7 @@ BEGIN
               WHEN avl_write_i='1' AND avl_waitrequest='0' ELSE avl_rad;
   
   -----------------------------------------------------------------------------
-  -- DPRAM OUTPUT
+  -- DPRAM Output. Double buffer for RAM bursts.
   PROCESS (avl_clk) IS
   BEGIN
     IF rising_edge(avl_clk) THEN
@@ -1526,7 +1498,6 @@ BEGIN
   o_dr<=o_dpram(o_ad3) WHEN rising_edge(o_clk);
   
   -----------------------------------------------------------------------------
-  
   -- Output Vertical Divider
   -- Vfrac = Vacc / Vsize
   ODivider:PROCESS (o_clk,o_reset_na) IS
@@ -1606,7 +1577,6 @@ BEGIN
       -- For intelaced video, half frames are updated independently
       -- Input : Toggle buffer at end of input frame
       o_inter  <=i_inter; -- <ASYNC>
-      
       o_iendframe0<=i_endframe0; -- <ASYNC>
       o_iendframe02<=o_iendframe0;
       IF o_iendframe0='1' AND o_iendframe02='0' THEN
@@ -2010,13 +1980,13 @@ BEGIN
       -- Cycle 3
       div_v:=o_div2;
       dir_v:=o_dir2;
-      IF div_v(18)='0' THEN
-        div_v:=div_v-to_unsigned(o_hsize*4,19);
-      ELSE
-        div_v:=div_v+to_unsigned(o_hsize*4,19);
-      END IF;
-      dir_v(7):=NOT div_v(18);
       IF FRAC>4 THEN
+        IF div_v(18)='0' THEN
+          div_v:=div_v-to_unsigned(o_hsize*4,19);
+        ELSE
+          div_v:=div_v+to_unsigned(o_hsize*4,19);
+        END IF;
+        dir_v(7):=NOT div_v(18);
         IF div_v(18)='0' THEN
           div_v:=div_v-to_unsigned(o_hsize*2,19);
         ELSE
@@ -2173,7 +2143,6 @@ BEGIN
                                (o_vcpt=o_vsend   AND o_hcpt<o_hsstart));
 
         o_vss<=to_std_logic(o_vcpt_pre2=o_vmin);
-        o_vss1<=o_vss;
         o_hsv(1 TO 5)<=o_hsv(0 TO 4);
         o_vsv(1 TO 5)<=o_vsv(0 TO 4);
         o_dev(1 TO 5)<=o_dev(0 TO 4);
@@ -2187,80 +2156,11 @@ BEGIN
           o_pev(2)<='0';
         END IF;
         
-        ----------------------------------------------------
-        -- SYNCHRONIZED LOW LATENCY MODE
-        -- Trigger start of output frame after third line of input frame.
-        o_isyncline<=i_syncline; -- <ASYNC>
-        o_isyncline2<=o_isyncline;
-        
-        IF SYNCHRO THEN
-          -- Measure input image size
-          IF o_isyncline2='1' AND o_isyncline='0' THEN
-            o_llicpt<=0;
-            o_llipos<=o_llocpt;
-            o_llisize<=o_llicpt;
-            o_llfl<=i_pfl; -- <ASYNC>
-          ELSE
-            o_llicpt<=o_llicpt+1;
-          END IF;
-          
-          -- Measure output image size
-          IF o_vss='1' AND o_vss1='0' THEN
-            o_vstog<=NOT o_vstog OR NOT o_inter;
-          END IF;
-          IF o_vss='1' AND o_vss1='0' AND o_vstog='1' THEN
-            o_llocpt<=0;
-            o_llup<='1';
-            o_llosize<=o_llocpt;
-          ELSE
-            o_llocpt<=o_llocpt+1;
-            o_llup<='0';
-          END IF;
-
-          -- Period difference between input and output images
-          o_lldiff<=(integer(o_llosize) - integer(o_llisize));
-          
-          o_lltune_i(14)<='0'; -- Interleaved video field
-          o_lltune_i(7 DOWNTO 6)<=o_inter & o_llfl;
-          IF o_llup='1' THEN
-            o_llcpt<=0;
-            o_llssh<=o_llosize;
-            o_llos<='0';
-            o_llop<='0';
-            
-          ELSIF o_llcpt<24 THEN
-            -- Frequency difference
-            IF o_lldiff>0 AND o_llssh<o_lldiff AND o_llos='0' THEN
-              o_lltune_i(5 DOWNTO 0)<='0' & to_unsigned(o_llcpt,5);
-              o_llos<='1';
-            ELSIF o_lldiff<=0 AND o_llssh<-o_lldiff AND o_llos='0' THEN
-              o_lltune_i(5 DOWNTO 0)<='1' & to_unsigned(o_llcpt,5);
-              o_llos<='1';
-            END IF;
-            -- Phase difference
-            IF o_llipos<o_llosize/2 AND o_llssh<o_llipos AND o_llop='0' THEN
-              o_lltune_i(13 DOWNTO 8)<='0' & to_unsigned(o_llcpt,5);
-              o_llop<='1';
-            ELSIF o_llipos>=o_llosize/2 AND o_llssh<(o_llosize-o_llipos)
-              AND o_llop='0' THEN
-              o_lltune_i(13 DOWNTO 8)<='1' & to_unsigned(o_llcpt,5);
-              o_llop<='1';
-            END IF;
-            o_llssh<=o_llssh/2;
-            o_llcpt<=o_llcpt+1;
-            
-          ELSIF o_llcpt=24 THEN
-            o_lltune_i(15)<=NOT o_lltune_i(15);
-            o_llssh<=o_llssh/2;
-            o_llcpt<=o_llcpt+1;
-          END IF;
-        END IF;
       END IF;
     END IF;
     
   END PROCESS OSWEEP;
-
-  o_lltune<=o_lltune_i;
+  
   -----------------------------------------------------------------------------
   -- Vertical Scaler
   VSCAL:PROCESS(o_clk) IS
@@ -2392,6 +2292,20 @@ BEGIN
     END IF;
 
   END PROCESS VSCAL;
+  
+  -----------------------------------------------------------------------------
+  -- Low Lag syntoniser interface
+  -- i_syncline falling edge shall be aligned with o_vss raising edge.
+  
+  o_lltune<=(0 => NOT i_syncline,
+             1 => '0',
+             2 => i_inter,
+             3 => i_flm,
+             4 => o_vss,
+             5 => '0',
+             6 => i_clk,
+             7 => o_clk,
+             OTHERS =>'0');
   
   ----------------------------------------------------------------------------  
 END ARCHITECTURE rtl;

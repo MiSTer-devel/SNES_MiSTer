@@ -5,14 +5,14 @@
 -- Changes the HDMI PLL frequency according to the scaler suggestions.
 --------------------------------------------
 -- LLTUNE :
---  15   : Toggle
---  14   : Unused
---  13   : Sign phase difference
---  12:8 : Phase difference. Log (0=Large 31=Small)
---  7    : 1=Interlaced video 0=Progressive
---  6    : Interlaced video field 
---  5    : Sign period difference.
---  4:0  : Period difference. Log (0=Large 31=Small)
+--  0   : Input Syncline
+--  1   : 
+--  2   : Input Interlaced mode
+--  3   : Input Interlaced field
+--  4   : Output Syncline
+--  5   : 
+--  6   : Input clock
+--  7   : Output clock
   
 LIBRARY ieee;
 USE ieee.std_logic_1164.ALL;
@@ -56,6 +56,7 @@ ARCHITECTURE rtl OF pll_hdmi_adj IS
   SIGNAL pdata    : unsigned(31 DOWNTO 0);
   TYPE enum_state IS (sIDLE,sW1,sW2,sW3,sW4,sW5,sW6);
   SIGNAL state : enum_state;
+  SIGNAL tune_freq,tune_phase : unsigned(5 DOWNTO 0);
   SIGNAL lltune_sync,lltune_sync2,lltune_sync3 : unsigned(15 DOWNTO 0);
   SIGNAL mfrac,mfrac_mem,mfrac_ref,diff : unsigned(40 DOWNTO 0);
   SIGNAL mul : unsigned(15 DOWNTO 0);
@@ -63,8 +64,102 @@ ARCHITECTURE rtl OF pll_hdmi_adj IS
   SIGNAL up,modo,phm,dir : std_logic;
   SIGNAL cpt : natural RANGE 0 TO 3;
   SIGNAL col : natural RANGE 0 TO 15;
+  
+  SIGNAL icpt,ocpt,ssh : natural RANGE 0 TO 2**24-1;
+  SIGNAL isync,isync2,itog,ipulse : std_logic;
+  SIGNAL osync,osync2,otog,opulse : std_logic;
+  SIGNAL sync,pulse,los,lop : std_logic;
+  SIGNAL osize,isize,offset,osizep : signed(23 DOWNTO 0);
+  SIGNAL logcpt : natural RANGE 0 TO 31;
+  SIGNAL udiff : integer RANGE -2**23 TO 2**23-1 :=0;
+  
 BEGIN
   ----------------------------------------------------------------------------
+  -- Sample image sizes
+  Sampler:PROCESS(clk,reset_na) IS
+  BEGIN
+    IF reset_na='0' THEN
+--pragma synthesis_off
+      otog<='0';
+      itog<='0';
+      isync<='0';
+      isync2<='0';
+      osync<='0';
+      osync2<='0';
+--pragma synthesis_on
+      
+    ELSIF rising_edge(clk) THEN
+      -- Clock domain crossing
+      isync<=lltune(0); -- <ASYNC>
+      isync2<=isync;
+      osync<=lltune(4); -- <ASYNC>
+      osync2<=osync;
+      
+      itog<=itog XOR (isync AND NOT isync2);
+      otog<=otog XOR (osync AND NOT osync2);
+      
+      --ipulse<=isync AND NOT isync2 AND itog;
+      --opulse<=osync AND NOT osync2 AND otog;
+      
+      -- Measure output image size
+      IF osync='1' AND osync2='0' AND otog='1' THEN
+        ocpt<=0;
+        osizep<=to_signed(ocpt,24);
+      ELSE
+        ocpt<=ocpt+1;
+      END IF;
+      
+      -- Measure input image size
+      IF isync='1' AND isync2='0' AND itog='1' THEN
+        icpt<=0;
+        --isize<=to_signed(icpt,24);
+        osize<=osizep;
+        offset<=to_signed(ocpt,24);
+        udiff<=integer(to_integer(osizep)) - integer(icpt);
+        sync<='1';
+      ELSE
+        icpt<=icpt+1;
+        sync<='0';
+      END IF;
+
+      --------------------------------------------
+      pulse<='0';
+      IF sync='1' THEN
+        logcpt<=0;
+        ssh<=to_integer(osize);
+        los<='0';
+        lop<='0';
+        
+      ELSIF logcpt<24 THEN
+        -- Frequency difference
+        IF udiff>0 AND ssh<udiff AND los='0' THEN
+          tune_freq<='0' & to_unsigned(logcpt,5);
+          los<='1';
+        ELSIF udiff<=0 AND ssh<-udiff AND los='0' THEN
+          tune_freq<='1' & to_unsigned(logcpt,5);
+          los<='1';
+        END IF;
+        -- Phase difference
+        IF offset<osize/2 AND ssh<offset AND lop='0' THEN
+          tune_phase<='0' & to_unsigned(logcpt,5);
+          lop<='1';
+        ELSIF offset>=osize/2 AND ssh<(osize-offset) AND lop='0' THEN
+          tune_phase<='1' & to_unsigned(logcpt,5);
+          lop<='1';
+        END IF;
+        ssh<=ssh/2;
+        logcpt<=logcpt+1;
+        
+      ELSIF logcpt=24 THEN
+        pulse<='1';
+        ssh<=ssh/2;
+        logcpt<=logcpt+1;
+      END IF;
+
+    END IF;
+  END PROCESS Sampler;
+  
+    ----------------------------------------------------------------------------
   -- 000010 : Start reg "Write either 0 or 1 to start fractional PLL reconf.
   -- 000100 : M counter
   -- 000111 : M counter Fractional Value K
@@ -118,14 +213,12 @@ BEGIN
       
       ------------------------------------------------------
       -- Tuning
-      lltune_sync<=lltune; -- <ASYNC>
-      lltune_sync2<=lltune_sync;
-      lltune_sync3<=lltune_sync2;
-      
-      off_v:=to_integer('0' & lltune_sync(4 DOWNTO 0));
+      off_v:=to_integer('0' & tune_freq(4 DOWNTO 0));
+      ofp_v:=to_integer('0' & tune_phase(4 DOWNTO 0));
+      --IF off_v<8 THEN off_v:=8; END IF;
+      --IF ofp_v<7 THEN ofp_v:=7; END IF;
       IF off_v<4 THEN off_v:=4; END IF;
-      ofp_v:=to_integer('0' & lltune_sync(12 DOWNTO 8));
-      IF ofp_v<3 THEN ofp_v:=3; END IF;
+      IF ofp_v<4 THEN ofp_v:=4; END IF;
       
       IF off_v>=18 AND ofp_v>=18 THEN
         locked<=llena;
@@ -134,9 +227,8 @@ BEGIN
       END IF;
       
       up_v:='0';
-      IF lltune_sync3(15)/=lltune_sync2(15) THEN
-        cpt<=cpt+1;
-        IF cpt=3 THEN cpt<=0; END IF;
+      IF pulse='1' THEN
+        cpt<=(cpt+1) MOD 4;
         IF llena='0' THEN 
           -- Recover original freq when disabling low lag mode
           cpt<=0;
@@ -150,7 +242,7 @@ BEGIN
           
         ELSIF phm='0' AND cpt=0 THEN
           -- Frequency adjust
-          sign_v:=lltune_sync(5);
+          sign_v:=tune_freq(5);
           IF col<10 THEN col<=col+1; END IF;
           IF off_v>=16 AND col>=10 THEN
             phm<='1';
@@ -166,7 +258,7 @@ BEGIN
           
         ELSIF cpt=0 THEN
           -- Phase adjust
-          sign_v:=NOT lltune_sync(13);
+          sign_v:=NOT tune_phase(5);
           col<=col+1;
           IF col>=10 THEN
             phm<='0';

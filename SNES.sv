@@ -383,8 +383,8 @@ main main
 	.HIGH_RES(HIGH_RES),
 	.DOTCLK(DOTCLK),
 	
-	.HBLANK(HBlank),
-	.VBLANK(VBlank),
+	.HBLANKn(HBlank_n),
+	.VBLANKn(VBlank_n),
 	.HSYNC(HSYNC),
 	.VSYNC(VSYNC),
 
@@ -517,8 +517,8 @@ wire [7:0] R,G,B;
 wire FIELD,INTERLACE;
 wire HSync, HSYNC;
 wire VSync, VSYNC;
-wire HBlank;
-wire VBlank;
+wire HBlank_n;
+wire VBlank_n;
 wire HIGH_RES;
 wire DOTCLK;
 
@@ -539,7 +539,7 @@ always @(posedge CLK_VIDEO) begin
 
 	pcnt <= pcnt + 1'd1;
 	old_dotclk <= DOTCLK;
-	if(~old_dotclk & DOTCLK & ~HBlank & ~VBlank) pcnt <= 1;
+	if(~old_dotclk & DOTCLK & HBlank_n & VBlank_n) pcnt <= 1;
 
 	ce_pix <= !pcnt[1:0] & (frame_hres | ~pcnt[2]);
 	
@@ -564,6 +564,8 @@ video_mixer #(.LINE_LENGTH(520)) video_mixer
 	.hq2x(scale==1),
 	.mono(0),
 
+	.HBlank(~HBlank_n),
+	.VBlank(~VBlank_n),
 	.R(R),
 	.G(G),
 	.B(B)

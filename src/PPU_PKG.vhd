@@ -67,7 +67,7 @@ package PPU_PKG is
 		VFLIP	: std_logic;
 		S		: std_logic;
 	end record;
-	type RangeOam_t is array(0 to 31) of Sprite_r;
+	type RangeOamIndex_t is array(0 to 31) of std_logic_vector(6 downto 0);
 	
 	type SprSize_t is array(0 to 15) of unsigned(7 downto 0);
 	constant SPR_WIDTH: SprSize_t := (

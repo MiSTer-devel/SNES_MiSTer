@@ -44,11 +44,11 @@ entity GSUMap is
 		BSRAM_OE_N	: out std_logic;
 		BSRAM_WE_N	: out std_logic;
 
+		MAP_ACTIVE  : out std_logic;
 		MAP_CTRL		: in std_logic_vector(7 downto 0);
 		ROM_MASK		: in std_logic_vector(23 downto 0);
 		BSRAM_MASK	: in std_logic_vector(23 downto 0);
-		
-		MAP_ACTIVE	: out std_logic;
+
 		TURBO		   : in std_logic;
 
 		BRK_OUT		: out std_logic;
@@ -62,21 +62,14 @@ end GSUMap;
 architecture rtl of GSUMap is
 
 	signal ROM_A 		: std_logic_vector(20 downto 0);
-	signal ROM_RD_N 	: std_logic;
 	signal RAM_A 		: std_logic_vector(16 downto 0);
-	signal RAM_DO 		: std_logic_vector(7 downto 0);
-	signal RAM_CE_N 	: std_logic;
 	signal RAM_WE_N 	: std_logic;
-	
-	signal GSU_DO 		: std_logic_vector(7 downto 0);
-	signal GSU_IRQ_N	: std_logic;
-	signal CLS			: std_logic;
-	
 	signal MAP_SEL	  	: std_logic;
 	
 begin
 
 	MAP_SEL <= '1' when MAP_CTRL(7 downto 4) = X"7" else '0';
+	MAP_ACTIVE <= MAP_SEL;
 	
 	GSU : entity work.GSU
 	port map(
@@ -85,7 +78,7 @@ begin
 		ENABLE		=> ENABLE,
 
 		ADDR			=> CA,
-		DO				=> GSU_DO,
+		DO				=> DO,
 		DI				=> DI,
 		RD_N			=> CPURD_N,
 		WR_N			=> CPUWR_N,
@@ -93,17 +86,17 @@ begin
 		SYSCLKF_CE	=> SYSCLKF_CE,
 		SYSCLKR_CE	=> SYSCLKR_CE,
 		
-		IRQ_N			=> GSU_IRQ_N,
+		IRQ_N			=> IRQ_N,
 		
 		ROM_A			=> ROM_A,
 		ROM_DI		=> ROM_Q(7 downto 0),
-		ROM_RD_N		=> ROM_RD_N,
+		ROM_RD_N		=> ROM_OE_N,
 		
 		RAM_A			=> RAM_A,
 		RAM_DI		=> BSRAM_Q,
-		RAM_DO		=> RAM_DO,
+		RAM_DO		=> BSRAM_D,
 		RAM_WE_N		=> RAM_WE_N,
-		RAM_CE_N		=> RAM_CE_N,
+		RAM_CE_N		=> BSRAM_CE_N,
 				
 		TURBO			=> TURBO,
 
@@ -114,20 +107,12 @@ begin
 		DBG_DAT_WR	=> DBG_DAT_WR
 	);
 	
-	MAP_ACTIVE	<= MAP_SEL;
-
-	ROM_ADDR 	<= (others => '1') when MAP_SEL = '0' else ("00" & ROM_A) and ROM_MASK(22 downto 0);
-	ROM_CE_N 	<= not MAP_SEL;
-	ROM_OE_N 	<= ROM_RD_N or not MAP_SEL;
+	ROM_ADDR 	<= ("00" & ROM_A) and ROM_MASK(22 downto 0);
+	ROM_CE_N 	<= '0';
 	ROM_WORD		<= '0';
 	
-	BSRAM_ADDR 	<= (others => '1') when MAP_SEL = '0' else ("0000" & RAM_A(15 downto 0));
-	BSRAM_CE_N 	<= RAM_CE_N or not MAP_SEL;
-	BSRAM_OE_N 	<= not RAM_WE_N or not MAP_SEL;
-	BSRAM_WE_N 	<= RAM_WE_N or not MAP_SEL;
-	BSRAM_D    	<= (others => '1') when MAP_SEL = '0' else RAM_DO;
+	BSRAM_ADDR 	<= "0000" & RAM_A(15 downto 0);
+	BSRAM_OE_N 	<= not RAM_WE_N;
+	BSRAM_WE_N 	<= RAM_WE_N;
 	
-	DO				<= (others => '1') when MAP_SEL = '0' else GSU_DO;
-	IRQ_N 		<= GSU_IRQ_N or not MAP_SEL;
-
 end rtl;

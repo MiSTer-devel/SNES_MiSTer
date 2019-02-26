@@ -1,7 +1,7 @@
 //============================================================================
 //  SNES for MiSTer
-//  Copyright (C) 2017,2018 Srg320
-//  Copyright (C) 2018 Sorgelig
+//  Copyright (C) 2017-2019 Srg320
+//  Copyright (C) 2018-2019 Sorgelig
 //
 //  This program is free software; you can redistribute it and/or modify it
 //  under the terms of the GNU General Public License as published by the Free
@@ -104,9 +104,18 @@ module emu
 	output        UART_DTR,
 	input         UART_DSR,
 
+	// Open-drain User port.
+	// 0 - D+/RX
+	// 1 - D-/TX
+	// 2..5 - USR1..USR4
+	// Set USER_OUT to 1 to read from USER_IN.
+	input   [5:0] USER_IN,
+	output  [5:0] USER_OUT,
+
 	input         OSD_STATUS
 );
 
+assign USER_OUT = '1;
 assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 
 assign AUDIO_S   = 1;
@@ -319,7 +328,6 @@ main main
 (
 	.RESET_N(~reset),
 
-	.MEM_CLK(clk_mem),
 	.MCLK(clk_sys), // 21.47727 / 21.28137
 	.ACLK(clk_sys),
 
@@ -375,8 +383,8 @@ main main
 	.HIGH_RES(HIGH_RES),
 	.DOTCLK(DOTCLK),
 	
-	.HBLANK(HBlank),
-	.VBLANK(VBlank),
+	.HBLANKn(HBlank_n),
+	.VBLANKn(VBlank_n),
 	.HSYNC(HSYNC),
 	.VSYNC(VSYNC),
 
@@ -399,7 +407,6 @@ wire       ROM_CE_N;
 wire       ROM_OE_N;
 wire       ROM_WORD;
 wire[15:0] ROM_Q;
-wire       REFRESH = 0;
 
 sdram sdram
 (
@@ -407,7 +414,7 @@ sdram sdram
 	.init(~clock_locked),
 	.clk(clk_mem),
 	
-	.refresh(REFRESH),
+	.refresh(0),
 	.addr(ioctl_download ? ioctl_addr-10'd512 : ROM_ADDR),
 	.din(ioctl_dout),
 	.dout(ROM_Q),
@@ -510,8 +517,8 @@ wire [7:0] R,G,B;
 wire FIELD,INTERLACE;
 wire HSync, HSYNC;
 wire VSync, VSYNC;
-wire HBlank;
-wire VBlank;
+wire HBlank_n;
+wire VBlank_n;
 wire HIGH_RES;
 wire DOTCLK;
 
@@ -532,7 +539,7 @@ always @(posedge CLK_VIDEO) begin
 
 	pcnt <= pcnt + 1'd1;
 	old_dotclk <= DOTCLK;
-	if(~old_dotclk & DOTCLK & ~HBlank & ~VBlank) pcnt <= 1;
+	if(~old_dotclk & DOTCLK & HBlank_n & VBlank_n) pcnt <= 1;
 
 	ce_pix <= !pcnt[1:0] & (frame_hres | ~pcnt[2]);
 	
@@ -557,6 +564,8 @@ video_mixer #(.LINE_LENGTH(520)) video_mixer
 	.hq2x(scale==1),
 	.mono(0),
 
+	.HBlank(~HBlank_n),
+	.VBlank(~VBlank_n),
 	.R(R),
 	.G(G),
 	.B(B)

@@ -212,11 +212,6 @@ reg  [6:0] coef_addr;
 reg  [8:0] coef_data;
 reg        coef_wr = 0;
 
-`ifndef LITE
-reg vip_newcfg = 0;
-reg coef_set = 0;
-`endif
-
 wire  [7:0] ARX, ARY;
 reg  [11:0] VSET = 0;
 reg   [2:0] scaler_flt;
@@ -233,9 +228,6 @@ always@(posedge clk_sys) begin
 
 	if(~io_uio) begin
 		has_cmd <= 0;
-`ifndef LITE
-		if(has_cmd && cmd == 'h2A) coef_set <= ~coef_set;
-`endif
 	end
 	else
 	if(~old_strobe & io_strobe) begin
@@ -253,18 +245,15 @@ always@(posedge clk_sys) begin
 				cfg_set <= 0;
 				cnt <= cnt + 1'd1;
 				if(cnt<8) begin
-`ifndef LITE
-					if(!cnt) vip_newcfg <= ~cfg_ready;
-`endif
 					case(cnt)
-						0: if(WIDTH  != io_din[11:0]) begin WIDTH  <= io_din[11:0]; `ifndef LITE vip_newcfg <= 1; `endif end
-						1: if(HFP    != io_din[11:0]) begin HFP    <= io_din[11:0]; `ifndef LITE vip_newcfg <= 1; `endif end
-						2: if(HS     != io_din[11:0]) begin HS     <= io_din[11:0]; `ifndef LITE vip_newcfg <= 1; `endif end
-						3: if(HBP    != io_din[11:0]) begin HBP    <= io_din[11:0]; `ifndef LITE vip_newcfg <= 1; `endif end
-						4: if(HEIGHT != io_din[11:0]) begin HEIGHT <= io_din[11:0]; `ifndef LITE vip_newcfg <= 1; `endif end
-						5: if(VFP    != io_din[11:0]) begin VFP    <= io_din[11:0]; `ifndef LITE vip_newcfg <= 1; `endif end
-						6: if(VS     != io_din[11:0]) begin VS     <= io_din[11:0]; `ifndef LITE vip_newcfg <= 1; `endif end
-						7: if(VBP    != io_din[11:0]) begin VBP    <= io_din[11:0]; `ifndef LITE vip_newcfg <= 1; `endif end
+						0: if(WIDTH  != io_din[11:0]) begin WIDTH  <= io_din[11:0]; end
+						1: if(HFP    != io_din[11:0]) begin HFP    <= io_din[11:0]; end
+						2: if(HS     != io_din[11:0]) begin HS     <= io_din[11:0]; end
+						3: if(HBP    != io_din[11:0]) begin HBP    <= io_din[11:0]; end
+						4: if(HEIGHT != io_din[11:0]) begin HEIGHT <= io_din[11:0]; end
+						5: if(VFP    != io_din[11:0]) begin VFP    <= io_din[11:0]; end
+						6: if(VS     != io_din[11:0]) begin VS     <= io_din[11:0]; end
+						7: if(VBP    != io_din[11:0]) begin VBP    <= io_din[11:0]; end
 					endcase
 					if(cnt == 1) begin
 						cfg_custom_p1 <= 0;
@@ -352,120 +341,6 @@ wire clk_hdmi  = ~HDMI_TX_CLK;  // Internal HDMI clock, inverted in relation to 
 wire clk_audio = FPGA_CLK3_50;
 
 ////////////////////  SYSTEM MEMORY & SCALER  /////////////////////////
-
-`ifndef LITE
-
-wire reset;
-vip vip
-(
-	//Reset/Clock
-	.reset_reset_req(reset_req | ~cfg_ready),
-	.reset_reset(reset),
-	.reset_reset_vip(0),
-
-	//DE10-nano has no reset signal on GPIO, so core has to emulate cold reset button.
-	.reset_cold_req(~btn_reset),
-	.reset_warm_req(0),
-
-	//control
-	.ctl_address(ctl_address),
-	.ctl_write(ctl_write),
-	.ctl_writedata(ctl_writedata),
-	.ctl_waitrequest(ctl_waitrequest),
-	.ctl_clock(clk_100m),
-	.ctl_reset(ctl_reset),
-
-	//64-bit DDR3 RAM access
-	.ramclk1_clk(ram_clk),
-	.ram1_address(ram_address),
-	.ram1_burstcount(ram_burstcount),
-	.ram1_waitrequest(ram_waitrequest),
-	.ram1_readdata(ram_readdata),
-	.ram1_readdatavalid(ram_readdatavalid),
-	.ram1_read(ram_read),
-	.ram1_writedata(ram_writedata),
-	.ram1_byteenable(ram_byteenable),
-	.ram1_write(ram_write),
-
-	//Spare 64-bit DDR3 RAM access
-	//currently unused
-	//can combine with ram1 to make a wider RAM bus (although will increase the latency)
-	.ramclk2_clk(0),
-	.ram2_address(0),
-	.ram2_burstcount(0),
-	.ram2_waitrequest(),
-	.ram2_readdata(),
-	.ram2_readdatavalid(),
-	.ram2_read(0),
-	.ram2_writedata(0),
-	.ram2_byteenable(0),
-	.ram2_write(0),
-
-	//Video input
-	.in_clk(clk_vid),
-	.in_data({r_out, g_out, b_out}),
-	.in_de(de),
-	.in_v_sync(vs),
-	.in_h_sync(hs),
-	.in_ce(ce_pix),
-	.in_f(f1),
-
-	//HDMI output
-	.hdmi_clk(clk_hdmi),
-	.hdmi_data(hdmi_data),
-	.hdmi_de(hdmi_de),
-	.hdmi_v_sync(HDMI_TX_VS),
-	.hdmi_h_sync(HDMI_TX_HS)
-);
-
-wire  [8:0] ctl_address;
-wire        ctl_write;
-wire [31:0] ctl_writedata;
-wire        ctl_waitrequest;
-wire        ctl_reset;
-
-vip_config vip_config
-(
-	.clk(clk_100m),
-	.reset(ctl_reset),
-
-	.ARX(ARX),
-	.ARY(ARY),
-	.CFG_SET(vip_newcfg & cfg_got),
-
-	.WIDTH(WIDTH),
-	.HFP(HFP),
-	.HBP(HBP),
-	.HS(HS),
-	.HEIGHT(HEIGHT),
-	.VFP(VFP),
-	.VBP(VBP),
-	.VS(VS),
-	.VSET(VSET),
-
-	.coef_set(coef_set),
-	.coef_clk(clk_sys),
-	.coef_addr(coef_addr),
-	.coef_data(coef_data),
-	.coef_wr(coef_wr),
-	.scaler_flt(scaler_flt),
-
-	.address(ctl_address),
-	.write(ctl_write),
-	.writedata(ctl_writedata),
-	.waitrequest(ctl_waitrequest)
-);
-
-assign cfg_write = adj_write;
-assign cfg_address = adj_address;
-assign cfg_data = adj_data;
-assign adj_waitrequest = cfg_waitrequest;
-assign led_locked = 0;
-
-`endif
-
-
-`ifdef LITE
 
 wire reset;
 sysmem_lite sysmem
@@ -643,8 +518,6 @@ pll_hdmi_adj pll_hdmi_adj
 	.o_address(cfg_address),
 	.o_writedata(cfg_data)
 );
-
-`endif
 
 
 /////////////////////////  HDMI output  /////////////////////////////////

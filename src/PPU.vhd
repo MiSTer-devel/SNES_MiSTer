@@ -79,6 +79,8 @@ signal OBJNAME : std_logic_vector(1 downto 0);
 signal OBJSIZE : std_logic_vector(2 downto 0);
 signal OAMADD : std_logic_vector(8 downto 0);
 signal OAM_PRIO : std_logic;
+signal OAM_PRIO_INDEX : std_logic_vector(6 downto 0);
+signal OBJ_TIME_INDEX : std_logic_vector(6 downto 0);
 signal TM : std_logic_vector(7 downto 0);
 signal TS : std_logic_vector(7 downto 0);
 signal BGINTERLACE : std_logic;
@@ -147,6 +149,7 @@ signal VRAM1_WRITE, VRAM2_WRITE : std_logic;
 signal VRAM_ADDR_INC : std_logic;
 signal EXTLATCHr : std_logic;
 signal OAM_ADDR_REQ : std_logic;
+signal OAM_PRIO_REQ : std_logic;
 signal VRAMPRERD_REQ : std_logic;
 signal VRAMRD_CNT : unsigned(1 downto 0);
 
@@ -204,9 +207,8 @@ signal HOAM_ADDR_A : std_logic_vector(4 downto 0);
 signal HOAM_WE : std_logic;
 
 signal OAM_ADDR : std_logic_vector(9 downto 0);
-signal OAM_RANGE : RangeOam_t;
+signal OAM_RANGE_INDEXES : RangeOamIndex_t;
 signal OAM_OBJ : Sprite_r;
-signal SCAN_OAM_ADDR : unsigned(7 downto 0);
 signal RANGE_CNT_WR : unsigned(5 downto 0);
 signal RANGE_CNT_RD	: unsigned(5 downto 0);
 signal TILES_OAM_CNT : unsigned(5 downto 0);
@@ -337,8 +339,9 @@ port map(
 );
 OAM_D <= DI & OAM_latch;
 OAM_ADDR_A <= OAM_ADDR(8 downto 1) when ENABLE = '1' else DBG_OAM_ADDR;
-OAM_ADDR_B <= std_logic_vector(SCAN_OAM_ADDR(7 downto 1));
-OAM_WE <= ENABLE when OAM_ADDR(0) = '1' and OAM_ADDR(9) = '0' and PAWR_N = '0' and PA = x"04" and SYSCLK_CE = '1' else '0';
+OAM_ADDR_B <= OAM_ADDR(8 downto 2);
+OAM_WE <= ENABLE when OAM_ADDR(0) = '1' and (OAM_ADDR(9) = '0' or (IN_VBL = '0' and FORCE_BLANK = '0')) 
+			and PAWR_N = '0' and PA = x"04" and SYSCLK_CE = '1' else '0';
 
 HOAM : entity work.dpram_dif generic map(5,8,7,2)
 port map(
@@ -352,9 +355,12 @@ port map(
 	q_a			=> HOAM_Q_A,
 	q_b			=> HOAM_Q_B
 );
-HOAM_ADDR_A <= OAM_ADDR(4 downto 0) when ENABLE = '1' else DBG_OAM_ADDR(4 downto 0);
-HOAM_ADDR_B <= std_logic_vector(SCAN_OAM_ADDR(7 downto 1));
-HOAM_WE <= ENABLE when OAM_ADDR(9) = '1' and PAWR_N = '0' and PA = x"04" and SYSCLK_CE = '1' else '0';
+HOAM_ADDR_A <= DBG_OAM_ADDR(4 downto 0) when ENABLE = '0' else 
+				OAM_ADDR(8 downto 4) when IN_VBL = '0' and FORCE_BLANK = '0' else 
+				OAM_ADDR(4 downto 0);
+HOAM_ADDR_B <= OAM_ADDR(8 downto 2);
+HOAM_WE <= ENABLE when (OAM_ADDR(9) = '1' or (IN_VBL = '0' and FORCE_BLANK = '0')) 
+			and PAWR_N = '0' and PA = x"04" and SYSCLK_CE = '1' else '0';
 
 process( RST_N, CLK )
 begin
@@ -425,20 +431,46 @@ begin
 		
 		OAM_ADDR <= (others => '0');
 		OAM_PRIO <= '0';
+		OAM_PRIO_INDEX <= (others => '0');
 		OAM_latch <= (others => '0');
 		
 		CGRAM_Lsb <= (others => '0');
 
 		OAM_ADDR_REQ <= '0';
+		OAM_PRIO_REQ <= '0';
 		VRAMPRERD_REQ <= '0';
 		VRAMRD_CNT <= (others => '0');
 		
 	elsif rising_edge(CLK) then
 		if OAM_ADDR_REQ = '1' then
 			OAM_ADDR <= OAMADD & "0";
+			OAM_PRIO_INDEX <= OAMADD(7 downto 1);
 			OAM_ADDR_REQ <= '0';
 		end if;
-		
+
+		if OAM_PRIO_REQ = '1'  then
+			OAM_PRIO_INDEX <= OAM_ADDR(8 downto 2);
+			OAM_PRIO_REQ <= '0';
+		end if;
+
+		if ENABLE = '1' and FORCE_BLANK = '0' then
+			if H_CNT = 0 and V_CNT <= LAST_VIS_LINE then
+				if OAM_PRIO = '0' then
+					OAM_ADDR <= (others => '0');
+				else
+					OAM_ADDR <= "0" & OAM_PRIO_INDEX & "00";
+				end if;
+			end if;
+
+			if DOT_CLKR_CE = '1' and OBJ_RANGE = '1' and H_CNT(0) = '1' then
+				OAM_ADDR <= std_logic_vector(unsigned(OAM_ADDR) + 4);
+			end if;
+		end if;
+
+		if FORCE_BLANK = '0' and OBJ_TIME = '1' then
+			OAM_ADDR <= "0" & OBJ_TIME_INDEX & "00";
+		end if;
+
 		if VRAMPRERD_REQ = '1' then
 			if VRAMRD_CNT = 3 then
 				if FORCE_BLANK = '1' or IN_VBL = '1' then
@@ -475,6 +507,7 @@ begin
 						OAM_latch <= DI;
 					end if;
 					OAM_ADDR <= std_logic_vector(unsigned(OAM_ADDR) + 1);
+					OAM_PRIO_REQ <= '1';
 				when x"05" =>						--BGMODE
 					BG_MODE <= DI(2 downto 0);
 					BG3PRIO <= DI(3);
@@ -645,6 +678,7 @@ begin
 					end if;
 				when x"38" =>			--RDOAM
 					OAM_ADDR <= std_logic_vector(unsigned(OAM_ADDR) + 1);
+					OAM_PRIO_REQ <= '1';
 				when x"3B" =>			--RDCGRAM
 					CGADD <= std_logic_vector(unsigned(CGADD) + 1);
 				when x"39" =>						--RDVRAML
@@ -681,6 +715,7 @@ begin
 		
 		if (H_CNT = 339 and V_CNT = LAST_VIS_LINE and FORCE_BLANK = '0') then
 			OAM_ADDR <= OAMADD & "0";
+			OAM_PRIO_INDEX <= OAMADD(7 downto 1);
 		end if;
 		
 		EXTLATCHr <= EXTLATCH;
@@ -1369,22 +1404,16 @@ variable W, H : unsigned(5 downto 0);
 variable NEW_RANGE_CNT : unsigned(5 downto 0);
 begin
 	if RST_N = '0' then
-		SCAN_OAM_ADDR <= (others => '0');
 		RANGE_CNT_WR <= (others => '0');
 		OBJ_RANGE_DONE <= '0';
 		OAM_OBJ <= ("000000000","00000000","00000000",'0',"000","00",'0','0','0');
 		OBJ_RANGE_OFL <= '0';
-		OAM_RANGE <= (others => ("000000000","00000000","00000000",'0',"000","00",'0','0','0'));
+		OAM_RANGE_INDEXES <= (others => "0000000");
 	elsif rising_edge(CLK) then 
 		if ENABLE = '1' and DOT_CLKR_CE = '1' then
 			if H_CNT = 339 and V_CNT < LAST_VIS_LINE then
 				RANGE_CNT_WR <= (others => '1');
 				OBJ_RANGE_DONE <= '0';
-				if OAM_PRIO = '0' then
-					SCAN_OAM_ADDR <= (others => '0');
-				else
-					SCAN_OAM_ADDR <= unsigned(OAM_ADDR(8 downto 2)) & "0";
-				end if;
 			end if;
 			
 			if H_CNT = 339 and V_CNT = 261 then
@@ -1405,7 +1434,6 @@ begin
 										OAM_Q_B(30),
 										OAM_Q_B(31),
 										HOAM_Q_B(1));
-						SCAN_OAM_ADDR <= SCAN_OAM_ADDR+2;
 					when '1' =>
 						SCREEN_Y := V_CNT(7 downto 0);
 						W := SprWidth(OAM_OBJ.S & OBJSIZE);
@@ -1416,7 +1444,7 @@ begin
 						if (OAM_OBJ.X <= 256 or (0 - OAM_OBJ.X) <= W) and (SCREEN_Y - OAM_OBJ.Y) <= H then
 							if OBJ_RANGE_DONE = '0' then
 								NEW_RANGE_CNT := RANGE_CNT_WR + 1;
-								OAM_RANGE(to_integer(NEW_RANGE_CNT(4 downto 0))) <= OAM_OBJ;
+								OAM_RANGE_INDEXES(to_integer(NEW_RANGE_CNT(4 downto 0))) <= OAM_ADDR(8 downto 2);
 								RANGE_CNT_WR <= NEW_RANGE_CNT;
 								if NEW_RANGE_CNT = 31 then
 									OBJ_RANGE_DONE <= '1';
@@ -1425,7 +1453,6 @@ begin
 								OBJ_RANGE_OFL <= '1';
 							end if;
 						end if;
-						
 					when others => null;
 				end case;
 			end if;
@@ -1435,7 +1462,7 @@ end process;
 
 
 --Sprites time engine
-process( RST_N, CLK, OAM_RANGE, RANGE_CNT_RD, TILES_CNT, OBJINTERLACE, FIELD, OBJSIZE, OBJNAME, OBJADDR, H_CNT, V_CNT )
+process( RST_N, CLK, OAM_Q_B, HOAM_Q_B, TILES_CNT, OBJINTERLACE, FIELD, OBJSIZE, OBJNAME, OBJADDR, H_CNT, V_CNT )
 variable SCREEN_Y : unsigned(7 downto 0);
 variable TILE_X : unsigned(8 downto 0);
 variable W, H : unsigned(5 downto 0);
@@ -1446,7 +1473,15 @@ variable Y : unsigned(7 downto 0);
 variable TEMP : unsigned(5 downto 0);
 variable TILE_COL, TILE_ROW : unsigned(3 downto 0);
 begin
-	SPR := OAM_RANGE(to_integer(RANGE_CNT_RD(4 downto 0)));
+	SPR := (unsigned(HOAM_Q_B(0) & OAM_Q_B(7 downto 0)),
+				unsigned(OAM_Q_B(15 downto 8)),
+				unsigned(OAM_Q_B(23 downto 16)),
+				OAM_Q_B(24),
+				OAM_Q_B(27 downto 25),
+				OAM_Q_B(29 downto 28),
+				OAM_Q_B(30),
+				OAM_Q_B(31),
+				HOAM_Q_B(1));
 	if SPR.X(8) = '1' and TILES_CNT = 0 then
 		TEMP := 0 - unsigned(SPR.X(5 downto 0));
 		CUR_TILES_CNT := TEMP(5 downto 3);
@@ -1492,12 +1527,16 @@ begin
 		SPR_TILE_DATA_TEMP <= (others => '0');
 		OBJ_TIME_OFL <= '0';
 		OBJ_TIME_SAVE <= '0';
+		OBJ_TIME_INDEX <= (others => '0');
 	elsif rising_edge(CLK) then 
 		if ENABLE = '1' and DOT_CLKR_CE = '1' then
 			if H_CNT = (256+16)-1 and V_CNT < LAST_VIS_LINE then
 				TILES_OAM_CNT <= (others => '0');
 				TILES_CNT <= (others => '0');
 				RANGE_CNT_RD <= RANGE_CNT_WR;
+				if RANGE_CNT_WR /= "111111" then
+					OBJ_TIME_INDEX <= OAM_RANGE_INDEXES(to_integer(RANGE_CNT_WR(4 downto 0)));
+				end if;
 			end if;
 			
 			if H_CNT = 339 and V_CNT = 261 then
@@ -1540,6 +1579,9 @@ begin
 							if CUR_TILES_CNT = W(5 downto 3) or (TILE_X + 8) >= 256 then
 								TILES_CNT <= (others => '0');
 								RANGE_CNT_RD <= RANGE_CNT_RD - 1;
+								if RANGE_CNT_RD /= "000000" then
+									OBJ_TIME_INDEX <= OAM_RANGE_INDEXES(to_integer(RANGE_CNT_RD(4 downto 0) - 1));
+								end if;
 							end if;
 					end case;
 				end if;

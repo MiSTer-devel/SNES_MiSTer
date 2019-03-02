@@ -73,6 +73,7 @@ signal ROM_MAP_A				: std_logic_vector(23 downto 0);
 signal SNES_BWRAM_A			: std_logic_vector(23 downto 0);
 signal SNES_BWRAM_MAP_A		: std_logic_vector(17 downto 0);
 signal SA1_BWRAM_MAP_A		: std_logic_vector(17 downto 0);
+signal SA1_BWRAM_DAT			: std_logic_vector(7 downto 0);
 signal SNES_ROM_ACCESS		: std_logic;
 signal SNES_BWRAM_ACCESS	: std_logic;
 signal SNES_IRAM_ACCESS		: std_logic;
@@ -81,6 +82,7 @@ signal SNES_MMIO_READ_ACCESS : std_logic;
 signal SNES_MMIO_WRITE_ACCESS : std_logic;
 signal SA1_ROM_ACCESS		: std_logic;
 signal SA1_BWRAM_ACCESS		: std_logic;
+signal SA1_BBF_ACCESS		: std_logic;
 signal SA1_IRAM_ACCESS		: std_logic;
 signal SA1_MMIO_READ_ACCESS : std_logic;
 signal SA1_MMIO_WRITE_ACCESS : std_logic;
@@ -106,6 +108,7 @@ signal SA1_INT_EN				: std_logic;
 signal CPU_ROM_MSB			: std_logic_vector(7 downto 0);
 signal CPU_ROM_DAT			: std_logic_vector(7 downto 0);
 signal LAST_ROM_ADDR			: std_logic_vector(23 downto 0);
+signal NEXT_SA1_ROM_A		: std_logic_vector(23 downto 0);
 signal ROM_VALID				: std_logic;
 signal ROM_MSB_VALID			: std_logic;
 signal SA1_BWRAM_VALID		: std_logic;
@@ -240,7 +243,7 @@ signal VCR						: std_logic_vector(8 downto 0);
 signal MOF						: std_logic;
 signal H_CNT					: unsigned(8 downto 0);
 signal V_CNT					: unsigned(8 downto 0);
-signal MDR : std_logic_vector(7 downto 0);
+signal MDR 						: std_logic_vector(7 downto 0);
 
 --IRAM
 signal IRAM_A					: std_logic_vector(10 downto 0);
@@ -326,20 +329,21 @@ SNES_CCDMA_IRAM_ACCESS <= CC1DMA_EXEC when SNES_A(23 downto 20) = x"4" else '0';
 SNES_MMIO_WRITE_ACCESS <= '1' when SNES_A(22) = '0' and SNES_A(15 downto 8) = x"22" else '0';	
 SNES_MMIO_READ_ACCESS <= '1' when SNES_A(22) = '0' and SNES_A(15 downto 8) = x"23" else '0';	
 
-SNES_ROM_SEL <= SNES_ROM_ACCESS and not WINDOW;
+SNES_ROM_SEL <= SNES_ROM_ACCESS and (not WINDOW or SA1RST);
 SNES_BWRAM_SEL <= SNES_BWRAM_ACCESS and not WINDOW;
 SNES_IRAM_SEL <= (SNES_IRAM_ACCESS and SNES_SYSCLK) or (SNES_CCDMA_IRAM_ACCESS and not WINDOW);
 
 SA1_ROM_ACCESS <= '1' when (P65_A(22) = '0' and P65_A(15) = '1') or (P65_A(23 downto 22) = "11") else '0';
-SA1_BWRAM_ACCESS <= '1' when P65_A(23 downto 20) = x"4" or P65_A(23 downto 20) = x"6" or (P65_A(15 downto 13) = "011" and P65_A(22) = '0') else '0';
+SA1_BWRAM_ACCESS <= '1' when P65_A(23 downto 20) = x"4" or (P65_A(22) = '0' and P65_A(15 downto 13) = "011" and SBW46 = '0') else '0';
+SA1_BBF_ACCESS <= '1' when P65_A(23 downto 20) = x"6" or (P65_A(22) = '0' and P65_A(15 downto 13) = "011" and SBW46 = '1') else '0';
 SA1_IRAM_ACCESS <= '1' when P65_A(22) = '0' and (P65_A(15 downto 11) = x"0" & "0" or P65_A(15 downto 11) = x"3" & "0") else '0';	
 SA1_MMIO_WRITE_ACCESS <= '1' when P65_A(22) = '0' and P65_A(15 downto 8) = x"22" else '0';	
 SA1_MMIO_READ_ACCESS <= '1' when P65_A(22) = '0' and P65_A(15 downto 8) = x"23" else '0';	
 
 SA1_ROM_SEL <= SA1_ROM_ACCESS and not DMA_SRC_ROM_SEL and not VBP_RUN;
-SA1_BWRAM_SEL <= SA1_BWRAM_ACCESS;
-SA1_IRAM_SEL <= SA1_IRAM_ACCESS;
-SA1_INT_SEL <= (not P65_VPA and not P65_VDA) or (not SA1_ROM_ACCESS and not SA1_BWRAM_ACCESS and not SA1_IRAM_ACCESS and (P65_VPA or P65_VDA));
+SA1_BWRAM_SEL <= (SA1_BWRAM_ACCESS or SA1_BBF_ACCESS) and (P65_VPA or P65_VDA);
+SA1_IRAM_SEL <= SA1_IRAM_ACCESS and (P65_VPA or P65_VDA);
+SA1_INT_SEL <= (not P65_VPA and not P65_VDA) or (not SA1_ROM_ACCESS and not SA1_BWRAM_ACCESS and not SA1_BBF_ACCESS and not SA1_IRAM_ACCESS and (P65_VPA or P65_VDA));
 
 SA1_BWRAM_WAIT <= ((DMA_SRC_BWRAM_SEL or DMA_DST_BWRAM_SEL) and (DPRIO or CDEN)) or CCDMA_SRC_BWRAM_SEL;
 SA1_IRAM_WAIT <= ((DMA_SRC_IRAM_SEL or DMA_DST_IRAM_SEL) and (DPRIO or CDEN)) or CCDMA_DST_IRAM_SEL;
@@ -350,7 +354,7 @@ begin
 		SA1_BWRAM_VALID <= '0';
 	elsif rising_edge(CLK) then
 		if EN = '1' then
-			if SNES_BWRAM_SEL = '1' or SA1_BWRAM_SEL = '0' or SA1_BWRAM_WAIT = '1' then
+			if SNES_BWRAM_SEL = '1' or SA1_BWRAM_SEL = '0' or SA1_BWRAM_WAIT = '1' or SA1_BWRAM_EN = '1' then
 				SA1_BWRAM_VALID <= '0';
 			else
 				SA1_BWRAM_VALID <= '1';
@@ -401,26 +405,24 @@ begin
 	end if;
 end process;
 
-process( SNES_A, P65_A, SDA, VDA, SNES_ROM_SEL, SA1_ROM_SEL, DMA_SRC_ROM_SEL, VBP_RUN, ROM_MSB_VALID, DMA_ROM_MSB_VALID, LAST_ROM_ADDR)
+process( SNES_A, P65_A, SDA, VDA, SNES_ROM_SEL, SA1_ROM_SEL, DMA_SRC_ROM_SEL, VBP_RUN, ROM_MSB_VALID, DMA_ROM_MSB_VALID, LAST_ROM_ADDR, NEXT_SA1_ROM_A)
 begin
-	if SNES_ROM_SEL = '1' then
-		INT_ROM_A <= SNES_A;
-	elsif VBP_RUN = '1' then
+	if VBP_RUN = '1' and SNES_ROM_SEL = '0' then
 		INT_ROM_A <= VDA;
-	elsif DMA_SRC_ROM_SEL = '1' then
+	elsif DMA_SRC_ROM_SEL = '1' and SNES_ROM_SEL = '0' then
 		if SDA(0) = '1' and DMA_ROM_MSB_VALID = '1' then
 			INT_ROM_A <= std_logic_vector(unsigned(SDA) + 1);
 		else
 			INT_ROM_A <= SDA;
 		end if;
-	elsif SA1_ROM_SEL = '1' then
+	elsif SA1_ROM_SEL = '1' and SNES_ROM_SEL = '0' then
 		if P65_A(0) = '1' and ROM_MSB_VALID = '1' then
 			INT_ROM_A <= std_logic_vector(unsigned(P65_A) + 1);
 		else
 			INT_ROM_A <= P65_A;
 		end if;
 	else
-		INT_ROM_A <= LAST_ROM_ADDR;
+		INT_ROM_A <= SNES_A;
 	end if;
 end process;
 
@@ -428,10 +430,15 @@ process( CLK, RST_N)
 begin
 	if RST_N = '0' then
 		LAST_ROM_ADDR <= (others => '0');
+		NEXT_SA1_ROM_A <= (others => '0');
 	elsif rising_edge(CLK) then
 		if EN = '1' then
 			if (SA1_ROM_SEL = '1' and (P65_VPA = '1' or P65_VDA = '1')) or DMA_SRC_ROM_SEL = '1' or VBP_RUN = '1' then
 				LAST_ROM_ADDR <= INT_ROM_A;
+			end if;
+			
+			if P65_A(0) = '0' then
+				NEXT_SA1_ROM_A <= std_logic_vector(unsigned(P65_A) + 2);
 			end if;
 		end if;
 	end if;
@@ -454,7 +461,7 @@ begin
 	end if;
 end process;
 
-process( P65_A, CPU_ROM_DAT, SA1_MMIO_READ_ACCESS, SA1_BWRAM_ACCESS, SA1_IRAM_ACCESS, SA1_ROM_ACCESS, IRAM_DO, BWRAM_DI, 
+process( P65_A, CPU_ROM_DAT, SA1_MMIO_READ_ACCESS, SA1_BWRAM_ACCESS, SA1_BBF_ACCESS, SA1_IRAM_ACCESS, SA1_ROM_ACCESS, IRAM_DO, BWRAM_DI, SBW46, 
 			CRV, CIV, CNV, SA1_IRQ_FLAG, TM_IRQ_FLAG, DMA_IRQ_FLAG, SA1_NMI_FLAG, SMSG, MR, MOF, VDP, BBF, HCR, VCR, H_CNT, MDR)
 begin
 	if SA1_MMIO_READ_ACCESS = '1' then	--SA1 Port Read
@@ -490,10 +497,10 @@ begin
 		end case;
 	elsif SA1_IRAM_ACCESS = '1' then												--I-RAM 00h-3Fh/80h-BFh:0000h-07FFh/3000h-37FFh
 		P65_DI <= IRAM_DO;
-	elsif SA1_BWRAM_ACCESS = '1' then
-		if P65_A(21) = '0' then														--BW-RAM 40h-4Fh:0000h-FFFFh
-			P65_DI <= BWRAM_DI;
-		elsif BBF = '0' then															--BW-RAM 60h-6Fh:0000h-FFFFh
+	elsif SA1_BWRAM_ACCESS = '1' then											--BW-RAM 40h-4Fh:0000h-FFFFh	
+		P65_DI <= BWRAM_DI;
+	elsif SA1_BBF_ACCESS = '1' then												--BW-RAM BBF 60h-6Fh:0000h-FFFFh	
+		if BBF = '0' then
 			case P65_A(0) is
 				when '0' => P65_DI <= "0000" & BWRAM_DI(3 downto 0);
 				when others => P65_DI <= "0000" & BWRAM_DI(7 downto 4);
@@ -506,7 +513,7 @@ begin
 				when others => P65_DI <= "000000" & BWRAM_DI(7 downto 6);
 			end case;
 		end if;
-	elsif SA1_ROM_ACCESS = '1' then													--ROM 00h-3Fh/80h-BFh:8000h-FFFFh, C0h-FFh:0000h-FFFFh 
+	elsif SA1_ROM_ACCESS = '1' then												--ROM 00h-3Fh/80h-BFh:8000h-FFFFh, C0h-FFh:0000h-FFFFh 
 		if P65_A(23 downto 5) = x"00FF" & "111" and P65_A(3 downto 1) = "110" then	--00FFEC/D, 00FFFC/D
 			if P65_A(0) = '0' then
 				P65_DI <= CRV(7 downto 0);
@@ -576,88 +583,99 @@ end process;
 ROM_A <= ROM_MAP_A(22 downto 0);
 ROM_RD_N <= CLK_CE;
 
---BWRAM
+
+--BWRAM & BBF
 process( SNES_A, BMAPS)
 begin
 	if SNES_A(22) = '1' then
 		SNES_BWRAM_MAP_A <= SNES_A(17 downto 0);
 	else
-		SNES_BWRAM_MAP_A <= BMAPS(4 downto 0) & SNES_A(12 downto 0);		--SNES BW-RAM 8K 00h-3Fh/80h-BFh:6000h-7FFFh
+		SNES_BWRAM_MAP_A <= BMAPS(4 downto 0) & SNES_A(12 downto 0);			--SNES BW-RAM 8K 00h-3Fh/80h-BFh:6000h-7FFFh
 	end if;
 end process;
 
-process( P65_A, SBW46, BMAP, BBF)
+process( P65_A, P65_DO, SA1_BWRAM_ACCESS, SBW46, BMAP, BBF, BWRAM_DI)
 variable INT_BWRAM_A : std_logic_vector(19 downto 0);
 begin
-	if P65_A(22) = '0' then																--SA1 BW-RAM 8K 00h-3Fh/80h-BFh:6000h-7FFFh
+	if P65_A(22) = '0' then																	--SA1 BW-RAM 8K 00h-3Fh/80h-BFh:6000h-7FFFh
 		if SBW46 = '0' then
-			INT_BWRAM_A := "00" & BMAP(4 downto 0) & P65_A(12 downto 0);	--map to 40h-4Fh:0000h-FFFFh
+			INT_BWRAM_A := "00" & BMAP(4 downto 0) & P65_A(12 downto 0);		--map to 40h-4Fh:0000h-FFFFh
 		else
-			INT_BWRAM_A := BMAP & P65_A(12 downto 0);								--map to 60h-6Fh:0000h-FFFFh
+			INT_BWRAM_A := BMAP & P65_A(12 downto 0);									--map to 60h-6Fh:0000h-FFFFh
 		end if;
 	else
-		INT_BWRAM_A := "00" & P65_A(17 downto 0);
+		INT_BWRAM_A := P65_A(19 downto 0);
 	end if;
 
-	if P65_A(22 downto 21) = "11" or (P65_A(22) = '0' and SBW46 = '1') then	--BW-RAM 60h-6Fh:0000h-FFFFh
-		if BBF = '0' then
-			SA1_BWRAM_MAP_A <= INT_BWRAM_A(18 downto 1);
-		else
-			SA1_BWRAM_MAP_A <= INT_BWRAM_A(19 downto 2);
-		end if;
-	else
+	if SA1_BWRAM_ACCESS = '1' then														--map to 40h-4Fh:0000h-FFFFh
 		SA1_BWRAM_MAP_A <= INT_BWRAM_A(17 downto 0);
+		SA1_BWRAM_DAT <= P65_DO;
+	elsif BBF = '0' then																		--BW-RAM BBF 60h-6Fh:0000h-FFFFh
+		SA1_BWRAM_MAP_A <= INT_BWRAM_A(18 downto 1);
+		case INT_BWRAM_A(0) is
+			when '0' =>	   SA1_BWRAM_DAT <= BWRAM_DI(7 downto 4) & P65_DO(3 downto 0);
+			when others =>	SA1_BWRAM_DAT <= P65_DO(3 downto 0) & BWRAM_DI(3 downto 0);
+		end case;
+	else
+		SA1_BWRAM_MAP_A <= INT_BWRAM_A(19 downto 2);
+		case INT_BWRAM_A(1 downto 0) is
+			when "00" =>	SA1_BWRAM_DAT <= BWRAM_DI(7 downto 2) & P65_DO(1 downto 0);
+			when "01" =>	SA1_BWRAM_DAT <= BWRAM_DI(7 downto 4) & P65_DO(1 downto 0) & BWRAM_DI(1 downto 0);
+			when "10" =>	SA1_BWRAM_DAT <= BWRAM_DI(7 downto 6) & P65_DO(1 downto 0) & BWRAM_DI(3 downto 0);
+			when others =>	SA1_BWRAM_DAT <=                        P65_DO(1 downto 0) & BWRAM_DI(5 downto 0);
+		end case;
 	end if;
 end process;
 
-BWRAM_A <= DBG_BWRAM_ADDR when ENABLE = '0' else 
-			  CC1_BWRAM_RD_ADDR when CCDMA_SRC_BWRAM_SEL = '1' else 
-			  SNES_BWRAM_MAP_A when SNES_BWRAM_SEL = '1' else 
-			  SDA(17 downto 0) when DMA_SRC_BWRAM_SEL = '1' and DMA_BWRAM_WAIT = '0' else 
-			  DDA(17 downto 0) when DMA_DST_BWRAM_SEL = '1' and DMA_BWRAM_WAIT = '0' else 
-			  SA1_BWRAM_MAP_A when SA1_BWRAM_SEL = '1' else 
+BWRAM_A <= DBG_BWRAM_ADDR			when ENABLE = '0' else 
+			  CC1_BWRAM_RD_ADDR		when CCDMA_SRC_BWRAM_SEL = '1' else 
+			  SNES_BWRAM_MAP_A		when SNES_BWRAM_SEL = '1' else 
+			  SDA(17 downto 0)		when DMA_SRC_BWRAM_SEL = '1' and DMA_BWRAM_WAIT = '0' else 
+			  DDA(17 downto 0)		when DMA_DST_BWRAM_SEL = '1' and DMA_BWRAM_WAIT = '0' else 
+			  SA1_BWRAM_MAP_A			when SA1_BWRAM_SEL = '1' else 
 			  (others => '0');
-BWRAM_DO <= SNES_DI when SNES_BWRAM_SEL = '1' else 
-				INT_DMA_DAT when DMA_DST_BWRAM_SEL = '1' and DMA_BWRAM_WAIT = '0' else 
-				P65_DO when SA1_BWRAM_SEL = '1' else 
+BWRAM_DO <= SNES_DI					when SNES_BWRAM_SEL = '1' else 
+				INT_DMA_DAT				when DMA_DST_BWRAM_SEL = '1' and DMA_BWRAM_WAIT = '0' else 
+				SA1_BWRAM_DAT			when SA1_BWRAM_SEL = '1' else 
 				x"00";
-BWRAM_WE_N <= '1' when ENABLE = '0' else 
-				  '1' when CCDMA_SRC_BWRAM_SEL = '1' else 
-				  SNES_WR_N when SNES_BWRAM_SEL = '1' else 
-				  '1' when DMA_SRC_BWRAM_SEL = '1' and DMA_BWRAM_WAIT = '0' else 
-				  '0' when DMA_DST_BWRAM_SEL = '1' and DMA_BWRAM_WAIT = '0' else 
-				  P65_R_WN when SA1_BWRAM_SEL = '1' else 
+BWRAM_WE_N <= '1'						when ENABLE = '0' else 
+				  '1'						when CCDMA_SRC_BWRAM_SEL = '1' else 
+				  SNES_WR_N				when SNES_BWRAM_SEL = '1' else 
+				  '1'						when DMA_SRC_BWRAM_SEL = '1' and DMA_BWRAM_WAIT = '0' else 
+				  '0'						when DMA_DST_BWRAM_SEL = '1' and DMA_BWRAM_WAIT = '0' else 
+				  P65_R_WN				when SA1_BWRAM_SEL = '1' and SA1_BWRAM_EN = '1' else 
 				  '1';
-BWRAM_OE_N <= '0' when ENABLE = '0' else 
-				  '0' when CCDMA_SRC_BWRAM_SEL = '1' else 
-				  SNES_RD_N when SNES_BWRAM_SEL = '1' else 
-				  '0' when DMA_SRC_BWRAM_SEL = '1' and DMA_BWRAM_WAIT = '0' else 
-				  '1' when DMA_DST_BWRAM_SEL = '1' and DMA_BWRAM_WAIT = '0' else 
-				  not P65_R_WN when SA1_BWRAM_SEL = '1' else 
+BWRAM_OE_N <= '0'						when ENABLE = '0' else 
+				  '0'						when CCDMA_SRC_BWRAM_SEL = '1' else 
+				  SNES_RD_N				when SNES_BWRAM_SEL = '1' else 
+				  '0'						when DMA_SRC_BWRAM_SEL = '1' and DMA_BWRAM_WAIT = '0' else 
+				  '1'						when DMA_DST_BWRAM_SEL = '1' and DMA_BWRAM_WAIT = '0' else 
+				  not P65_R_WN			when SA1_BWRAM_SEL = '1' and SA1_BWRAM_EN = '1' else 
 				  '1';
 
 --IRAM
-IRAM_A <= DBG_IRAM_ADDR when ENABLE = '0' else 
-			 SNES_A(10 downto 0) when SNES_IRAM_SEL = '1' and SNES_IRAM_ACCESS = '1' else 
-			 CC1_IRAM_RD_ADDR when SNES_IRAM_SEL = '1' and SNES_CCDMA_IRAM_ACCESS = '1' else 
-			 SDA(10 downto 0) when DMA_SRC_IRAM_SEL = '1' and DMA_IRAM_WAIT = '0' else 
-			 DDA(10 downto 0) when DMA_DST_IRAM_SEL = '1' and DMA_IRAM_WAIT = '0' else 
-			 CC12_IRAM_WR_ADDR when CCDMA_DST_IRAM_SEL = '1' else 
-			 P65_A(10 downto 0) when SA1_IRAM_SEL = '1' else 
+IRAM_A <= DBG_IRAM_ADDR				when ENABLE = '0' else 
+			 SNES_A(10 downto 0)		when SNES_IRAM_SEL = '1' and SNES_IRAM_ACCESS = '1' else 
+			 CC1_IRAM_RD_ADDR			when SNES_IRAM_SEL = '1' and SNES_CCDMA_IRAM_ACCESS = '1' else 
+			 SDA(10 downto 0)			when DMA_SRC_IRAM_SEL = '1' and DMA_IRAM_WAIT = '0' else 
+			 DDA(10 downto 0)			when DMA_DST_IRAM_SEL = '1' and DMA_IRAM_WAIT = '0' else 
+			 CC12_IRAM_WR_ADDR		when CCDMA_DST_IRAM_SEL = '1' else 
+			 P65_A(10 downto 0)		when SA1_IRAM_SEL = '1' else 
 			 (others => '0');
-IRAM_DI <= SNES_DI when SNES_IRAM_SEL = '1' and SNES_IRAM_ACCESS = '1' else 
-			  INT_DMA_DAT when DMA_DST_IRAM_SEL = '1' and DMA_IRAM_WAIT = '0' else 
-			  CC12_IRAM_WR_DAT when CCDMA_DST_IRAM_SEL = '1' else 
-			  P65_DO when SA1_IRAM_SEL = '1' else 
+IRAM_DI <= SNES_DI					when SNES_IRAM_SEL = '1' and SNES_IRAM_ACCESS = '1' else 
+			  INT_DMA_DAT				when DMA_DST_IRAM_SEL = '1' and DMA_IRAM_WAIT = '0' else 
+			  CC12_IRAM_WR_DAT		when CCDMA_DST_IRAM_SEL = '1' else 
+			  P65_DO						when SA1_IRAM_SEL = '1' else 
 			  x"00";
-IRAM_WE <= '0' when ENABLE = '0' else 
-			  not SNES_WR_N when SNES_IRAM_SEL = '1' and SNES_IRAM_ACCESS = '1' else 
-			  '0' when SNES_IRAM_SEL = '1' and SNES_CCDMA_IRAM_ACCESS = '1' else 
-			  '0' when DMA_SRC_IRAM_SEL = '1' and DMA_IRAM_WAIT = '0' else 
-			  DMA_EN when DMA_DST_IRAM_SEL = '1' and DMA_IRAM_WAIT = '0' else 
-			  DMA_EN when CCDMA_DST_IRAM_SEL = '1' else 
-			  not P65_R_WN when SA1_IRAM_SEL = '1' else 
+IRAM_WE <= '0'							when ENABLE = '0' else 
+			  not SNES_WR_N			when SNES_IRAM_SEL = '1' and SNES_IRAM_ACCESS = '1' else 
+			  '0'							when SNES_IRAM_SEL = '1' and SNES_CCDMA_IRAM_ACCESS = '1' else 
+			  '0'							when DMA_SRC_IRAM_SEL = '1' and DMA_IRAM_WAIT = '0' else 
+			  DMA_EN						when DMA_DST_IRAM_SEL = '1' and DMA_IRAM_WAIT = '0' else 
+			  CCDMA_IRAM_EN			when CCDMA_DST_IRAM_SEL = '1' else 
+			  not P65_R_WN				when SA1_IRAM_SEL = '1' else 
 			  '0';
+
 			  
 IRAM: entity work.spram generic map(11, 8)
 port map (
@@ -707,7 +725,7 @@ begin
 		DMA_BWRAM_VALID <= '0';
 	elsif rising_edge(CLK) then
 		if EN = '1' then
-			if SNES_BWRAM_SEL = '1' or (CCDMA_SRC_BWRAM_SEL = '0' and CC1DMA_EXEC = '1') or DMA_BWRAM_WAIT = '1' or DMA_RUN = '0' or DMA_EN = '1' then
+			if SNES_BWRAM_SEL = '1' or (CCDMA_SRC_BWRAM_SEL = '0' and CC1DMA_EXEC = '1') or DMA_BWRAM_WAIT = '1' or DMA_RUN = '0' then-- or DMA_EN = '1'
 				DMA_BWRAM_VALID <= '0';
 			else
 				DMA_BWRAM_VALID <= '1';
@@ -796,7 +814,7 @@ begin
 						DDA(7 downto 0) <= SNES_DI;
 					when x"36" =>
 						DDA(15 downto 8) <= SNES_DI;
-						DMA_RUN <= (not DMADD and NDMA_SEL) or CC1DMA_SEL;
+						DMA_RUN <= CC1DMA_SEL;
 						CCDMA_RW <= '0';
 						CC_BPP <= (others => '0');
 						CC_TILE_Y <= (others => '0');
@@ -1175,8 +1193,8 @@ begin
 							SA1_NMI_FLAG <= '1';
 						end if;
 					when x"01" =>						--SIE
+						CDMA_IRQ_EN <= SNES_DI(5);
 						SNES_IRQ_EN <= SNES_DI(7);
-						CDMA_IRQ_EN <= SNES_DI(7);
 					when x"02" =>						--SIC
 						if SNES_DI(7) = '1' then
 							SNES_IRQ_FLAG <= '0';

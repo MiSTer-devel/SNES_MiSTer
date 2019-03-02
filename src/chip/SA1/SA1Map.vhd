@@ -113,7 +113,7 @@ begin
 	ROM_CE_N 	<= '0';
 	ROM_WORD		<= '1';
 
-	BSRAM_ADDR 	<= "00" & BWRAM_A and BSRAM_MASK(19 downto 0);
+	BSRAM_ADDR 	<= ("00" & BWRAM_A) and BSRAM_MASK(19 downto 0);
 	BSRAM_CE_N 	<= '0';
 
 end rtl;

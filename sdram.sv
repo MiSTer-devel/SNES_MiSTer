@@ -37,8 +37,6 @@ module sdram
 	input             init,			// init signal after FPGA config to initialize RAM
 	input             clk,			// sdram is accessed at up to 128MHz
 
-	input             refresh,
-
 	input      [24:0] addr,
 	input             rd,
 	input             wr,
@@ -71,30 +69,32 @@ reg [15:0] data;
 reg        we;
 reg        ds;
 reg        ram_req=0;
+wire       ram_req_test = (we || (a[24:1] != addr[24:1]));
 
 // access manager
 always @(posedge clk) begin
 	reg old_ref;
-	reg old_rd,old_wr,old_rfsh;
+	reg old_rd,old_wr;
 	reg [15:0] last_data;
 
 	old_rd <= old_rd & rd;
 	old_wr <= old_wr & wr;
-	old_rfsh <= refresh;
 
 	if(state == STATE_IDLE && mode == MODE_NORMAL) begin
 		if((~old_rd & rd) | (~old_wr & wr)) begin
 			old_rd <= rd;
 			old_wr <= wr;
 			we <= wr;
-			a <= addr;
 			ds <= word;
-			data <= word ? din : {din[7:0],din[7:0]};
-			ram_req <= wr || (a[24:1] != addr[24:1]);
 			busy <= 1;
 			state <= STATE_START;
 		end
-		else if(~old_rfsh & refresh) state <= STATE_START;
+	end
+	
+	if(state == STATE_START && busy) begin
+		a <= addr;
+		data <= word ? din : {din[7:0],din[7:0]};
+		ram_req <= ram_req_test;
 	end
 
 	if(state == STATE_READY && busy) begin
@@ -157,10 +157,9 @@ localparam CMD_LOAD_MODE       = 4'b0000;
 // SDRAM state machines
 always @(posedge clk) begin
 	casex({ram_req,we,mode,state})
-		{2'b1X, MODE_NORMAL, STATE_START}: {SDRAM_nCS, SDRAM_nRAS, SDRAM_nCAS, SDRAM_nWE} <= CMD_ACTIVE;
+		{2'bXX, MODE_NORMAL, STATE_START}: {SDRAM_nCS, SDRAM_nRAS, SDRAM_nCAS, SDRAM_nWE} <= ram_req_test ? CMD_ACTIVE : CMD_AUTO_REFRESH;
 		{2'b11, MODE_NORMAL, STATE_CONT }: {SDRAM_nCS, SDRAM_nRAS, SDRAM_nCAS, SDRAM_nWE} <= CMD_WRITE;
 		{2'b10, MODE_NORMAL, STATE_CONT }: {SDRAM_nCS, SDRAM_nRAS, SDRAM_nCAS, SDRAM_nWE} <= CMD_READ;
-		{2'b0X, MODE_NORMAL, STATE_START}: {SDRAM_nCS, SDRAM_nRAS, SDRAM_nCAS, SDRAM_nWE} <= CMD_AUTO_REFRESH;
 
 		// init
 		{2'bXX,    MODE_LDM, STATE_START}: {SDRAM_nCS, SDRAM_nRAS, SDRAM_nCAS, SDRAM_nWE} <= CMD_LOAD_MODE;
@@ -169,20 +168,20 @@ always @(posedge clk) begin
 		                          default: {SDRAM_nCS, SDRAM_nRAS, SDRAM_nCAS, SDRAM_nWE} <= CMD_INHIBIT;
 	endcase
 
-	casex({ram_req,mode,state})
-		{1'b1,  MODE_NORMAL, STATE_START}: SDRAM_A <= a[13:1];
-		{1'b1,  MODE_NORMAL, STATE_CONT }: SDRAM_A <= {4'b0010, a[22:14]};
+	casex({mode,state})
+		{MODE_NORMAL, STATE_START}: SDRAM_A <= addr[13:1];
+		{MODE_NORMAL, STATE_CONT }: SDRAM_A <= {4'b0010, a[22:14]};
 
 		// init
-		{1'bX,     MODE_LDM, STATE_START}: SDRAM_A <= MODE;
-		{1'bX,     MODE_PRE, STATE_START}: SDRAM_A <= 13'b0010000000000;
+		{   MODE_LDM, STATE_START}: SDRAM_A <= MODE;
+		{   MODE_PRE, STATE_START}: SDRAM_A <= 13'b0010000000000;
 
-		                          default: SDRAM_A <= 13'b0000000000000;
+		                   default: SDRAM_A <= 13'b0000000000000;
 	endcase
 
 	if(state == STATE_START) begin
-		SDRAM_BA <= (mode == MODE_NORMAL) ? a[24:23] : 2'b00;
-		{SDRAM_DQMH,SDRAM_DQML} <= (~we | ds) ? 2'b00 : {~a[0], a[0]};
+		SDRAM_BA <= (mode == MODE_NORMAL) ? addr[24:23] : 2'b00;
+		{SDRAM_DQMH,SDRAM_DQML} <= (~we | ds) ? 2'b00 : {~addr[0], addr[0]};
 	end
 
 	SDRAM_DQ <= 'Z;

@@ -31,7 +31,7 @@ entity DSP_LHRomMap is
 		
 		IRQ_N			: out std_logic;
 
-		ROM_ADDR		: out std_logic_vector(22 downto 0);
+		ROM_ADDR		: out std_logic_vector(23 downto 0);
 		ROM_Q			: in  std_logic_vector(15 downto 0);
 		ROM_CE_N		: out std_logic;
 		ROM_OE_N		: out std_logic;
@@ -59,7 +59,7 @@ end DSP_LHRomMap;
 
 architecture rtl of DSP_LHRomMap is
 
-	signal CART_ADDR : std_logic_vector(22 downto 0);
+	signal CART_ADDR : std_logic_vector(23 downto 0);
 	signal BRAM_ADDR : std_logic_vector(19 downto 0);
 	signal BSRAM_SEL : std_logic;
 	signal DP_SEL    : std_logic;
@@ -91,67 +91,83 @@ begin
 	process( CA, MAP_CTRL, ROMSEL_N, RAMSEL_N, BSRAM_MASK, ROM_MASK )
 	begin
 		DP_SEL <= '0';
-		case MAP_CTRL(2 downto 0) is
-			when "000" =>							-- LoROM
-				CART_ADDR <= "0" & CA(22 downto 16) & CA(14 downto 0);
-				BRAM_ADDR <= CA(20 downto 16) & CA(14 downto 0);
-				if MAP_CTRL(3) = '0' then
-					if CA(22 downto 20) = "111" and CA(15) = '0' and ROMSEL_N = '0' and BSRAM_MASK(10) = '1' then
+		if ROM_MASK(23) = '0' then
+			case MAP_CTRL(2 downto 0) is
+				when "000" =>							-- LoROM
+					CART_ADDR <= "00" & CA(22 downto 16) & CA(14 downto 0);
+					BRAM_ADDR <= CA(20 downto 16) & CA(14 downto 0);
+					if MAP_CTRL(3) = '0' then
+						if CA(22 downto 20) = "111" and CA(15) = '0' and ROMSEL_N = '0' and BSRAM_MASK(10) = '1' then
+							BSRAM_SEL <= '1';
+						else
+							BSRAM_SEL <= '0';
+						end if;
+						if (CA(22 downto 21) = "01" and CA(15) = '1' and ROM_MASK(20) = '0') or		--20-3F/A0-BF:8000-FFFF
+							(CA(22 downto 20) = "110" and CA(15) = '0' and ROM_MASK(20) = '1') then	--60-6F/E0-EF:0000-7FFF
+							DSP_SEL <= MAP_CTRL(7);
+						else
+							DSP_SEL <= '0';
+						end if;
+						DSP_A0 <= CA(14);
+					else
+						BSRAM_SEL <= '0';
+						if CA(22 downto 19) = "1101" and ROMSEL_N = '0' then --68-6F/E8-EF:0000-0FFF
+							DP_SEL <= '1';
+						end if;
+						
+						if CA(22 downto 19) = "1100" then	--60-67/E0-E7:0000-0001
+							DSP_SEL <= MAP_CTRL(7);
+						else
+							DSP_SEL <= '0';
+						end if;
+						DSP_A0 <= CA(0);
+					end if;
+				when "001" =>							-- HiROM
+					CART_ADDR <= "00" & CA(21 downto 0);
+					BRAM_ADDR <= "00" & CA(20 downto 16) & CA(12 downto 0);
+					if CA(22 downto 21) = "01" and CA(15 downto 13) = "011" and BSRAM_MASK(10) = '1' then
 						BSRAM_SEL <= '1';
 					else
 						BSRAM_SEL <= '0';
 					end if;
-					if (CA(22 downto 21) = "01" and CA(15) = '1' and ROM_MASK(20) = '0') or		--20-3F/A0-BF:8000-FFFF
-						(CA(22 downto 20) = "110" and CA(15) = '0' and ROM_MASK(20) = '1') then	--60-6F/E0-EF:0000-7FFF
+					if CA(22 downto 21) = "00" and CA(15 downto 13) = "011" then	--00-1F/80-9f:6000-7FFF
 						DSP_SEL <= MAP_CTRL(7);
 					else
 						DSP_SEL <= '0';
 					end if;
-					DSP_A0 <= CA(14);
-				else
-					BSRAM_SEL <= '0';
-					if CA(22 downto 19) = "1101" and ROMSEL_N = '0' then --68-6F/E8-EF:0000-0FFF
-						DP_SEL <= '1';
-					end if;
-					
-					if CA(22 downto 19) = "1100" then	--60-67/E0-E7:0000-0001
-						DSP_SEL <= MAP_CTRL(7);
+					DSP_A0 <= CA(12);
+				when "101"|"010" =>					-- ExHiROM
+					CART_ADDR <= "0" & (not CA(23)) & CA(21 downto 0);
+					BRAM_ADDR <= CA(19 downto 0);
+					if CA(22 downto 21) = "01" and CA(15 downto 13) = "011" and BSRAM_MASK(10) = '1' then
+						BSRAM_SEL <= '1';
 					else
-						DSP_SEL <= '0';
+						BSRAM_SEL <= '0';
 					end if;
-					DSP_A0 <= CA(0);
-				end if;
-			when "001" =>							-- HiROM
-				CART_ADDR <= "0" & CA(21 downto 0);
-				BRAM_ADDR <= "00" & CA(20 downto 16) & CA(12 downto 0);
-				if CA(22 downto 21) = "01" and CA(15 downto 13) = "011" and BSRAM_MASK(10) = '1' then
-					BSRAM_SEL <= '1';
-				else
-					BSRAM_SEL <= '0';
-				end if;
-				if CA(22 downto 21) = "00" and CA(15 downto 13) = "011" then	--00-1F/80-9f:6000-7FFF
-					DSP_SEL <= MAP_CTRL(7);
-				else
 					DSP_SEL <= '0';
-				end if;
-				DSP_A0 <= CA(12);
-			when "101"|"010" =>					-- ExHiROM
-				CART_ADDR <= (not CA(23)) & CA(21 downto 0);
-				BRAM_ADDR <= CA(19 downto 0);
-				if CA(22 downto 21) = "01" and CA(15 downto 13) = "011" and BSRAM_MASK(10) = '1' then
-					BSRAM_SEL <= '1';
-				else
+					DSP_A0 <= '1';
+				when others =>
+					CART_ADDR <= "0" & (not CA(23) and not MAP_CTRL(7)) & CA(21 downto 0);
+					BRAM_ADDR <= CA(19 downto 0);
 					BSRAM_SEL <= '0';
-				end if;
-				DSP_SEL <= '0';
-				DSP_A0 <= '1';
-			when others =>
-				CART_ADDR <= (not CA(23) and not MAP_CTRL(7)) & CA(21 downto 0);
-				BRAM_ADDR <= CA(19 downto 0);
+					DSP_SEL <= '0';
+					DSP_A0 <= '1';
+			end case;
+		else												--96Mbit 
+			if CA(15) = '0' then
+				CART_ADDR <= "10" & CA(23) & CA(21 downto 16) & CA(14 downto 0);
+			else
+				CART_ADDR <= "0" & CA(23 downto 16) & CA(14 downto 0);
+			end if;
+			BRAM_ADDR <= "00" & CA(20 downto 16) & CA(12 downto 0);
+			if CA(22 downto 21) = "01" and CA(15 downto 13) = "011" and BSRAM_MASK(10) = '1' then
+				BSRAM_SEL <= '1';
+			else
 				BSRAM_SEL <= '0';
-				DSP_SEL <= '0';
-				DSP_A0 <= '1';
-		end case;
+			end if;
+			DSP_SEL <= '0';
+			DSP_A0 <= '1';
+		end if;
 	end process;
 	
 	MAP_SEL <= not MAP_CTRL(6) and (MAP_CTRL(7) or not (MAP_CTRL(5) or MAP_CTRL(4)));
@@ -187,7 +203,7 @@ begin
 	
 	ROM_RD <= (SYSCLKF_CE or SYSCLKR_CE) when rising_edge(MCLK);
 
-	ROM_ADDR <= CART_ADDR(22 downto 0) and ROM_MASK(22 downto 0);
+	ROM_ADDR <= CART_ADDR and ROM_MASK;
 	ROM_CE_N <= ROMSEL_N;
 	ROM_OE_N <= not ROM_RD;
 	ROM_WORD	<= '0';

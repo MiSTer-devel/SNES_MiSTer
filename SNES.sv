@@ -402,7 +402,7 @@ main main
 
 ////////////////////////////  MEMORY  ///////////////////////////////////
 
-wire[22:0] ROM_ADDR;
+wire[23:0] ROM_ADDR;
 wire       ROM_CE_N;
 wire       ROM_OE_N;
 wire       ROM_WORD;

@@ -414,7 +414,6 @@ sdram sdram
 	.init(~clock_locked),
 	.clk(clk_mem),
 	
-	.refresh(0),
 	.addr(ioctl_download ? ioctl_addr-10'd512 : ROM_ADDR),
 	.din(ioctl_dout),
 	.dout(ROM_Q),
@@ -490,7 +489,7 @@ dpram #(16) aram
 	.wren_b(ioctl_wr)
 );
 
-localparam  BSRAM_BITS = 16; // 512Kbits is largest known size in official carts
+localparam  BSRAM_BITS = 17; // 1Mbits
 wire [19:0] BSRAM_ADDR;
 wire        BSRAM_CE_N;
 wire        BSRAM_WE_N;

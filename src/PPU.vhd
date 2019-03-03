@@ -1252,15 +1252,15 @@ begin
 				BG_DATA <= (others => (others => '0'));
 				BG3_OPT_DATA0 <= (others => '0');
 				BG3_OPT_DATA1 <= (others => '0');
-								
+			end if;
+			
+			if H_CNT = 339 and V_CNT >= 1 and V_CNT <= LAST_VIS_LINE then			
 				if BG_MOSAIC_Y = unsigned(MOSAIC_SIZE) then
 					BG_MOSAIC_Y <= (others => '0');
 				else
 					BG_MOSAIC_Y <= BG_MOSAIC_Y + 1;
 				end if;
-			end if;
-			
-			if H_CNT = 339 and V_CNT = 261 then
+			elsif H_CNT = 339 and V_CNT = 261 then
 				BG_MOSAIC_Y <= (others => '0');
 			end if;
 			

@@ -16,7 +16,7 @@ module main
    input      [23:0] ROM_MASK,
    input      [23:0] RAM_MASK,
 
-   output reg [22:0] ROM_ADDR,
+   output reg [23:0] ROM_ADDR,
    input      [15:0] ROM_Q,
    output reg        ROM_CE_N,
    output reg        ROM_OE_N,
@@ -179,7 +179,7 @@ SNES SNES
 `ifdef USE_DLH
 wire  [7:0] DLH_DO;
 wire        DLH_IRQ_N;
-wire [22:0] DLH_ROM_ADDR;
+wire [23:0] DLH_ROM_ADDR;
 wire        DLH_ROM_CE_N;
 wire        DLH_ROM_OE_N;
 wire        DLH_ROM_WORD;
@@ -482,7 +482,7 @@ always @(*) begin
 		begin
 			DI         = CX4_DO;
 			IRQ_N      = CX4_IRQ_N;
-			ROM_ADDR   = CX4_ROM_ADDR;
+			ROM_ADDR   = {1'b0,CX4_ROM_ADDR};
 			ROM_CE_N   = CX4_ROM_CE_N;
 			ROM_OE_N   = CX4_ROM_OE_N;
 			BSRAM_ADDR = CX4_BSRAM_ADDR;
@@ -498,7 +498,7 @@ always @(*) begin
 		begin
 			DI         = SDD_DO;
 			IRQ_N      = SDD_IRQ_N;
-			ROM_ADDR   = SDD_ROM_ADDR;
+			ROM_ADDR   = {1'b0,SDD_ROM_ADDR};
 			ROM_CE_N   = SDD_ROM_CE_N;
 			ROM_OE_N   = SDD_ROM_OE_N;
 			BSRAM_ADDR = SDD_BSRAM_ADDR;
@@ -514,7 +514,7 @@ always @(*) begin
 		begin
 			DI         = GSU_DO;
 			IRQ_N      = GSU_IRQ_N;
-			ROM_ADDR   = GSU_ROM_ADDR;
+			ROM_ADDR   = {1'b0,GSU_ROM_ADDR};
 			ROM_CE_N   = GSU_ROM_CE_N;
 			ROM_OE_N   = GSU_ROM_OE_N;
 			BSRAM_ADDR = GSU_BSRAM_ADDR;
@@ -530,7 +530,7 @@ always @(*) begin
 		begin
 			DI         = SA1_DO;
 			IRQ_N      = SA1_IRQ_N;
-			ROM_ADDR   = SA1_ROM_ADDR;
+			ROM_ADDR   = {1'b0,SA1_ROM_ADDR};
 			ROM_CE_N   = SA1_ROM_CE_N;
 			ROM_OE_N   = SA1_ROM_OE_N;
 			BSRAM_ADDR = SA1_BSRAM_ADDR;

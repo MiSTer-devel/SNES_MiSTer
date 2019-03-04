@@ -498,9 +498,9 @@ dpram_dif #(BSRAM_BITS,8,BSRAM_BITS-1,16) bsram
 (
 	.clock(clk_sys),
 
-	//Clear BSRAM upon ROM loading
+	//Thrash the BSRAM upon ROM loading
 	.address_a(ioctl_download ? ioctl_addr[BSRAM_BITS-1:0] : BSRAM_ADDR[BSRAM_BITS-1:0]),
-	.data_a(ioctl_download ? 8'h00 : BSRAM_D),
+	.data_a(ioctl_download ? ioctl_addr[7:0] : BSRAM_D),
 	.wren_a(ioctl_download ? ioctl_wr : ~BSRAM_CE_N & ~BSRAM_WE_N),
 	.q_a(BSRAM_Q),
 
@@ -625,7 +625,7 @@ always @(posedge clk_sys) begin
 	if(~old_downloading & ioctl_download) bk_ena <= 0;
 	
 	//Save file always mounted in the end of downloading state.
-	if(ioctl_download && img_mounted && img_size && !img_readonly) bk_ena <= |ram_mask;
+	if(ioctl_download && img_mounted && !img_readonly) bk_ena <= |ram_mask;
 end
 
 wire bk_load    = status[12];
@@ -650,7 +650,7 @@ always @(posedge clk_sys) begin
 			sd_rd <=  bk_load;
 			sd_wr <= ~bk_load;
 		end
-		if(old_downloading & ~ioctl_download & bk_ena) begin
+		if(old_downloading & ~ioctl_download & |img_size & bk_ena) begin
 			bk_state <= 1;
 			bk_loading <= 1;
 			sd_lba <= 0;

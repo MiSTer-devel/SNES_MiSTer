@@ -91,7 +91,6 @@ architecture rtl of GSU is
 	signal ROM_FETCH_EN, RAM_FETCH_EN, CACHE_FETCH_EN : std_logic;
 	signal ROM_CACHE_EN, RAM_CACHE_EN, ROM_LOAD_EN, RAM_LOAD_EN : std_logic;
 	signal ROM_ACCESS_CNT, RAM_ACCESS_CNT : unsigned(2 downto 0);
-	signal MEM_CYCLES : unsigned(2 downto 0);
 	signal ROM_NEED_WAIT, RAM_NEED_WAIT : std_logic;
 	signal CODE_IN_ROM, CODE_IN_RAM : std_logic;
 	signal RAM_BYTES, RAM_WORD, RAM_RW : std_logic;	
@@ -395,7 +394,7 @@ begin
 	EN <= ENABLE and FLAG_GO and (CLK_CE or CLS);
 	
 	OP_CYCLES <= "000" when TURBO = '1' else
-					 not (MS0 and not CLS) & "11" when OP.OP = OP_FMULT or OP.OP = OP_LMULT else
+					 not (MS0 and not CLS) & "10" when OP.OP = OP_FMULT or OP.OP = OP_LMULT else
 					 "00" & not (MS0 and not CLS) when OP.OP = OP_MULT or OP.OP = OP_UMULT else
 					 "000";
 	
@@ -532,21 +531,26 @@ begin
 	
 	
 	--Memory buses
-	MEM_CYCLES <= "011" when TURBO = '1' else 
-					  "010" when CLS = '0' else 
-					  "100";
-	
 	R14_CHANGE <= '1' when MC.DREG(1) = '1' and DST_REG = 14 else '0';
 	
 	process(CLK, RST_N)
+	variable ROM_CYCLES : unsigned(2 downto 0);
 	begin
 		if RST_N = '0' then
 			ROMDR <= (others => '0');
-			ROM_ACCESS_CNT <= "101";
+			ROM_ACCESS_CNT <= "010";
 			ROMST <= ROMST_IDLE;
 			FLAG_R <= '0';
 		elsif rising_edge(CLK) then
 			if EN = '1' then
+				if TURBO = '1' then
+					ROM_CYCLES := "011";
+				elsif CLS = '0' then
+					ROM_CYCLES := "010";
+				else 
+					ROM_CYCLES := "100";
+				end if;
+				
 				case ROMST is
 					when ROMST_IDLE =>
 					
@@ -588,14 +592,10 @@ begin
 				if ROMST /= ROMST_IDLE and RON = '1' then
 					ROM_ACCESS_CNT <= ROM_ACCESS_CNT - 1;
 					if ROM_ACCESS_CNT = 0 then
-						if MC.STATE = "10" and RAM_LOAD_EN = '1' then
-							ROM_ACCESS_CNT <= "000";
-						else
-							ROM_ACCESS_CNT <= MEM_CYCLES;
-						end if;
+						ROM_ACCESS_CNT <= ROM_CYCLES;
 					end if;
 				else
-					ROM_ACCESS_CNT <= MEM_CYCLES;
+					ROM_ACCESS_CNT <= ROM_CYCLES;
 				end if;
 			end if;
 		end if;
@@ -624,6 +624,7 @@ begin
 	end process;
 	
 	process(CLK, RST_N)
+		variable RAM_CYCLES : unsigned(2 downto 0);
 	begin
 		if RST_N = '0' then
 			RAMADDR <= (others => '0');
@@ -631,11 +632,19 @@ begin
 			RAM_LOAD_DATA <= (others => '0');
 			RAM_WORD <= '0';
 			RAM_BYTES <= '0';
-			RAM_ACCESS_CNT <= "101";
+			RAM_ACCESS_CNT <= "001";
 			RAMST <= RAMST_IDLE;
 			PCF_RW <= '0';
 		elsif rising_edge(CLK) then
 			if EN = '1' then
+				if TURBO = '1' then
+					RAM_CYCLES := "011";
+				elsif CLS = '0' then
+					RAM_CYCLES := "001";
+				else 
+					RAM_CYCLES := "100";
+				end if;
+				
 				if CPU_EN = '1' then
 					if MC.RAMADDR = "001" then
 						RAMADDR(7 downto 0) <= OPDATA;
@@ -749,10 +758,10 @@ begin
 				if RAMST /= RAMST_IDLE and RAN = '1' then
 					RAM_ACCESS_CNT <= RAM_ACCESS_CNT - 1;
 					if RAM_ACCESS_CNT = 0 then
-						RAM_ACCESS_CNT <= MEM_CYCLES;
+						RAM_ACCESS_CNT <= RAM_CYCLES;
 					end if;
 				else
-					RAM_ACCESS_CNT <= MEM_CYCLES;
+					RAM_ACCESS_CNT <= RAM_CYCLES;
 				end if;
 			end if;
 		end if;

@@ -501,7 +501,7 @@ begin
 					NMI <= '0';
 				end if;
 				
-				if NMI_FLAG = '1' and NMI = '0' and DMA_ACTIVE = '0' and NMI_EN = '1' then
+				if NMI_FLAG = '1' and NMI = '0' and NMI_EN = '1' then
 					NMI <= '1';
 				end if;
 

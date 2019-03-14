@@ -1263,13 +1263,15 @@ begin
 	DATA_RAM_ADDR_B <= ADDR(11 downto 0) when ENABLE = '1' else DBG_RAM_ADDR;
 	DATA_RAM_DI_B <= DI;
 	DATA_RAM_WE_B <= '1' when ENABLE = '1' and RAMIO_WR = '1' and CPU_RUN = '0' else '0';
-	DATA_RAM : entity work.dpram generic map(12, 8)
+	DATA_RAM : entity work.dpram_difclk generic map(12, 8, 12, 8)
 	port map(
-		clock			=> not CLK,
+		clock0		=> not CLK,
 		address_a	=> DATA_RAM_ADDR_A,
 		data_a		=> DATA_RAM_DI_A,
 		wren_a		=> DATA_RAM_WE_A,
 		q_a			=> DATA_RAM_Q_A,
+		
+		clock1		=> CLK,
 		address_b	=> DATA_RAM_ADDR_B,
 		data_b		=> DATA_RAM_DI_B,
 		wren_b		=> DATA_RAM_WE_B,

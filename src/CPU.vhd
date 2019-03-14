@@ -243,7 +243,7 @@ begin
 			DOT_CLK_CE <= '0';
 			CPU_ACTIVEr <= '1';
 			DMA_ACTIVEr <= '0';
-		elsif rising_edge(CLK) then
+		elsif falling_edge(CLK) then
 			if REFRESHED = '1' and CPU_ACTIVEr = '1' then
 				CPU_CYCLES := x"8";
 			elsif SPEED = FAST or (SPEED = SLOWFAST and MEMSEL = '1') then
@@ -286,9 +286,9 @@ begin
 					INT_CLK <= '0';
 				end if;
 				
-				if DMA_CLK_CNT = 4-1-1 then
+				if DMA_CLK_CNT = 4-1 then
 					INT_CLKR_CE <= '1';
-				elsif DMA_CLK_CNT = 8-1-1 then
+				elsif DMA_CLK_CNT = 8-1 then
 					INT_CLKF_CE <= '1';
 				end if;
 			elsif CPU_ACTIVEr = '1' then
@@ -298,9 +298,9 @@ begin
 					INT_CLK <= '0';
 				end if;
 				
-				if P65_CLK_CNT = 3-1-1 then
+				if P65_CLK_CNT = 3-1 then
 					INT_CLKR_CE <= '1';
-				elsif P65_CLK_CNT = CPU_CYCLES-1-1  then
+				elsif P65_CLK_CNT = CPU_CYCLES-1  then
 					INT_CLKF_CE <= '1';
 				end if;
 			end if;

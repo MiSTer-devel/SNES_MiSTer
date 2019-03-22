@@ -8,6 +8,8 @@ entity P65C816 is
     port( 
         CLK			: in std_logic;
 		  RST_N		: in std_logic;
+		  CE			: in std_logic;
+		  
 		  RDY_IN		: in std_logic;
         NMI_N		: in std_logic;  
 		  IRQ_N		: in std_logic; 
@@ -51,9 +53,9 @@ architecture rtl of P65C816 is
 	signal w16 : std_logic;
 	signal DLNoZero : std_logic;
 	signal WAIExec, STPExec : std_logic;
-	signal nmi_active, irq_active, last_nmi_active : std_logic;
-	signal lastNMI, turn_nmi_on, turn_nmi_off, nmi_remembered : std_logic;
-	signal NMI_Nn : std_logic;
+	signal NMI_SYNC, IRQ_SYNC : std_logic;
+	signal NMI_ACTIVE, IRQ_ACTIVE : std_logic;
+	signal OLD_NMI_N : std_logic;
 	signal ADDR_BUS : std_logic_vector(23 downto 0);
 	
 	-- ALU 
@@ -77,7 +79,7 @@ architecture rtl of P65C816 is
 	signal JSR_FOUND : std_logic;
 	
 begin
-	EN <= RDY_IN and not WAIExec and not STPExec;
+	EN <= RDY_IN and CE and not WAIExec and not STPExec;
 	
 	IsBranchCycle1 <= '1' when IR(4 downto 0) = "10000" and STATE = "0001" else '0';
 	process(IR, P)
@@ -368,7 +370,7 @@ begin
 							IR = x"EB" or IR = x"AB" then
 							P(1 downto 0) <= ZO & CO; P(7 downto 6) <= SO & VO; -- ALU
 						end if;
-					when "010" => P(2) <= '1'; P(3) <= '0';		-- BRK
+					when "010" => P(2) <= '1'; P(3) <= '0';		-- BRK/COP
 					when "011" => P(7 downto 6) <= D_IN(7 downto 6); P(5) <= D_IN(5) or EF; P(4) <= D_IN(4) or EF; P(3 downto 0) <= D_IN(3 downto 0); -- RTI/PLP
 					when "100" => 
 						case IR(7 downto 6) is
@@ -444,17 +446,15 @@ begin
 	end process;
 	
 	--Data bus
-	D_OUT <= AluR(15 downto 8) when MC.OUT_BUS = "001" and MC.BYTE_SEL(1) = '1' else
-				AluR(7 downto 0) when MC.OUT_BUS = "001" and MC.BYTE_SEL(1) = '0' else
+	D_OUT <= P(7) & P(6) & (P(5) or EF) & (P(4) or (not (GotInterrupt) and EF)) & P(3 downto 0) when MC.OUT_BUS = "001" else
 				PC(15 downto 8) when MC.OUT_BUS = "010" and MC.BYTE_SEL(1) = '1' else
 				PC(7 downto 0) when MC.OUT_BUS = "010" and MC.BYTE_SEL(1) = '0' else
 				AA(15 downto 8) when MC.OUT_BUS = "011" and MC.BYTE_SEL(1) = '1' else
 				AA(7 downto 0) when MC.OUT_BUS = "011" and MC.BYTE_SEL(1) = '0' else
-				P(7) & P(6) & (P(5) or EF) & (P(4) or (not (GotInterrupt) and EF)) & P(3 downto 0) when MC.OUT_BUS = "100" else
+				PBR when MC.OUT_BUS = "100" else
 				SB(15 downto 8) when MC.OUT_BUS = "101" and MC.BYTE_SEL(1) = '1' else
 				SB(7 downto 0) when MC.OUT_BUS = "101" and MC.BYTE_SEL(1) = '0' else
-				DR when MC.OUT_BUS = "110" and MC.BYTE_SEL(1) = '1' else
-				PBR when MC.OUT_BUS = "110" and MC.BYTE_SEL(1) = '0' else
+				DR when MC.OUT_BUS = "110" else
 				x"00";
 		
 	process(MC, IsResetInterrupt)
@@ -470,43 +470,47 @@ begin
 	process(CLK, RST_N)
 	begin
 		if RST_N = '0' then
+			OLD_NMI_N <= '1';
+			NMI_SYNC <= '0';
+			IRQ_SYNC <= '0';
+		elsif rising_edge(CLK) then
+			if CE = '1' and IsResetInterrupt = '0' then
+				OLD_NMI_N <= NMI_N;
+				if NMI_N = '0' and OLD_NMI_N = '1' and NMI_SYNC = '0' then
+					NMI_SYNC <= '1';
+				elsif NMI_ACTIVE = '1' and LAST_CYCLE = '1' then
+					NMI_SYNC <= '0';
+				end if;
+				IRQ_SYNC <= not IRQ_N;
+			end if;
+		end if;
+	end process; 
+	
+	process(CLK, RST_N)
+	begin
+		if RST_N = '0' then
 			IsResetInterrupt <= '1';
 			IsNMIInterrupt <= '0';
 			IsIRQInterrupt <= '0';
 			GotInterrupt <= '1';
-			lastNMI <= '0';
-			nmi_active <= '0';
-			irq_active <= '0';
+			NMI_ACTIVE <= '0';
+			IRQ_ACTIVE <= '0';
 		elsif rising_edge(CLK) then
-			if IsResetInterrupt = '0' then
-				lastNMI <= not NMI_N;
-				if NMI_N = '0' and LastNMI = '0' then
-					nmi_active <= '1';
-				elsif nmi_active = '1' and LAST_CYCLE = '1' and EN = '1' then-- and IR = x"00"
-					nmi_active <= '0';
-				end if;
-				
-				irq_active <= not IRQ_N and not P(2);
-			end if;
-			
-			
 			if EN = '1' then
+				NMI_ACTIVE <= NMI_SYNC;
+				IRQ_ACTIVE <= IRQ_SYNC and not P(2);
+				
 				if LAST_CYCLE = '1' then
-					if GotInterrupt = '0' and (irq_active = '1' or nmi_active = '1') then
-						GotInterrupt <= '1';
+					if GotInterrupt = '0' then
+						GotInterrupt <= IRQ_ACTIVE or NMI_ACTIVE;
+						NMI_ACTIVE <= '0';
 					else
 						GotInterrupt <= '0';
 					end if;
 					
 					IsResetInterrupt <= '0';
-					
-					if IsNMIInterrupt = '0' and nmi_active = '1' then
-						IsNMIInterrupt <= '1';
-					elsif IsNMIInterrupt = '1' and IR = x"00" then
-						IsNMIInterrupt <= '0';
-					end if;
-
-					IsIRQInterrupt <= irq_active;
+					IsNMIInterrupt <= NMI_ACTIVE;
+					IsIRQInterrupt <= IRQ_ACTIVE;
 				end if;
 			end if;
 		end if;
@@ -520,9 +524,8 @@ begin
 		if RST_N = '0' then
 			WAIExec <= '0';
 			STPExec <= '0';
-			NMI_Nn <= '1';
 		elsif rising_edge(CLK) then
-			if EN = '1' and IsResetInterrupt = '0' then
+			if EN = '1' and GotInterrupt = '0' then
 				if STATE = "0000" then 
 					if D_IN = x"CB" then			-- WAI
 						WAIExec <= '1';
@@ -532,9 +535,10 @@ begin
 				end if;
 			end if;
 			
-			NMI_Nn <= NMI_N;
-			if ( IRQ_N = '0' or ABORT_N = '0' or (NMI_Nn = '1' and NMI_N = '0') ) and WAIExec = '1' then
-				WAIExec <= '0';
+			if CE = '1' then
+				if ( NMI_SYNC = '1' or IRQ_SYNC = '1' or ABORT_N = '0' ) and WAIExec = '1' then
+					WAIExec <= '0';
+				end if;
 			end if;
 		end if;
 	end process; 
@@ -630,7 +634,7 @@ begin
 			JSR_RET_ADDR <= (others=>'0');
 			JSR_FOUND <= '0';
 		elsif rising_edge(CLK) then
-			if RDY_IN = '1' then
+			if CE = '1' and RDY_IN = '1' then
 				if NextIR = x"20" or NextIR = x"22" or NextIR = x"FC" then
 					JSRS := '1';
 				else

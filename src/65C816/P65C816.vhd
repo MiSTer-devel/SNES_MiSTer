@@ -589,8 +589,9 @@ begin
 	
 	A_OUT <= ADDR_BUS;
 
-	process(MC, IR)
+	process(MC, IR, LAST_CYCLE, IRQ_ACTIVE, NMI_ACTIVE)
 		variable rmw : std_logic;
+		variable twoCls : std_logic;
 	begin
 		 if IR = x"06" or IR = x"0E" or IR = x"16" or IR = x"1E" or 
 			 IR = x"C6" or IR = x"CE" or IR = x"D6" or IR = x"DE" or 
@@ -615,10 +616,15 @@ begin
 		else
 			MLB <= '1';
 		end if;
+		
+		if LAST_CYCLE = '1' and MC.STATE_CTRL = "010" and MC.VA = "00" then
+			twoCls := '1';
+		else
+			twoCls := '0';
+		end if;
+		VDA <= MC.VA(1);
+		VPA <= MC.VA(0) or (twoCls and (IRQ_ACTIVE or NMI_ACTIVE));
 	end process;
-	
-	VDA <= MC.VA(1);
-	VPA <= MC.VA(0);
 	
 	RDY_OUT <= EN;
 	

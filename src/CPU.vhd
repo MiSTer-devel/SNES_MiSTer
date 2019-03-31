@@ -115,7 +115,7 @@ architecture rtl of SCPU is
 	signal REFRESHED : std_logic;
 	signal MATH_CLK_CNT	: unsigned(3 downto 0);
 	signal MATH_TEMP	: std_logic_vector(22 downto 0);
-	signal VBLANK_OLD, VBLANK_OLD2 : std_logic;
+	signal HBLANK_OLD, VBLANK_OLD, VBLANK_OLD2 : std_logic;
 	signal IRQ_FLAG_OLD, HIRQ_FLAG, VIRQ_VALID_OLD : std_logic;
 
 	-- DMA registers
@@ -784,7 +784,6 @@ begin
 	DO <= MDR;
 
 
-	-- H/V Counters
 	process( RST_N, CLK )
 	begin
 		if RST_N = '0' then
@@ -792,22 +791,25 @@ begin
 			V_CNT <= (others => '0');
 			FIELD <= '0';
 			FRAME_CNT <= (others => '0');
+			HBLANK_OLD <= '0';
 			VBLANK_OLD <= '0';
 		elsif rising_edge(CLK) then
-			if ENABLE = '1' and DOT_CLK_CE = '1' then
+			if ENABLE = '1' then
+				HBLANK_OLD <= HBLANK;
 				VBLANK_OLD <= VBLANK;
-				if H_CNT = 340 or (VBLANK = '0' and VBLANK_OLD = '1') then
+				if HBLANK = '0' and HBLANK_OLD = '1' then
 					H_CNT <= (others => '0');
-					if VBLANK = '0' and VBLANK_OLD = '1' then
-						V_CNT <= (others => '0');
-						H_CNT <= (others => '0');
-						FIELD <= not FIELD;
-						FRAME_CNT <= FRAME_CNT + 1;
-					else
-						V_CNT <= V_CNT + 1;	
-					end if;
-				else
+					V_CNT <= V_CNT + 1;	
+				elsif VBLANK = '0' and VBLANK_OLD = '1' then
+					H_CNT <= (others => '0');
+				elsif DOT_CLK_CE = '1' then
 					H_CNT <= H_CNT + 1;
+				end if;
+				
+				if VBLANK = '0' and VBLANK_OLD = '1' then
+					V_CNT <= (others => '0');
+					FIELD <= not FIELD;
+					FRAME_CNT <= FRAME_CNT + 1;
 				end if;
 			end if;
 		end if;
@@ -819,10 +821,10 @@ begin
 		if RST_N = '0' then
 			REFRESHED <= '0';
 		elsif rising_edge(CLK) then
-			if ENABLE = '1' and INT_CLKF_CE = '1' then
-				if REFRESHED = '0' and H_CNT >= 132 and H_CNT < 132 + 10 then
+			if ENABLE = '1' and (INT_CLKF_CE = '1' or INT_CLKR_CE = '1') then
+				if REFRESHED = '0' and H_CNT >= 134 and H_CNT < 134 + 10 then
 					REFRESHED <= '1';
-				elsif REFRESHED = '1' and H_CNT >= 132 + 10 then
+				elsif REFRESHED = '1' and H_CNT >= 134 + 10 then
 					REFRESHED <= '0';
 				end if;
 			end if;
@@ -960,14 +962,14 @@ begin
 							HDMA_INIT_EXEC <= '0';
 						end if;
 						
-						if H_CNT >= 275 and VBLANK = '0' and HDMA_RUN_EXEC = '0' then
+						if H_CNT >= 276 and VBLANK = '0' and HDMA_RUN_EXEC = '0' then
 							if (HDMA_CH_RUN and HDMAEN) /= x"00" then
 								HDMA_RUN <= '1';
 								HDS <= HDS_PRE_TRANSFER;
 								DBG_HDMA_CNT <= (others => '0'); 
 							end if;
 							HDMA_RUN_EXEC <= '1';
-						elsif H_CNT < 275 and VBLANK = '0' and HDMA_RUN_EXEC = '1' then
+						elsif H_CNT < 276 and VBLANK = '0' and HDMA_RUN_EXEC = '1' then
 							HDMA_RUN_EXEC <= '0';
 						end if;
 

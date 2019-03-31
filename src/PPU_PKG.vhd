@@ -56,18 +56,33 @@ package PPU_PKG is
 	type BgTileInfo_t is array(0 to 3) of std_logic_vector(15 downto 0);
 	type BgTileAtr_t is array(0 to 3) of std_logic_vector(3 downto 0);
 	
-	type Sprite_r is record
-		X		: unsigned(8 downto 0);
-		Y		: unsigned(7 downto 0);
-		TILE	: unsigned(7 downto 0);
-		N		: std_logic;
-		PAL	: std_logic_vector(2 downto 0);
-		PRIO	: std_logic_vector(1 downto 0);
-		HFLIP	: std_logic;
-		VFLIP	: std_logic;
-		S		: std_logic;
+	type BgPlanes_t is array(0 to 11) of std_logic_vector(7 downto 0);
+	type BgTileInfo_r is record
+		PLANES 	: BgPlanes_t;
+		ATR 		: BgTileAtr_t;
 	end record;
-	type RangeOamIndex_t is array(0 to 31) of std_logic_vector(6 downto 0);
+	type BgTileInfos_t is array(0 to 1) of BgTileInfo_r;
+
+
+	constant BG_FETCH_START		: unsigned(8 downto 0) := "000000000"; 	--0 
+	constant BG_FETCH_END		: unsigned(8 downto 0) := "100001111"; 	--(256+16)-1=271
+	constant SPR_GET_PIX_START	: unsigned(8 downto 0) := "000010000"; 	--16 
+	constant SPR_GET_PIX_END	: unsigned(8 downto 0) := "100001111"; 	--(16+256)-1=271
+	constant BG_GET_PIX_START	: unsigned(8 downto 0) := "000010001"; 	--17
+	constant BG_GET_PIX_END		: unsigned(8 downto 0) := "100010000"; 	--(17+256)-1=272
+	constant BG_MATH_START		: unsigned(8 downto 0) := "000010010"; 	--18
+	constant BG_MATH_END			: unsigned(8 downto 0) := "100010001"; 	--(18+256)-1=273
+	constant BG_OUT_START		: unsigned(8 downto 0) := "000010011"; 	--19
+	constant BG_OUT_END			: unsigned(8 downto 0) := "100010010"; 	--(19+256)-1=274
+	
+	constant OBJ_RANGE_START	: unsigned(8 downto 0) := "000000000"; 	--0 
+	constant OBJ_RANGE_END		: unsigned(8 downto 0) := "011111111"; 	--256-1=255
+	constant OBJ_TIME_START		: unsigned(8 downto 0) := "100001110"; 	--(16+256)-2=270 
+	constant OBJ_TIME_END		: unsigned(8 downto 0) := "101010001"; 	--(16+256+68)-2-1=337 
+	constant OBJ_FETCH_START	: unsigned(8 downto 0) := "100010000"; 	--(16+256)=272
+	constant OBJ_FETCH_END		: unsigned(8 downto 0) := "101010011"; 	--(16+256+68)-1=339
+	
+	type RangeOam_t is array(0 to 31) of std_logic_vector(6 downto 0);
 	
 	type SprSize_t is array(0 to 15) of unsigned(7 downto 0);
 	constant SPR_WIDTH: SprSize_t := (

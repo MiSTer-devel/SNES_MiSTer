@@ -65,200 +65,232 @@ end SPPU;
 
 architecture rtl of SPPU is
 
-signal DOT_CLK : std_logic := '0';
-signal DOT_CLKR_CE : std_logic;
-signal CLK_CNT : unsigned(2 downto 0) := (others => '0');
-signal MDR1, MDR2	: std_logic_vector(7 downto 0);
-signal D_OUT : std_logic_vector(7 downto 0);
+signal DOT_CLK 			: std_logic;
+signal DOT_CLKR_CE 		: std_logic;
+signal DOT_CLKF_CE 		: std_logic;
+signal CLK_CNT 			: unsigned(2 downto 0);
+signal MDR1					: std_logic_vector(7 downto 0);
+signal MDR2					: std_logic_vector(7 downto 0);
+signal D_OUT 				: std_logic_vector(7 downto 0);
 
 -- Registers
-signal FORCE_BLANK : std_logic;
-signal MB : std_logic_vector(3 downto 0);
-signal OBJADDR : std_logic_vector(2 downto 0);
-signal OBJNAME : std_logic_vector(1 downto 0);
-signal OBJSIZE : std_logic_vector(2 downto 0);
-signal OAMADD : std_logic_vector(8 downto 0);
-signal OAM_PRIO : std_logic;
-signal OAM_PRIO_INDEX : std_logic_vector(6 downto 0);
-signal OBJ_TIME_INDEX : std_logic_vector(6 downto 0);
-signal TM : std_logic_vector(7 downto 0);
-signal TS : std_logic_vector(7 downto 0);
-signal BGINTERLACE : std_logic;
-signal OBJINTERLACE : std_logic;
-signal OVERSCAN : std_logic;
-signal PSEUDOHIRES : std_logic;
-signal M7EXTBG	: std_logic;
-signal BG_MODE	: std_logic_vector(2 downto 0);
-signal BG3PRIO	: std_logic;
-signal BG_SIZE	: std_logic_vector(3 downto 0);
-signal BG_MOSAIC_EN : std_logic_vector(3 downto 0);
-signal MOSAIC_SIZE : std_logic_vector(3 downto 0);
-signal BG_SC_ADDR	: BgScAddr_t;
-signal BG_SC_SIZE	: BgScSize_t;
-signal BG_NBA : BgTileAddr_t;
-signal CGADD : std_logic_vector(8 downto 0);
-signal VMAIN_ADDRINC : std_logic;
-signal VMAIN_ADDRTRANS : std_logic_vector(1 downto 0);
-signal VMADD : std_logic_vector(15 downto 0);
+signal FORCE_BLANK 		: std_logic;
+signal MB 					: std_logic_vector(3 downto 0);
+signal OBJADDR 			: std_logic_vector(2 downto 0);
+signal OBJNAME 			: std_logic_vector(1 downto 0);
+signal OBJSIZE 			: std_logic_vector(2 downto 0);
+signal OAMADD 				: std_logic_vector(8 downto 0);
+signal OAM_PRIO 			: std_logic;
+signal TM 					: std_logic_vector(7 downto 0);
+signal TS 					: std_logic_vector(7 downto 0);
+signal BGINTERLACE 		: std_logic;
+signal OBJINTERLACE 		: std_logic;
+signal OVERSCAN 			: std_logic;
+signal PSEUDOHIRES 		: std_logic;
+signal M7EXTBG				: std_logic;
+signal BG_MODE				: std_logic_vector(2 downto 0);
+signal BG3PRIO				: std_logic;
+signal BG_SIZE				: std_logic_vector(3 downto 0);
+signal BG_MOSAIC_EN		: std_logic_vector(3 downto 0);
+signal MOSAIC_SIZE 		: std_logic_vector(3 downto 0);
+signal BG_SC_ADDR			: BgScAddr_t;
+signal BG_SC_SIZE			: BgScSize_t;
+signal BG_NBA 				: BgTileAddr_t;
+signal CGADD 				: std_logic_vector(8 downto 0);
+signal VMAIN_ADDRINC 	: std_logic;
+signal VMAIN_ADDRTRANS 	: std_logic_vector(1 downto 0);
+signal VMADD 				: std_logic_vector(15 downto 0);
 
-signal BG_HOFS: BgScroll_t;
-signal BG_VOFS: BgScroll_t;
+signal BG_HOFS				: BgScroll_t;
+signal BG_VOFS				: BgScroll_t;
 
-signal M7SEL: std_logic_vector(7 downto 0);
-signal M7A: std_logic_vector(15 downto 0);
-signal M7B: std_logic_vector(15 downto 0);
-signal M7C: std_logic_vector(15 downto 0);
-signal M7D: std_logic_vector(15 downto 0);
-signal M7HOFS: std_logic_vector(12 downto 0);
-signal M7VOFS: std_logic_vector(12 downto 0);
-signal M7X: std_logic_vector(12 downto 0);
-signal M7Y: std_logic_vector(12 downto 0);
+signal M7SEL				: std_logic_vector(7 downto 0);
+signal M7A					: std_logic_vector(15 downto 0);
+signal M7B					: std_logic_vector(15 downto 0);
+signal M7C					: std_logic_vector(15 downto 0);
+signal M7D					: std_logic_vector(15 downto 0);
+signal M7HOFS				: std_logic_vector(12 downto 0);
+signal M7VOFS				: std_logic_vector(12 downto 0);
+signal M7X					: std_logic_vector(12 downto 0);
+signal M7Y					: std_logic_vector(12 downto 0);
 
-signal WH0 : std_logic_vector(7 downto 0);
-signal WH1 : std_logic_vector(7 downto 0);
-signal WH2 : std_logic_vector(7 downto 0);
-signal WH3 : std_logic_vector(7 downto 0);
-signal W12SEL : std_logic_vector(7 downto 0);
-signal W34SEL : std_logic_vector(7 downto 0);
-signal WOBJSEL : std_logic_vector(7 downto 0);
-signal WBGLOG : std_logic_vector(7 downto 0);
-signal WOBJLOG : std_logic_vector(7 downto 0);
-signal TMW : std_logic_vector(7 downto 0);
-signal TSW : std_logic_vector(7 downto 0);
-signal CGWSEL : std_logic_vector(7 downto 0);
-signal CGADSUB	: std_logic_vector(7 downto 0);
+signal WH0 					: std_logic_vector(7 downto 0);
+signal WH1 					: std_logic_vector(7 downto 0);
+signal WH2 					: std_logic_vector(7 downto 0);
+signal WH3 					: std_logic_vector(7 downto 0);
+signal W12SEL 				: std_logic_vector(7 downto 0);
+signal W34SEL 				: std_logic_vector(7 downto 0);
+signal WOBJSEL 			: std_logic_vector(7 downto 0);
+signal WBGLOG 				: std_logic_vector(7 downto 0);
+signal WOBJLOG 			: std_logic_vector(7 downto 0);
+signal TMW 					: std_logic_vector(7 downto 0);
+signal TSW 					: std_logic_vector(7 downto 0);
+signal CGWSEL 				: std_logic_vector(7 downto 0);
+signal CGADSUB				: std_logic_vector(7 downto 0);
+signal SUBCOLBD 			: std_logic_vector(14 downto 0);
+signal OPHCT 				: std_logic_vector(8 downto 0);
+signal OPVCT 				: std_logic_vector(8 downto 0);
 
-signal OPHCT : std_logic_vector(8 downto 0);
-signal OPVCT : std_logic_vector(8 downto 0);
+signal OPHCT_latch 		: std_logic;
+signal OPVCT_latch 		: std_logic;
+signal CGRAM_Lsb 			: std_logic_vector(7 downto 0);
+signal BGOFS_latch 		: std_logic_vector(7 downto 0);
+signal M7_latch 			: std_logic_vector(7 downto 0);
+signal BGHOFS_latch 		: std_logic_vector(2 downto 0);
+signal OAM_latch 			: std_logic_vector(7 downto 0);
+signal VRAMDATA_Prefetch: std_logic_vector(15 downto 0);
+signal VMADD_INC 			: unsigned(7 downto 0);
+signal F_LATCH 			: std_logic;
+signal OBJ_TIME_OFL 		: std_logic;
+signal OBJ_RANGE_OFL 	: std_logic;
 
-signal OPHCT_latch : std_logic;
-signal OPVCT_latch : std_logic;
-signal CGRAM_Lsb : std_logic_vector(7 downto 0);
-signal BGOFS_latch : std_logic_vector(7 downto 0);
-signal M7_latch : std_logic_vector(7 downto 0);
-signal BGHOFS_latch : std_logic_vector(2 downto 0);
-signal OAM_latch : std_logic_vector(7 downto 0);
-signal VRAMDATA_Prefetch : std_logic_vector(15 downto 0);
-signal VMADD_INC : unsigned(7 downto 0);
-signal F_LATCH : std_logic;
-signal OBJ_TIME_OFL : std_logic;
-signal OBJ_RANGE_OFL : std_logic;
-
-signal VMADD_TRANS : std_logic_vector(15 downto 0);
-signal VRAM1_WRITE, VRAM2_WRITE : std_logic;
-signal VRAM_ADDR_INC : std_logic;
-signal EXTLATCHr : std_logic;
-signal OAM_ADDR_REQ : std_logic;
-signal OAM_PRIO_REQ : std_logic;
-signal VRAMPRERD_REQ : std_logic;
-signal VRAMRD_CNT : unsigned(1 downto 0);
+signal BG_FORCE_BLANK	: std_logic;
+signal VMADD_TRANS 		: std_logic_vector(15 downto 0);
+signal VRAM1_WRITE 		: std_logic;
+signal VRAM2_WRITE 		: std_logic;
+signal VRAM_ADDR_INC 	: std_logic;
+signal EXTLATCHr 			: std_logic;
+signal OAM_ADDR_REQ 		: std_logic;
+signal VRAMPRERD_REQ 	: std_logic;
+signal VRAMRD_CNT 		: unsigned(1 downto 0);
 
 -- HV COUNTERS
-signal H_CNT : unsigned(8 downto 0);
-signal V_CNT : unsigned(8 downto 0);
-signal FIELD : std_logic;
-
-signal LAST_VIS_LINE : unsigned(8 downto 0);
-signal IN_HBL : std_logic;
-signal IN_VBL : std_logic;
+signal H_CNT 				: unsigned(8 downto 0);
+signal V_CNT 				: unsigned(8 downto 0);
+signal FIELD 				: std_logic;
+signal LAST_VIS_LINE 	: unsigned(8 downto 0);
+signal LAST_LINE			: unsigned(8 downto 0);
+signal LAST_DOT			: unsigned(8 downto 0);
+signal IN_HBL 				: std_logic;
+signal IN_VBL 				: std_logic;
 
 -- BACKGROUND
-signal BG_VRAM_ADDRA, BG_VRAM_ADDRB : std_logic_vector(15 downto 0);
-signal BG_VRAM_FETCH : std_logic;
-signal SPR_GET_PIXEL, BG_GET_PIXEL, BG_MATH, BG_OUT : std_logic;
-signal GET_PIXEL_X, WINDOW_X, OUT_X, OUT_Y	: unsigned(7 downto 0);
-signal BG_MOSAIC_X : unsigned(3 downto 0);
-signal BG_MOSAIC_Y : unsigned(3 downto 0);
-signal BF : BgFetch_r;
-signal BG3_OPT_DATA0 : std_logic_vector(15 downto 0);
-signal BG3_OPT_DATA1 : std_logic_vector(15 downto 0);
-signal BG_DATA : BgData_t;
-signal BG_TILE_INFO : BgTileInfo_t;
+signal BG_VRAM_ADDRA 	: std_logic_vector(15 downto 0);
+signal BG_VRAM_ADDRB 	: std_logic_vector(15 downto 0);
+signal BG_FETCH 			: std_logic;
+signal SPR_GET_PIXEL 	: std_logic;
+signal BG_GET_PIXEL 		: std_logic;
+signal BG_MATH 			: std_logic;
+signal BG_OUT 				: std_logic;
+signal GET_PIXEL_X		: unsigned(7 downto 0);
+signal WINDOW_X			: unsigned(7 downto 0);
+signal OUT_X				: unsigned(7 downto 0);
+signal OUT_Y				: unsigned(7 downto 0);
+signal BG_MOSAIC_X 		: unsigned(3 downto 0);
+signal BG_MOSAIC_Y 		: unsigned(3 downto 0);
+signal BF 					: BgFetch_r;
+signal BG3_OPT_DATA0 	: std_logic_vector(15 downto 0);
+signal BG3_OPT_DATA1 	: std_logic_vector(15 downto 0);
+signal BG_DATA 			: BgData_t;
+signal BG_TILE_INFO 		: BgTileInfo_t;
+signal BG_TILES 			: BgTileInfos_t;
+signal BG1_PIX_DATA 		: std_logic_vector(11 downto 0);
+signal BG2_PIX_DATA 		: std_logic_vector(7 downto 0);
+signal BG3_PIX_DATA 		: std_logic_vector(5 downto 0);
+signal BG4_PIX_DATA 		: std_logic_vector(5 downto 0);
 
-type BgPlanes_t is array(0 to 11) of std_logic_vector(7 downto 0);
-type BgTileInfo_r is record
-	PLANES : BgPlanes_t;
-	ATR : BgTileAtr_t;
-end record;
-type BgTileInfos_t is array(0 to 1) of BgTileInfo_r;
-signal BG_TILES : BgTileInfos_t;
-
-signal BG1_PIX_DATA : std_logic_vector(11 downto 0);
-signal BG2_PIX_DATA : std_logic_vector(7 downto 0);
-signal BG3_PIX_DATA, BG4_PIX_DATA : std_logic_vector(5 downto 0);
-
-signal M7_TEMP_X, M7_TEMP_Y : signed(23 downto 0);
-signal MPY : signed(23 downto 0);
-signal M7_TILE_N : unsigned(7 downto 0);
-signal M7_TILE_ROW, M7_TILE_COL : unsigned(2 downto 0);
-signal M7_TILE_OUTSIDE : std_logic;
+signal M7_TEMP_X 			: signed(23 downto 0);
+signal M7_TEMP_Y 			: signed(23 downto 0);
+signal MPY 					: signed(23 downto 0);
+signal M7_TILE_N 			: unsigned(7 downto 0);
+signal M7_TILE_ROW 		: unsigned(2 downto 0);
+signal M7_TILE_COL 		: unsigned(2 downto 0);
+signal M7_TILE_OUTSIDE 	: std_logic;
 
 -- OBJ
-signal OAM_D : std_logic_vector(15 downto 0);
-signal OAM_Q_A : std_logic_vector(15 downto 0);
-signal OAM_Q_B : std_logic_vector(31 downto 0);
-signal OAM_ADDR_A : std_logic_vector(7 downto 0);
-signal OAM_ADDR_B : std_logic_vector(6 downto 0);
-signal OAM_WE : std_logic;
-signal HOAM_Q_A : std_logic_vector(7 downto 0);
-signal HOAM_Q_B : std_logic_vector(1 downto 0);
-signal HOAM_ADDR_B : std_logic_vector(6 downto 0);
-signal HOAM_ADDR_A : std_logic_vector(4 downto 0);
-signal HOAM_WE : std_logic;
+signal OAM_D 				: std_logic_vector(15 downto 0);
+signal OAM_Q 				: std_logic_vector(15 downto 0);
+signal OAM_ADDR_WR 		: std_logic_vector(7 downto 0);
+signal OAM_ADDR_RD 		: std_logic_vector(7 downto 0);
+signal OAM_WE 				: std_logic;
+signal OAM_CS 				: std_logic;
+signal HOAM_Q 				: std_logic_vector(7 downto 0);
+signal HOAM_ADDR_RD 		: std_logic_vector(4 downto 0);
+signal HOAM_ADDR_WR 		: std_logic_vector(4 downto 0);
+signal HOAM_WE 			: std_logic;
+signal HOAM_CS 			: std_logic;
+signal HOAM_X8 			: std_logic;
+signal HOAM_S 				: std_logic;
 
-signal OAM_ADDR : std_logic_vector(9 downto 0);
-signal OAM_RANGE_INDEXES : RangeOamIndex_t;
-signal OAM_OBJ : Sprite_r;
-signal RANGE_CNT_WR : unsigned(5 downto 0);
-signal RANGE_CNT_RD	: unsigned(5 downto 0);
-signal TILES_OAM_CNT : unsigned(5 downto 0);
-signal TILES_CNT : unsigned(2 downto 0);
+signal OAM_ADDR 			: std_logic_vector(9 downto 0);
+signal INT_OAM_ADDR 		: std_logic_vector(6 downto 0);
+signal OAM_RANGE 			: RangeOam_t;
+signal OAM_RANGE_INDEX 	: std_logic_vector(6 downto 0);
+signal OAM_TIME_INDEX 	: std_logic_vector(6 downto 0);
+signal RANGE_CNT 			: unsigned(5 downto 0);
+signal TILES_OAM_CNT 	: unsigned(5 downto 0);
+signal TILES_CNT 			: unsigned(2 downto 0);
 
-signal OBJ_RANGE, OBJ_TIME: std_logic;
-signal OBJ_RANGE_DONE : std_logic;
+signal OBJ_RANGE 			: std_logic;
+signal OBJ_TIME 			: std_logic;
+signal OBJ_FETCH 			: std_logic;
+signal OBJ_RANGE_DONE 	: std_logic;
+signal OBJ_TIME_DONE 	: std_logic;
 
-signal SPR_PIX_DATA, SPR_PIX_DATA_BUF : std_logic_vector(8 downto 0);
-signal SPR_PIXEL_X : unsigned(7 downto 0);
-signal OBJ_VRAM_ADDR : std_logic_vector(15 downto 0);
+signal OAM_OBJ_X			: unsigned(8 downto 0);
+signal OAM_OBJ_Y			: unsigned(7 downto 0);
+signal OAM_OBJ_S 			: std_logic;
+signal OBJ_TILE_COL 		: unsigned(3 downto 0);
+signal OBJ_TILE_ROW 		: unsigned(3 downto 0);
+signal OBJ_TILE_LINE 	: unsigned(2 downto 0);
+signal OBJ_TILE_GAP 		: unsigned(14 downto 0);
+signal OBJ_TILE_HFLIP 	: std_logic;
+signal OBJ_TILE_PAL 		: std_logic_vector(2 downto 0);
+signal OBJ_TILE_PRIO 	: std_logic_vector(1 downto 0);
+signal OBJ_TILE_X 		: unsigned(8 downto 0);
 
-signal SPR_TILE_DATA : std_logic_vector(31 downto 0);
-signal SPR_TILE_DATA_TEMP : std_logic_vector(15 downto 0);
-signal SPR_TILE_X : unsigned(8 downto 0);
-signal SPR_TILE_PAL : std_logic_vector(2 downto 0);
-signal SPR_TILE_PRIO : std_logic_vector(1 downto 0);
-signal OBJ_TIME_SAVE : std_logic;
+signal SPR_PIX_DATA 		: std_logic_vector(8 downto 0);
+signal SPR_PIX_DATA_BUF : std_logic_vector(8 downto 0);
+signal SPR_PIXEL_X 		: unsigned(7 downto 0);
+signal OBJ_VRAM_ADDR 	: std_logic_vector(15 downto 0);
+signal SPR_TILE_DATA 	: std_logic_vector(31 downto 0);
+signal SPR_TILE_DATA_TEMP: std_logic_vector(15 downto 0);
+signal SPR_TILE_X 		: unsigned(8 downto 0);
+signal SPR_TILE_PAL 		: std_logic_vector(2 downto 0);
+signal SPR_TILE_PRIO 	: std_logic_vector(1 downto 0);
+signal OBJ_TIME_SAVE 	: std_logic;
 
-signal SPR_PIX_D, SPR_PIX_Q : std_logic_vector(8 downto 0);
-signal SPR_PIX_ADDR_A : std_logic_vector(7 downto 0);
-signal SPR_PIX_WE_A, SPR_PIX_WE_B : std_logic;
-signal SPR_PIX_CNT : unsigned(2 downto 0);
+signal SPR_PIX_D 			: std_logic_vector(8 downto 0);
+signal SPR_PIX_Q 			: std_logic_vector(8 downto 0);
+signal SPR_PIX_ADDR_A 	: std_logic_vector(7 downto 0);
+signal SPR_PIX_WE_A 		: std_logic;
+signal SPR_PIX_WE_B 		: std_logic;
+signal SPR_PIX_CNT 		: unsigned(2 downto 0);
 
--- MATH
-signal SUBCOL : std_logic_vector(14 downto 0);
-signal MAIN_R, MAIN_G, MAIN_B	: unsigned(4 downto 0);
-signal SUB_R, SUB_G, SUB_B	: unsigned(4 downto 0);
-signal HIRES : std_logic;
-signal HRES : std_logic;
+signal OBJ_FORCE_BLANK	: std_logic;
 
 -- CRAM
-signal CRAM_Q, CRAM_D, CRAM_IO_Q : std_logic_vector(14 downto 0);
-signal CRAM_WE: std_logic;
-signal CRAM_MAIN_Q, CRAM_SUB_Q  : std_logic_vector(14 downto 0);
-signal CRAM_MAIN_ADDR, CRAM_SUB_ADDR, CRAM_ADDR : std_logic_vector(7 downto 0);
-signal CRAM_ADDR_INC: std_logic;
+signal CGRAM_Q 			: std_logic_vector(14 downto 0);
+signal CGRAM_D 			: std_logic_vector(14 downto 0);
+signal CGRAM_WE			: std_logic;
+signal CGRAM_FETCH_ADDR : std_logic_vector(7 downto 0);
+signal CGRAM_ADDR 		: std_logic_vector(7 downto 0);
+signal CGRAM_ADDR_INC	: std_logic;
+
+-- COLOR MATH
+signal SUB_COLOR 			: std_logic_vector(14 downto 0);
+signal SUB_BD 				: std_logic;
+signal MAIN_R				: unsigned(4 downto 0);
+signal MAIN_G				: unsigned(4 downto 0);
+signal MAIN_B				: unsigned(4 downto 0);
+signal SUB_R				: unsigned(4 downto 0);
+signal SUB_G				: unsigned(4 downto 0);
+signal SUB_B				: unsigned(4 downto 0);
+signal HIRES 				: std_logic;
 
 --debug
-signal DBG_VRAM_ADDR : std_logic_vector(16 downto 0);
-signal DBG_CRAM_ADDR : std_logic_vector(7 downto 0);
-signal DBG_OAM_ADDR : std_logic_vector(7 downto 0);
-signal DBG_DAT_WRr : std_logic;
-signal DBG_CTRL : std_logic_vector(7 downto 0) := (others => '0');
-signal DBG_RUN_LAST : std_logic;
-signal DBG_BRK_HCNT : std_logic_vector(8 downto 0) := (others => '1');
-signal DBG_BRK_VCNT : std_logic_vector(8 downto 0) := (others => '1'); 
-signal DBG_BG_EN : std_logic_vector(7 downto 0) := (others => '1');
-signal DBG_OBJ_EN : std_logic_vector(7 downto 0) := (others => '1');
-signal FRAME_CNT: unsigned(15 downto 0);
+signal DBG_VRAM_ADDR 	: std_logic_vector(16 downto 0);
+signal DBG_CGRAM_ADDR 	: std_logic_vector(7 downto 0);
+signal DBG_OAM_ADDR 		: std_logic_vector(7 downto 0);
+signal DBG_DAT_WRr 		: std_logic;
+signal DBG_CTRL 			: std_logic_vector(7 downto 0) := (others => '0');
+signal DBG_RUN_LAST 		: std_logic;
+signal DBG_BRK_HCNT 		: std_logic_vector(8 downto 0) := (others => '1');
+signal DBG_BRK_VCNT 		: std_logic_vector(8 downto 0) := (others => '1'); 
+signal DBG_BG_EN 			: std_logic_vector(7 downto 0) := (others => '1');
+signal DBG_OBJ_EN 		: std_logic_vector(7 downto 0) := (others => '1');
+signal DBG_BRK_ADDR 		: std_logic_vector(15 downto 0) := (others => '1');
+signal FRAME_CNT			: unsigned(15 downto 0);
 	
 begin
 
@@ -269,6 +301,7 @@ begin
 		CLK_CNT <= (others => '0');
 		DOT_CLK <= '0';
 		DOT_CLKR_CE <= '0';
+		DOT_CLKF_CE <= '0';
 	elsif rising_edge(CLK) then
 		if ENABLE = '0' then
 			DOT_CYCLES := "100";
@@ -281,6 +314,7 @@ begin
 		end if;
 		
 		DOT_CLKR_CE <= '0';
+		DOT_CLKF_CE <= '0';
 		CLK_CNT <= CLK_CNT + 1;
 		if CLK_CNT = 1  then
 			DOT_CLK <= '0';
@@ -289,78 +323,29 @@ begin
 			DOT_CLK <= '1';
 		end if;
 
-		if CLK_CNT = DOT_CYCLES-1-1  then
+		if CLK_CNT = 0 then			
+			DOT_CLKF_CE <= '1';
+		elsif CLK_CNT = DOT_CYCLES-1-1  then
 			DOT_CLKR_CE <= '1';
 		end if;
 	end if;
 end process;
 
-CRAM_MAIN : entity work.dpram generic map(8,15)
+
+CGRAM : entity work.spram generic map(8,15)
 port map(
-	clock			=> CLK,
-	data_a		=> CRAM_D,
-	data_b		=> (others => '0'),
-	address_a	=> CGADD(8 downto 1),
-	address_b	=> CRAM_MAIN_ADDR,
-	wren_a		=> CRAM_WE,
-	wren_b		=> '0',
-	q_a			=> CRAM_IO_Q,
-	q_b			=> CRAM_MAIN_Q
+	clock		=> CLK,
+	address	=> CGRAM_ADDR,
+	data		=> CGRAM_D,
+	wren		=> CGRAM_WE,
+	q			=> CGRAM_Q
 );
 
-CRAM_SUB : entity work.dpram generic map(8,15)
-port map(
-	clock			=> CLK,
-	data_a		=> CRAM_D,
-	data_b		=> (others => '0'),
-	address_a	=> CGADD(8 downto 1),
-	address_b	=> CRAM_SUB_ADDR,
-	wren_a		=> CRAM_WE,
-	wren_b		=> '0',
---	q_a			=> CRAM_IO_Q,
-	q_b			=> CRAM_SUB_Q
-);
---CRAM_ADDR <= DBG_CRAM_ADDR when ENABLE = '0' else CRAM_MAIN_ADDR when DOT_CLK = '0' else CRAM_SUB_ADDR;
-CRAM_D <= DI(6 downto 0) & CGRAM_Lsb;
-CRAM_WE <= '1' when CGADD(0) = '1' and PAWR_N = '0' and PA = x"22" and SYSCLK_CE = '1' else '0';
-
-
-OAM : entity work.dpram_dif generic map(8,16,7,32)
-port map(
-	clock			=> CLK,
-	data_a		=> OAM_D,
-	data_b		=> (others => '0'),
-	address_a	=> OAM_ADDR_A,
-	address_b	=> OAM_ADDR_B,
-	wren_a		=> OAM_WE,
-	wren_b		=> '0',
-	q_a			=> OAM_Q_A,
-	q_b			=> OAM_Q_B
-);
-OAM_D <= DI & OAM_latch;
-OAM_ADDR_A <= OAM_ADDR(8 downto 1) when ENABLE = '1' else DBG_OAM_ADDR;
-OAM_ADDR_B <= OAM_ADDR(8 downto 2);
-OAM_WE <= ENABLE when OAM_ADDR(0) = '1' and (OAM_ADDR(9) = '0' or (IN_VBL = '0' and FORCE_BLANK = '0')) 
-			and PAWR_N = '0' and PA = x"04" and SYSCLK_CE = '1' else '0';
-
-HOAM : entity work.dpram_dif generic map(5,8,7,2)
-port map(
-	clock			=> CLK,
-	data_a		=> DI,
-	data_b		=> (others => '0'),
-	address_a	=> HOAM_ADDR_A,
-	address_b	=> HOAM_ADDR_B,
-	wren_a		=> HOAM_WE,
-	wren_b		=> '0',
-	q_a			=> HOAM_Q_A,
-	q_b			=> HOAM_Q_B
-);
-HOAM_ADDR_A <= DBG_OAM_ADDR(4 downto 0) when ENABLE = '0' else 
-				OAM_ADDR(8 downto 4) when IN_VBL = '0' and FORCE_BLANK = '0' else 
-				OAM_ADDR(4 downto 0);
-HOAM_ADDR_B <= OAM_ADDR(8 downto 2);
-HOAM_WE <= ENABLE when (OAM_ADDR(9) = '1' or (IN_VBL = '0' and FORCE_BLANK = '0')) 
-			and PAWR_N = '0' and PA = x"04" and SYSCLK_CE = '1' else '0';
+CGRAM_ADDR <= DBG_CGRAM_ADDR when ENABLE = '0' else 
+				  CGRAM_FETCH_ADDR when BG_MATH = '1' and FORCE_BLANK = '0' else 
+				  CGADD(8 downto 1);
+CGRAM_D <= DI(6 downto 0) & CGRAM_Lsb;
+CGRAM_WE <= '1' when CGADD(0) = '1' and PAWR_N = '0' and PA = x"22" and SYSCLK_CE = '1' else '0';
 
 process( RST_N, CLK )
 begin
@@ -416,7 +401,7 @@ begin
 		CGADSUB <= (others => '0');
 		OPHCT <= (others => '0');
 		OPVCT <= (others => '0');
-		SUBCOL <= (others => '0');
+		SUBCOLBD <= (others => '0');
 		
 		VRAMDATA_Prefetch <= (others => '0');
 		VMADD_INC <= x"01";
@@ -431,46 +416,19 @@ begin
 		
 		OAM_ADDR <= (others => '0');
 		OAM_PRIO <= '0';
-		OAM_PRIO_INDEX <= (others => '0');
 		OAM_latch <= (others => '0');
 		
 		CGRAM_Lsb <= (others => '0');
 
 		OAM_ADDR_REQ <= '0';
-		OAM_PRIO_REQ <= '0';
 		VRAMPRERD_REQ <= '0';
 		VRAMRD_CNT <= (others => '0');
-		
 	elsif rising_edge(CLK) then
 		if OAM_ADDR_REQ = '1' then
 			OAM_ADDR <= OAMADD & "0";
-			OAM_PRIO_INDEX <= OAMADD(7 downto 1);
 			OAM_ADDR_REQ <= '0';
 		end if;
-
-		if OAM_PRIO_REQ = '1'  then
-			OAM_PRIO_INDEX <= OAM_ADDR(8 downto 2);
-			OAM_PRIO_REQ <= '0';
-		end if;
-
-		if ENABLE = '1' and FORCE_BLANK = '0' then
-			if H_CNT = 0 and V_CNT <= LAST_VIS_LINE then
-				if OAM_PRIO = '0' then
-					OAM_ADDR <= (others => '0');
-				else
-					OAM_ADDR <= "0" & OAM_PRIO_INDEX & "00";
-				end if;
-			end if;
-
-			if DOT_CLKR_CE = '1' and OBJ_RANGE = '1' and H_CNT(0) = '1' then
-				OAM_ADDR <= std_logic_vector(unsigned(OAM_ADDR) + 4);
-			end if;
-		end if;
-
-		if FORCE_BLANK = '0' and OBJ_TIME = '1' then
-			OAM_ADDR <= "0" & OBJ_TIME_INDEX & "00";
-		end if;
-
+		
 		if VRAMPRERD_REQ = '1' then
 			if VRAMRD_CNT = 3 then
 				if FORCE_BLANK = '1' or IN_VBL = '1' then
@@ -507,7 +465,6 @@ begin
 						OAM_latch <= DI;
 					end if;
 					OAM_ADDR <= std_logic_vector(unsigned(OAM_ADDR) + 1);
-					OAM_PRIO_REQ <= '1';
 				when x"05" =>						--BGMODE
 					BG_MODE <= DI(2 downto 0);
 					BG3PRIO <= DI(3);
@@ -651,13 +608,13 @@ begin
 					CGADSUB <= DI;
 				when x"32" =>						--COLDI
 					if DI(7) = '1' then
-						SUBCOL(14 downto 10) <= DI(4 downto 0);
+						SUBCOLBD(14 downto 10) <= DI(4 downto 0);
 					end if;
 					if DI(6) = '1' then
-						SUBCOL(9 downto 5) <= DI(4 downto 0);
+						SUBCOLBD(9 downto 5) <= DI(4 downto 0);
 					end if;
 					if DI(5) = '1' then
-						SUBCOL(4 downto 0) <= DI(4 downto 0);
+						SUBCOLBD(4 downto 0) <= DI(4 downto 0);
 					end if;
 				when x"33" =>						--SETINI
 					BGINTERLACE <= DI(0);
@@ -678,7 +635,6 @@ begin
 					end if;
 				when x"38" =>			--RDOAM
 					OAM_ADDR <= std_logic_vector(unsigned(OAM_ADDR) + 1);
-					OAM_PRIO_REQ <= '1';
 				when x"3B" =>			--RDCGRAM
 					CGADD <= std_logic_vector(unsigned(CGADD) + 1);
 				when x"39" =>						--RDVRAML
@@ -713,9 +669,8 @@ begin
 			end case;
 		end if;
 		
-		if (H_CNT = 339 and V_CNT = LAST_VIS_LINE and FORCE_BLANK = '0') then
-			OAM_ADDR <= OAMADD & "0";
-			OAM_PRIO_INDEX <= OAMADD(7 downto 1);
+		if (H_CNT = LAST_DOT and V_CNT = LAST_VIS_LINE and FORCE_BLANK = '0') then
+			OAM_ADDR_REQ <= '1';
 		end if;
 		
 		EXTLATCHr <= EXTLATCH;
@@ -744,8 +699,8 @@ begin
 	end if;
 end process;
 
-process( PA, MPY, OAM_ADDR, OAM_Q_A, HOAM_Q_A, VRAMDATA_Prefetch, OBJ_TIME_OFL, OBJ_RANGE_OFL, 
-			CGADD, CRAM_IO_Q, OPHCT_latch, OPHCT, OPVCT_latch, OPVCT, FIELD, F_LATCH, EXTLATCH, PAL, MDR1, MDR2, DI)
+process( PA, MPY, OAM_ADDR, OAM_Q, HOAM_Q, VRAMDATA_Prefetch, OBJ_TIME_OFL, OBJ_RANGE_OFL, 
+			CGADD, CGRAM_Q, OPHCT_latch, OPHCT, OPVCT_latch, OPVCT, FIELD, F_LATCH, EXTLATCH, PAL, MDR1, MDR2, DI)
 begin 
 	case PA is
 		when x"04" | x"05" | x"06" | x"08" | x"09" | x"0A" | 
@@ -761,12 +716,12 @@ begin
 		when x"38" =>						--RDOAM
 			if OAM_ADDR(9) = '0' then
 				if OAM_ADDR(0) = '0' then
-					D_OUT <= OAM_Q_A(7 downto 0);
+					D_OUT <= OAM_Q(7 downto 0);
 				else
-					D_OUT <= OAM_Q_A(15 downto 8);
+					D_OUT <= OAM_Q(15 downto 8);
 				end if;
 			else
-				D_OUT <= HOAM_Q_A;
+				D_OUT <= HOAM_Q;
 			end if;
 		when x"39" =>						--RDVRAML
 			D_OUT <= VRAMDATA_Prefetch(7 downto 0);
@@ -776,9 +731,9 @@ begin
 			D_OUT <= OBJ_TIME_OFL & OBJ_RANGE_OFL & "0" & MDR1(4) & x"1";
 		when x"3B" =>						--RDCGRAM
 			if CGADD(0) = '0' then
-				D_OUT <= CRAM_IO_Q(7 downto 0);
+				D_OUT <= CGRAM_Q(7 downto 0);
 			else
-				D_OUT <= MDR2(7) & CRAM_IO_Q(14 downto 8);
+				D_OUT <= MDR2(7) & CGRAM_Q(14 downto 8);
 			end if;
 		when x"3C" =>						--OPHCT
 			if OPHCT_latch = '0' then
@@ -807,18 +762,18 @@ VMADD_TRANS <= VMADD(15 downto  8) & VMADD(4 downto 0) & VMADD(7 downto 5) when 
 					VMADD(15 downto 10) & VMADD(6 downto 0) & VMADD(9 downto 7) when VMAIN_ADDRTRANS = "11" else 
 					VMADD(15 downto  0);
 					
-VRAM1_WRITE <= '1' when PAWR_N = '0' and PA = x"18" and (FORCE_BLANK = '1' or IN_VBL = '1') else '0';
-VRAM2_WRITE <= '1' when PAWR_N = '0' and PA = x"19" and (FORCE_BLANK = '1' or IN_VBL = '1') else '0';			
+VRAM1_WRITE <= '1' when PAWR_N = '0' and PA = x"18" and (BG_FORCE_BLANK = '1' or IN_VBL = '1') else '0';
+VRAM2_WRITE <= '1' when PAWR_N = '0' and PA = x"19" and (BG_FORCE_BLANK = '1' or IN_VBL = '1') else '0';			
 
 		
 VRAM_ADDRA <= DBG_VRAM_ADDR(16 downto 1) when ENABLE = '0' else
-				  BG_VRAM_ADDRA when BG_VRAM_FETCH = '1' and FORCE_BLANK = '0'else 
-				  OBJ_VRAM_ADDR when OBJ_TIME = '1' and FORCE_BLANK = '0' else
+				  BG_VRAM_ADDRA when BG_FETCH = '1' and BG_FORCE_BLANK = '0'else 
+				  OBJ_VRAM_ADDR when OBJ_FETCH = '1' and OBJ_FORCE_BLANK = '0' else
 				  VMADD_TRANS;
 VRAM_ADDRB <= DBG_VRAM_ADDR(16 downto 1) when ENABLE = '0' else
-				  BG_VRAM_ADDRB when BG_VRAM_FETCH = '1' and FORCE_BLANK = '0'else 
-				  OBJ_VRAM_ADDR when OBJ_TIME = '1' and FORCE_BLANK = '0' else
-				  VMADD_TRANS;				 
+				  BG_VRAM_ADDRB when BG_FETCH = '1' and BG_FORCE_BLANK = '0'else 
+				  OBJ_VRAM_ADDR when OBJ_FETCH = '1' and OBJ_FORCE_BLANK= '0' else
+				  VMADD_TRANS;			 
 				 
 
 VRAM_DAO <= DI;
@@ -829,14 +784,33 @@ VRAM_WRB_N <= '1' when ENABLE = '0' else not VRAM2_WRITE;
 
 
 
+--HV counters
+process( PAL, BGINTERLACE, FIELD, V_CNT )
+begin
+	if PAL = '0' then
+		if BGINTERLACE = '1' and FIELD = '0' then
+			LAST_LINE <= LINE_NUM_NTSC;
+		else
+			LAST_LINE <= LINE_NUM_NTSC-1;
+		end if;
+		LAST_DOT <= DOT_NUM-1;
+	else
+		if BGINTERLACE = '1' and FIELD = '0' then
+			LAST_LINE <= LINE_NUM_PAL;
+		else
+			LAST_LINE <= LINE_NUM_PAL-1;
+		end if;
+		if V_CNT = 311 and BGINTERLACE = '1' and FIELD = '1' then
+			LAST_DOT <= DOT_NUM;
+		else
+			LAST_DOT <= DOT_NUM-1;
+		end if;
+	end if;
+end process;
+
 LAST_VIS_LINE <= '0' & x"E0" when OVERSCAN = '0' else '0' & x"EF";
 
-HIGH_RES <= HIRES or (PSEUDOHIRES and not BLEND);
-
---HV counters
 process( RST_N, CLK )
-variable LAST_LINE: unsigned(8 downto 0);
-variable LAST_DOT: unsigned(8 downto 0);
 variable VSYNC_LINE: unsigned(8 downto 0);
 variable VSYNC_HSTART: unsigned(8 downto 0);
 begin
@@ -850,24 +824,8 @@ begin
 	elsif rising_edge(CLK) then
 		if ENABLE = '1' and DOT_CLKR_CE = '1' then
 			if PAL = '0' then
-				if BGINTERLACE = '1' and FIELD = '0' then
-					LAST_LINE := LINE_NUM_NTSC;
-				else
-					LAST_LINE := LINE_NUM_NTSC-1;
-				end if;
-				LAST_DOT := DOT_NUM-1;
 				VSYNC_LINE := LINE_VSYNC_NTSC;
 			else
-				if BGINTERLACE = '1' and FIELD = '0' then
-					LAST_LINE := LINE_NUM_PAL;
-				else
-					LAST_LINE := LINE_NUM_PAL-1;
-				end if;
-				if V_CNT = 311 and BGINTERLACE = '1' and FIELD = '1' then
-					LAST_DOT := DOT_NUM;
-				else
-					LAST_DOT := DOT_NUM-1;
-				end if;
 				VSYNC_LINE := LINE_VSYNC_PAL;
 			end if;
 			
@@ -894,7 +852,7 @@ begin
 
 			if H_CNT = 274-1 then
 				IN_HBL <= '1';
-			elsif H_CNT = 0 then
+			elsif H_CNT = LAST_DOT then
 				IN_HBL <= '0';
 			end if;
 			
@@ -923,48 +881,54 @@ begin
 end process;
 
 
-process( H_CNT, V_CNT, LAST_VIS_LINE, FORCE_BLANK )
+process( H_CNT, V_CNT, LAST_VIS_LINE )
 begin
-	if H_CNT <= (256+16)-1 and V_CNT >= 0 and V_CNT <= LAST_VIS_LINE then
-		BG_VRAM_FETCH <= '1';
+	if H_CNT <= BG_FETCH_END and V_CNT >= 0 and V_CNT <= LAST_VIS_LINE then
+		BG_FETCH <= '1';
 	else
-		BG_VRAM_FETCH <= '0';
+		BG_FETCH <= '0';
 	end if;
 	
-	if H_CNT >= (16) and H_CNT <= (16+256)-1 and V_CNT >= 1 and V_CNT <= LAST_VIS_LINE then
+	if H_CNT >= SPR_GET_PIX_START and H_CNT <= SPR_GET_PIX_END and V_CNT >= 1 and V_CNT <= LAST_VIS_LINE then
 		SPR_GET_PIXEL <= '1';
 	else
 		SPR_GET_PIXEL <= '0';
 	end if;
 	
-	if H_CNT >= (17) and H_CNT <= (17+256)-1 and V_CNT >= 1 and V_CNT <= LAST_VIS_LINE then
+	if H_CNT >= BG_GET_PIX_START and H_CNT <= BG_GET_PIX_END and V_CNT >= 1 and V_CNT <= LAST_VIS_LINE then
 		BG_GET_PIXEL <= '1';
 	else
 		BG_GET_PIXEL <= '0';
 	end if;
 	
-	if H_CNT >= (18) and H_CNT <= (18+256)-1 and V_CNT >= 1 and V_CNT <= LAST_VIS_LINE then
+	if H_CNT >= BG_MATH_START and H_CNT <= BG_MATH_END and V_CNT >= 1 and V_CNT <= LAST_VIS_LINE then
 		BG_MATH <= '1';
 	else
 		BG_MATH <= '0';
 	end if;
 	
-	if H_CNT >= (19) and H_CNT <= (19+256)-1 and V_CNT >= 1 and V_CNT <= LAST_VIS_LINE then
+	if H_CNT >= BG_OUT_START and H_CNT <= BG_OUT_END and V_CNT >= 1 and V_CNT <= LAST_VIS_LINE then
 		BG_OUT <= '1';
 	else
 		BG_OUT <= '0';
 	end if;
 	
-	if H_CNT <= (256)-1 and V_CNT < LAST_VIS_LINE and FORCE_BLANK = '0' then
+	if H_CNT <= OBJ_RANGE_END and V_CNT < LAST_VIS_LINE then
 		OBJ_RANGE <= '1';
 	else
 		OBJ_RANGE <= '0';
 	end if;
 	
-	if H_CNT >= (16+256) and H_CNT <= (16+256+68)-1 and V_CNT < LAST_VIS_LINE then
+	if H_CNT >= OBJ_TIME_START and H_CNT <= OBJ_TIME_END and V_CNT < LAST_VIS_LINE then
 		OBJ_TIME <= '1';
 	else
 		OBJ_TIME <= '0';
+	end if;
+	
+	if H_CNT >= OBJ_FETCH_START and H_CNT <= OBJ_FETCH_END and V_CNT < LAST_VIS_LINE then
+		OBJ_FETCH <= '1';
+	else
+		OBJ_FETCH <= '0';
 	end if;
 end process;
 
@@ -1246,25 +1210,32 @@ begin
 		BG3_OPT_DATA0 <= (others => '0');
 		BG3_OPT_DATA1 <= (others => '0');
 		BG_MOSAIC_Y <= (others => '0');
+		BG_FORCE_BLANK <= '1';
 	elsif rising_edge(CLK) then 
 		if ENABLE = '1' and DOT_CLKR_CE = '1' then
-			if H_CNT = 339 and V_CNT <= LAST_VIS_LINE then
+			if H_CNT = LAST_DOT and V_CNT <= LAST_VIS_LINE then
 				BG_DATA <= (others => (others => '0'));
 				BG3_OPT_DATA0 <= (others => '0');
 				BG3_OPT_DATA1 <= (others => '0');
 			end if;
 			
-			if H_CNT = 339 and V_CNT >= 1 and V_CNT <= LAST_VIS_LINE then			
+			if H_CNT = LAST_DOT and V_CNT >= 1 and V_CNT <= LAST_VIS_LINE then			
 				if BG_MOSAIC_Y = unsigned(MOSAIC_SIZE) then
 					BG_MOSAIC_Y <= (others => '0');
 				else
 					BG_MOSAIC_Y <= BG_MOSAIC_Y + 1;
 				end if;
-			elsif H_CNT = 339 and V_CNT = 261 then
+			elsif H_CNT = LAST_DOT and V_CNT = LAST_LINE then
 				BG_MOSAIC_Y <= (others => '0');
 			end if;
 			
-			if BG_VRAM_FETCH = '1' and FORCE_BLANK = '0' then
+			if H_CNT = LAST_DOT then
+				BG_FORCE_BLANK <= FORCE_BLANK;
+			elsif BG_FETCH = '1' and H_CNT(2 downto 0) = 0 then
+				BG_FORCE_BLANK <= FORCE_BLANK;
+			end if;
+			
+			if BG_FETCH = '1' and BG_FORCE_BLANK = '0' then
 				if BG_MODE /= "111" then 
 					BG_DATA(to_integer(H_CNT(2 downto 0))) <= VRAM_DBI & VRAM_DAI;
 				else
@@ -1397,198 +1368,254 @@ begin
 	end if;
 end process;
 
---Sprites range engine
+
+--Sprites engine
+OAM : entity work.dpram generic map(8,16)
+port map(
+	clock			=> CLK,
+	data_a		=> OAM_D,
+	address_a	=> OAM_ADDR_WR,
+	address_b	=> OAM_ADDR_RD,
+	wren_a		=> OAM_WE,
+	cs_a			=> OAM_CS,
+	q_b			=> OAM_Q
+);
+OAM_D <= DI & OAM_latch;
+OAM_ADDR_WR <= OAM_ADDR(8 downto 1) when OBJ_FORCE_BLANK = '1' or IN_VBL = '1' else
+				   INT_OAM_ADDR & OAM_ADDR(1);
+OAM_ADDR_RD <= DBG_OAM_ADDR when ENABLE = '0' else 
+				   OAM_ADDR(8 downto 1) when OBJ_FORCE_BLANK = '1' or IN_VBL = '1' else
+				   INT_OAM_ADDR & H_CNT(0);
+OAM_WE <= ENABLE when PAWR_N = '0' and PA = x"04" and SYSCLK_CE = '1' else '0';
+OAM_CS <= '1' when (OAM_ADDR(9) = '0' or (IN_VBL = '0' and OBJ_FORCE_BLANK = '0')) and OAM_ADDR(0) = '1' else '0';
+
+
+HOAM : entity work.dpram generic map(5,8)
+port map(
+	clock			=> CLK,
+	data_a		=> DI,
+	address_a	=> HOAM_ADDR_WR,
+	address_b	=> HOAM_ADDR_RD,
+	wren_a		=> HOAM_WE,
+	cs_a			=> HOAM_CS,
+	q_b			=> HOAM_Q
+);
+HOAM_ADDR_WR <= OAM_ADDR(4 downto 0) when OBJ_FORCE_BLANK = '1' or IN_VBL = '1' else
+				    INT_OAM_ADDR(6 downto 2);
+HOAM_ADDR_RD <= DBG_OAM_ADDR(4 downto 0) when ENABLE = '0' else 
+					 OAM_ADDR(4 downto 0) when OBJ_FORCE_BLANK = '1' or IN_VBL = '1' else
+				    INT_OAM_ADDR(6 downto 2);
+HOAM_WE <= ENABLE when PAWR_N = '0' and PA = x"04" and SYSCLK_CE = '1' else '0';
+HOAM_CS <= '1' when OAM_ADDR(9) = '1' or (IN_VBL = '0' and OBJ_FORCE_BLANK = '0') else '0';
+
+HOAM_X8 <= HOAM_Q(to_integer(unsigned(INT_OAM_ADDR(1 downto 0))&"0"));
+HOAM_S  <= HOAM_Q(to_integer(unsigned(INT_OAM_ADDR(1 downto 0))&"1"));
+
+
 process( RST_N, CLK )
-variable SCREEN_Y : unsigned(7 downto 0);
-variable W, H : unsigned(5 downto 0);
-variable NEW_RANGE_CNT : unsigned(5 downto 0);
+variable SCREEN_Y 		: unsigned(7 downto 0);
+variable X 					: unsigned(8 downto 0);
+variable Y 					: unsigned(7 downto 0);
+variable W, H, H2 		: unsigned(5 downto 0);
+variable NEW_RANGE_CNT 	: unsigned(5 downto 0);
+variable TILE_X 			: unsigned(8 downto 0);
+variable CUR_TILES_CNT 	: unsigned(2 downto 0);
+variable OAM_OBJ_TILE	: unsigned(7 downto 0);
+variable OAM_OBJ_N		: std_logic;
+variable OAM_OBJ_PAL		: std_logic_vector(2 downto 0);
+variable OAM_OBJ_PRIO	: std_logic_vector(1 downto 0);
+variable OAM_OBJ_HFLIP	: std_logic;
+variable OAM_OBJ_VFLIP	: std_logic;
+variable TEMP 				: unsigned(5 downto 0);
 begin
 	if RST_N = '0' then
-		RANGE_CNT_WR <= (others => '0');
-		OBJ_RANGE_DONE <= '0';
-		OAM_OBJ <= ("000000000","00000000","00000000",'0',"000","00",'0','0','0');
-		OBJ_RANGE_OFL <= '0';
-		OAM_RANGE_INDEXES <= (others => "0000000");
-	elsif rising_edge(CLK) then 
-		if ENABLE = '1' and DOT_CLKR_CE = '1' then
-			if H_CNT = 339 and V_CNT < LAST_VIS_LINE then
-				RANGE_CNT_WR <= (others => '1');
-				OBJ_RANGE_DONE <= '0';
-			end if;
-			
-			if H_CNT = 339 and V_CNT = 261 then
-				if FORCE_BLANK = '0' then
-					OBJ_RANGE_OFL <= '0';
-				end if;
-			end if;
-			
-			if OBJ_RANGE = '1' then
-				case H_CNT(0) is
-					when '0' =>
-						OAM_OBJ <= (unsigned(HOAM_Q_B(0) & OAM_Q_B(7 downto 0)), 
-										unsigned(OAM_Q_B(15 downto 8)), 
-										unsigned(OAM_Q_B(23 downto 16)),
-										OAM_Q_B(24),
-										OAM_Q_B(27 downto 25),
-										OAM_Q_B(29 downto 28),
-										OAM_Q_B(30),
-										OAM_Q_B(31),
-										HOAM_Q_B(1));
-					when '1' =>
-						SCREEN_Y := V_CNT(7 downto 0);
-						W := SprWidth(OAM_OBJ.S & OBJSIZE);
-						H := SprHeight(OAM_OBJ.S & OBJSIZE);
-						if OBJINTERLACE = '1' then
-							H := (H srl 1);
-						end if;
-						if (OAM_OBJ.X <= 256 or (0 - OAM_OBJ.X) <= W) and (SCREEN_Y - OAM_OBJ.Y) <= H then
-							if OBJ_RANGE_DONE = '0' then
-								NEW_RANGE_CNT := RANGE_CNT_WR + 1;
-								OAM_RANGE_INDEXES(to_integer(NEW_RANGE_CNT(4 downto 0))) <= OAM_ADDR(8 downto 2);
-								RANGE_CNT_WR <= NEW_RANGE_CNT;
-								if NEW_RANGE_CNT = 31 then
-									OBJ_RANGE_DONE <= '1';
-								end if;
-							elsif OBJ_RANGE_OFL = '0' then
-								OBJ_RANGE_OFL <= '1';
-							end if;
-						end if;
-					when others => null;
-				end case;
-			end if;
-		end if;
-	end if;
-end process;
-
-
---Sprites time engine
-process( RST_N, CLK, OAM_Q_B, HOAM_Q_B, TILES_CNT, OBJINTERLACE, FIELD, OBJSIZE, OBJNAME, OBJADDR, H_CNT, V_CNT )
-variable SCREEN_Y : unsigned(7 downto 0);
-variable TILE_X : unsigned(8 downto 0);
-variable W, H : unsigned(5 downto 0);
-variable TILE_GAP : unsigned(14 downto 0);
-variable SPR : Sprite_r;
-variable CUR_TILES_CNT : unsigned(2 downto 0);
-variable Y : unsigned(7 downto 0);
-variable TEMP : unsigned(5 downto 0);
-variable TILE_COL, TILE_ROW : unsigned(3 downto 0);
-begin
-	SPR := (unsigned(HOAM_Q_B(0) & OAM_Q_B(7 downto 0)),
-				unsigned(OAM_Q_B(15 downto 8)),
-				unsigned(OAM_Q_B(23 downto 16)),
-				OAM_Q_B(24),
-				OAM_Q_B(27 downto 25),
-				OAM_Q_B(29 downto 28),
-				OAM_Q_B(30),
-				OAM_Q_B(31),
-				HOAM_Q_B(1));
-	if SPR.X(8) = '1' and TILES_CNT = 0 then
-		TEMP := 0 - unsigned(SPR.X(5 downto 0));
-		CUR_TILES_CNT := TEMP(5 downto 3);
-	else
-		CUR_TILES_CNT := TILES_CNT;
-	end if;
-	
-	SCREEN_Y := V_CNT(7 downto 0);
-	if SPR.VFLIP = '0' then
-		Y := SCREEN_Y - SPR.Y;
-	else
-		Y := not (SCREEN_Y - SPR.Y);
-	end if;
-	if OBJINTERLACE = '1' then
-		Y := (Y(6 downto 0) & FIELD);
-	end if;
-
-	W := SprWidth(SPR.S & OBJSIZE);
-	H := SprHeight(SPR.S & OBJSIZE);
-	if SPR.HFLIP = '0' then
-		TILE_COL := unsigned(SPR.TILE(3 downto 0)) + CUR_TILES_CNT;
-	else
-		TILE_COL := unsigned(SPR.TILE(3 downto 0)) + ((not CUR_TILES_CNT) and W(5 downto 3));
-	end if;
-	TILE_ROW := unsigned(SPR.TILE(7 downto 4)) + (Y(5 downto 3) and H(5 downto 3));
-	if SPR.N = '0' then
-		TILE_GAP := (others => '0');
-	else
-		TILE_GAP := 4096 + (resize(unsigned(OBJNAME),TILE_GAP'length) sll 12);
-	end if;
-	OBJ_VRAM_ADDR <= std_logic_vector( (resize(unsigned(OBJADDR),OBJ_VRAM_ADDR'length) sll 13) + 
-												  resize(TILE_GAP,OBJ_VRAM_ADDR'length) + 
-												  resize((TILE_ROW & TILE_COL & H_CNT(0) & Y(2 downto 0)),OBJ_VRAM_ADDR'length) );
-	
-	if RST_N = '0' then
-		RANGE_CNT_RD <= (others => '0');
+		RANGE_CNT <= (others => '1');
+		OAM_RANGE <= (others => (others => '0'));
 		TILES_OAM_CNT <= (others => '0');
 		TILES_CNT <= (others => '0');
+		OBJ_RANGE_OFL <= '0';
+		OBJ_TIME_OFL <= '0';
+		OBJ_RANGE_DONE <= '0';
+		OBJ_TIME_DONE <= '0';
+		OBJ_TIME_SAVE <= '0';
+		OAM_TIME_INDEX <= (others => '0');
+		OAM_OBJ_X <= (others => '0');
+		OAM_OBJ_Y <= (others => '0');
+		OAM_OBJ_S <= '0';
+		OBJ_TILE_LINE <= (others => '0');
+		OBJ_TILE_COL <= (others => '0');
+		OBJ_TILE_ROW <= (others => '0');
+		OBJ_TILE_GAP <= (others => '0');
+		OBJ_TILE_HFLIP <= '0';
+		OBJ_TILE_PAL <= (others => '0');
+		OBJ_TILE_PRIO <= (others => '0');
+		OBJ_TILE_X <= (others => '0');
 		SPR_TILE_DATA <= (others => '0');
 		SPR_TILE_X <= (others => '0');
 		SPR_TILE_PAL <= (others => '0');
 		SPR_TILE_PRIO <= (others => '0');
 		SPR_TILE_DATA_TEMP <= (others => '0');
-		OBJ_TIME_OFL <= '0';
-		OBJ_TIME_SAVE <= '0';
-		OBJ_TIME_INDEX <= (others => '0');
+		OBJ_FORCE_BLANK <= '1';
 	elsif rising_edge(CLK) then 
 		if ENABLE = '1' and DOT_CLKR_CE = '1' then
-			if H_CNT = (256+16)-1 and V_CNT < LAST_VIS_LINE then
-				TILES_OAM_CNT <= (others => '0');
-				TILES_CNT <= (others => '0');
-				RANGE_CNT_RD <= RANGE_CNT_WR;
-				if RANGE_CNT_WR /= "111111" then
-					OBJ_TIME_INDEX <= OAM_RANGE_INDEXES(to_integer(RANGE_CNT_WR(4 downto 0)));
-				end if;
+			if FORCE_BLANK = '1' then
+				OBJ_FORCE_BLANK <= '1';
+			elsif H_CNT = LAST_DOT and FORCE_BLANK = '0' then
+				OBJ_FORCE_BLANK <= '0';
 			end if;
-			
-			if H_CNT = 339 and V_CNT = 261 then
-				if FORCE_BLANK = '0' then
-					OBJ_TIME_OFL <= '0';
-				end if;
-			end if;
-			
-			if H_CNT = 0 and V_CNT <= LAST_VIS_LINE then
-				if RANGE_CNT_RD /= "111111" and TILES_OAM_CNT = 34 then
+		
+			if H_CNT = LAST_DOT and V_CNT < LAST_VIS_LINE then
+				RANGE_CNT <= (others => '1');
+				if RANGE_CNT(5) /= '1' and TILES_OAM_CNT = 34 then
 					OBJ_TIME_OFL <= '1';
 				end if;
+				OBJ_RANGE_DONE <= '0';
 			end if;
 			
-			if OBJ_TIME = '1' and RANGE_CNT_RD /= "111111" and H_CNT(0) = '1' then 
+			if V_CNT < LAST_VIS_LINE and OBJ_FORCE_BLANK = '0' then
+				if H_CNT = OBJ_TIME_START-1 then
+					if RANGE_CNT(5) /= '1' then
+						OAM_TIME_INDEX <= OAM_RANGE(to_integer(RANGE_CNT(4 downto 0)));
+					end if;
+				end if;
+			end if;
+			
+			if H_CNT = LAST_DOT and V_CNT = LAST_LINE and OBJ_FORCE_BLANK = '0' then
+				OBJ_RANGE_OFL <= '0';
+				OBJ_TIME_OFL <= '0';
+			end if;
+			
+			if H_CNT(0) = '0' then
+				OAM_OBJ_X <= HOAM_X8 & unsigned(OAM_Q(7 downto 0));
+				OAM_OBJ_Y <= unsigned(OAM_Q(15 downto 8));
+				OAM_OBJ_S <= HOAM_S;
+			end if;	
+			
+			SCREEN_Y := V_CNT(7 downto 0);
+			W := SprWidth(OAM_OBJ_S & OBJSIZE);
+			H := SprHeight(OAM_OBJ_S & OBJSIZE);
+			if OBJINTERLACE = '1' then
+				H2 := (H srl 1);
+			else
+				H2 := H;
+			end if;		
+			
+			if OBJ_RANGE = '1' and H_CNT(0) = '1' and OBJ_FORCE_BLANK = '0' then
+				if (OAM_OBJ_X <= 256 or (0 - OAM_OBJ_X) <= W) and (SCREEN_Y - OAM_OBJ_Y) <= H2 then
+					if OBJ_RANGE_DONE = '0' then
+						NEW_RANGE_CNT := RANGE_CNT + 1;
+						OAM_RANGE(to_integer(NEW_RANGE_CNT(4 downto 0))) <= OAM_RANGE_INDEX;
+						RANGE_CNT <= NEW_RANGE_CNT;
+						if NEW_RANGE_CNT = 31 then
+							OBJ_RANGE_DONE <= '1';
+						end if;
+					elsif OBJ_RANGE_OFL = '0' then
+						OBJ_RANGE_OFL <= '1';
+					end if;
+				end if;
+			end if;
+			
+			if H_CNT = OBJ_TIME_START-1 and V_CNT < LAST_VIS_LINE then
+				TILES_OAM_CNT <= (others => '0');
+				TILES_CNT <= (others => '0');
+				OBJ_TIME_DONE <= '1';
+			end if;
+			
+			if OBJ_TIME = '1' and H_CNT(0) = '1' and OBJ_FORCE_BLANK = '0' then 
+				if RANGE_CNT(5) /= '1' then
+					OAM_OBJ_TILE := unsigned(OAM_Q(7 downto 0));
+					OAM_OBJ_N := OAM_Q(8);
+					OAM_OBJ_PAL := OAM_Q(11 downto 9);
+					OAM_OBJ_PRIO := OAM_Q(13 downto 12);
+					OAM_OBJ_HFLIP := OAM_Q(14);
+					OAM_OBJ_VFLIP := OAM_Q(15);
+					
+					if OAM_OBJ_X(8) = '1' and TILES_CNT = 0 then
+						TEMP := 0 - unsigned(OAM_OBJ_X(5 downto 0));
+						CUR_TILES_CNT := TEMP(5 downto 3);
+					else
+						CUR_TILES_CNT := TILES_CNT;
+					end if;
+					
+					if OAM_OBJ_VFLIP = '0' then
+						Y := SCREEN_Y - OAM_OBJ_Y;
+					else
+						Y := not (SCREEN_Y - OAM_OBJ_Y);
+					end if;
+					if OBJINTERLACE = '1' then
+						Y := (Y(6 downto 0) & FIELD);
+					end if;
+					OBJ_TILE_LINE <= Y(2 downto 0);
+
+					if OAM_OBJ_HFLIP = '0' then
+						OBJ_TILE_COL <= unsigned(OAM_OBJ_TILE(3 downto 0)) + CUR_TILES_CNT;
+					else
+						OBJ_TILE_COL <= unsigned(OAM_OBJ_TILE(3 downto 0)) + ((not CUR_TILES_CNT) and W(5 downto 3));
+					end if;
+					OBJ_TILE_ROW <= unsigned(OAM_OBJ_TILE(7 downto 4)) + (Y(5 downto 3) and H(5 downto 3));
+					if OAM_OBJ_N = '0' then
+						OBJ_TILE_GAP <= (others => '0');
+					else
+						OBJ_TILE_GAP <= 4096 + (resize(unsigned(OBJNAME), OBJ_TILE_GAP'length) sll 12);
+					end if;
+					
+					TILE_X := OAM_OBJ_X + (resize(CUR_TILES_CNT,9) sll 3);
+					
+					OBJ_TILE_HFLIP <= OAM_OBJ_HFLIP;
+					OBJ_TILE_PAL <= OAM_OBJ_PAL ;
+					OBJ_TILE_PRIO <= OAM_OBJ_PRIO;
+					OBJ_TILE_X <= TILE_X;
+					
+					TILES_OAM_CNT <= TILES_OAM_CNT + 1;
+					TILES_CNT <= CUR_TILES_CNT + 1;
+					if CUR_TILES_CNT = W(5 downto 3) or (TILE_X + 8) >= 256 then
+						NEW_RANGE_CNT := RANGE_CNT - 1;
+						TILES_CNT <= (others => '0');
+						RANGE_CNT <= NEW_RANGE_CNT;
+						if NEW_RANGE_CNT(5) /= '1' then
+							OAM_TIME_INDEX <= OAM_RANGE(to_integer(NEW_RANGE_CNT(4 downto 0)));
+						end if;
+					end if;
+					
+					OBJ_TIME_DONE <= '0';
+				else
+					OBJ_TIME_DONE <= '1';
+				end if;
+			end if;
+			
+			if OBJ_FETCH = '1' and OBJ_FORCE_BLANK = '0' then 
+				if OBJ_TIME_DONE = '0' then
+					case H_CNT(0) is
+						when '0' =>
+							SPR_TILE_DATA_TEMP <= FlipPlane(VRAM_DBI, OBJ_TILE_HFLIP) & FlipPlane(VRAM_DAI, OBJ_TILE_HFLIP);
+						when others =>
+							SPR_TILE_DATA <= FlipPlane(VRAM_DBI, OBJ_TILE_HFLIP) & 
+												  FlipPlane(VRAM_DAI, OBJ_TILE_HFLIP) & 
+												  SPR_TILE_DATA_TEMP(15 downto 0);
+							SPR_TILE_X <= OBJ_TILE_X;
+							SPR_TILE_PAL <= OBJ_TILE_PAL;
+							SPR_TILE_PRIO <= OBJ_TILE_PRIO;
+					end case;
+				end if;
+			end if;
+				
+			if OBJ_FETCH = '1' and OBJ_TIME_DONE = '0' and H_CNT(0) = '1' then 
 				OBJ_TIME_SAVE <= '1';
 			elsif OBJ_TIME_SAVE = '1' and H_CNT(0) = '1' then
 				OBJ_TIME_SAVE <= '0';
 			end if;
-			
-			if OBJ_TIME = '1' then 
-				if RANGE_CNT_RD /= "111111" then
-					case H_CNT(0) is
-						when '0' =>
-							SPR_TILE_DATA_TEMP <= VRAM_DBI & VRAM_DAI;
-						when others =>
-							TILE_X := SPR.X + (resize(CUR_TILES_CNT,9) sll 3);
-
-							SPR_TILE_DATA <= FlipPlane(VRAM_DBI, SPR.HFLIP) & 
-												  FlipPlane(VRAM_DAI, SPR.HFLIP) & 
-												  FlipPlane(SPR_TILE_DATA_TEMP(15 downto 8), SPR.HFLIP) & 
-												  FlipPlane(SPR_TILE_DATA_TEMP(7 downto 0), SPR.HFLIP);
-							SPR_TILE_X <= TILE_X;
-							SPR_TILE_PAL <= SPR.PAL;
-							SPR_TILE_PRIO <= SPR.PRIO;
-							
-							TILES_OAM_CNT <= TILES_OAM_CNT + 1;
-							
-							TILES_CNT <= CUR_TILES_CNT + 1;
-							if CUR_TILES_CNT = W(5 downto 3) or (TILE_X + 8) >= 256 then
-								TILES_CNT <= (others => '0');
-								RANGE_CNT_RD <= RANGE_CNT_RD - 1;
-								if RANGE_CNT_RD /= "000000" then
-									OBJ_TIME_INDEX <= OAM_RANGE_INDEXES(to_integer(RANGE_CNT_RD(4 downto 0) - 1));
-								end if;
-							end if;
-					end case;
-				end if;
-			end if;
 		end if;
 	end if;
 end process;
+
+OAM_RANGE_INDEX <= std_logic_vector( H_CNT(7 downto 1) + unsigned(OAMADD(7 downto 1)) );
+
+INT_OAM_ADDR <= OAM_RANGE_INDEX when OBJ_RANGE = '1' else OAM_TIME_INDEX;
+
+OBJ_VRAM_ADDR <= std_logic_vector( (resize(unsigned(OBJADDR), OBJ_VRAM_ADDR'length) sll 13) + 
+												resize(OBJ_TILE_GAP, OBJ_VRAM_ADDR'length) + 
+												resize((OBJ_TILE_ROW & OBJ_TILE_COL & H_CNT(0) & OBJ_TILE_LINE), OBJ_VRAM_ADDR'length) );
+
 
 process( RST_N, CLK )
 variable X : unsigned(8 downto 0);
@@ -1628,12 +1655,10 @@ SPR_BUF : entity work.dpram generic map(8,9)
 port map(
 	clock			=> CLK,
 	data_a		=> SPR_PIX_D,
-	data_b		=> (others => '0'),
 	address_a	=> SPR_PIX_ADDR_A,
 	address_b	=> std_logic_vector(SPR_PIXEL_X),
 	wren_a		=> SPR_PIX_WE_A,
 	wren_b		=> SPR_PIX_WE_B,
---	q_a			=> SPR_PIX_Q_A,
 	q_b			=> SPR_PIX_Q
 );
 SPR_PIX_WE_B <= '1' when SPR_GET_PIXEL = '1' and DOT_CLKR_CE = '1'  else '0';
@@ -1645,7 +1670,7 @@ begin
 		SPR_PIXEL_X <= (others => '0');
 	elsif rising_edge(CLK) then 
 		if ENABLE = '1' and DOT_CLKR_CE = '1' then
-			if H_CNT = 339 and V_CNT >= 1 and V_CNT <= LAST_VIS_LINE then
+			if H_CNT = LAST_DOT and V_CNT >= 1 and V_CNT <= LAST_VIS_LINE then
 				SPR_PIXEL_X <= (others => '0');
 			end if;
 
@@ -1657,7 +1682,6 @@ begin
 		end if;
 	end if;
 end process;
-
 
 
 process( RST_N, CLK )
@@ -1672,7 +1696,7 @@ begin
 		SPR_PIX_DATA <= (others => '0');
 	elsif rising_edge(CLK) then 
 		if ENABLE = '1' and DOT_CLKR_CE = '1' then
-			if H_CNT = 339 and V_CNT >= 1 and V_CNT <= LAST_VIS_LINE then
+			if H_CNT = LAST_DOT and V_CNT >= 1 and V_CNT <= LAST_VIS_LINE then
 				GET_PIXEL_X <= (others => '0');
 				BG_MOSAIC_X <= (others => '0');
 			end if;
@@ -1756,17 +1780,17 @@ end process;
 
 
 process( RST_N, CLK, WH0, WH1, WH2, WH3, W12SEL, W34SEL, WOBJSEL, WBGLOG, WOBJLOG, CGWSEL, CGADSUB, TMW, TSW, TM, TS, BG_MODE, BG3PRIO, M7EXTBG,
-			WINDOW_X, SPR_PIX_DATA, BG1_PIX_DATA, BG2_PIX_DATA, BG3_PIX_DATA, BG4_PIX_DATA, DBG_BG_EN, DBG_OBJ_EN)
+			WINDOW_X, SPR_PIX_DATA, BG1_PIX_DATA, BG2_PIX_DATA, BG3_PIX_DATA, BG4_PIX_DATA, DBG_BG_EN, DBG_OBJ_EN, DOT_CLK)
 variable PAL1,PAL2,PAL3,PAL4,OBJ_PAL : std_logic_vector(7 downto 0);
 variable PRIO1,PRIO2,PRIO3,PRIO4 : std_logic;
-variable MBGPR0EN, MBGPR1EN, SBGPR0EN, SBGPR1EN : std_logic_vector(3 downto 0);
-variable MOBJPR0EN,MOBJPR1EN,MOBJPR2EN,MOBJPR3EN,SOBJPR0EN,SOBJPR1EN,SOBJPR2EN,SOBJPR3EN : std_logic;
+variable BGPR0EN, BGPR1EN : std_logic_vector(3 downto 0);
+variable OBJPR0EN,OBJPR1EN,OBJPR2EN,OBJPR3EN : std_logic;
 variable OBJ_PRIO : std_logic_vector(1 downto 0);
 variable win1, win2, win1en, win2en, bglog0, bglog1, winres : std_logic_vector(5 downto 0);
 variable main_dis, sub_dis : std_logic_vector(4 downto 0);
 variable MAIN_EN, SUB_EN, SUB_MATH_EN : std_logic;
-variable MAIN_DCM, SUB_DCM, SUB_BD, MATH : std_logic;
-variable MAIN_COLOR, SUB_COLOR	: std_logic_vector(14 downto 0);
+variable DCM, BD, MATH : std_logic;
+variable MAIN_COLOR	: std_logic_vector(14 downto 0);
 variable COLOR_MASK : std_logic_vector(4 downto 0);
 variable MATH_R, MATH_G, MATH_B	: unsigned(4 downto 0);
 variable HALF : std_logic;
@@ -1826,9 +1850,8 @@ begin
 		when others => null;
 	end case;
 	
-	SUB_BD := '0';
-	MAIN_DCM := '0';
-	SUB_DCM := '0';
+	BD := '0';
+	DCM := '0';
 	MATH := '0';
 	
 	OBJ_PRIO := SPR_PIX_DATA(8 downto 7);
@@ -1838,552 +1861,403 @@ begin
 	PRIO3 := BG3_PIX_DATA(5);
 	PRIO4 := BG4_PIX_DATA(5);
 	
-	MBGPR0EN(0) := TM(0) and (not main_dis(0)) and (not PRIO1) and DBG_BG_EN(0);
-	MBGPR0EN(1) := TM(1) and (not main_dis(1)) and (not PRIO2) and DBG_BG_EN(1);
-	MBGPR0EN(2) := TM(2) and (not main_dis(2)) and (not PRIO3) and DBG_BG_EN(2);
-	MBGPR0EN(3) := TM(3) and (not main_dis(3)) and (not PRIO4) and DBG_BG_EN(3);
-	MBGPR1EN(0) := TM(0) and (not main_dis(0)) and (    PRIO1) and DBG_BG_EN(4);
-	MBGPR1EN(1) := TM(1) and (not main_dis(1)) and (    PRIO2) and DBG_BG_EN(5);
-	MBGPR1EN(2) := TM(2) and (not main_dis(2)) and (    PRIO3) and DBG_BG_EN(6);
-	MBGPR1EN(3) := TM(3) and (not main_dis(3)) and (    PRIO4) and DBG_BG_EN(7);
-	MOBJPR0EN := TM(4) and (not main_dis(4)) and (not OBJ_PRIO(0)) and (not OBJ_PRIO(1)) and DBG_OBJ_EN(0);
-	MOBJPR1EN := TM(4) and (not main_dis(4)) and (    OBJ_PRIO(0)) and (not OBJ_PRIO(1)) and DBG_OBJ_EN(0);
-	MOBJPR2EN := TM(4) and (not main_dis(4)) and (not OBJ_PRIO(0)) and (    OBJ_PRIO(1)) and DBG_OBJ_EN(0);
-	MOBJPR3EN := TM(4) and (not main_dis(4)) and (    OBJ_PRIO(0)) and (    OBJ_PRIO(1)) and DBG_OBJ_EN(0);
-	
-	SBGPR0EN(0) := TS(0) and (not sub_dis(0)) and (not PRIO1) and DBG_BG_EN(0);
-	SBGPR0EN(1) := TS(1) and (not sub_dis(1)) and (not PRIO2) and DBG_BG_EN(1);
-	SBGPR0EN(2) := TS(2) and (not sub_dis(2)) and (not PRIO3) and DBG_BG_EN(2);
-	SBGPR0EN(3) := TS(3) and (not sub_dis(3)) and (not PRIO4) and DBG_BG_EN(3);
-	SBGPR1EN(0) := TS(0) and (not sub_dis(0)) and (    PRIO1) and DBG_BG_EN(4);
-	SBGPR1EN(1) := TS(1) and (not sub_dis(1)) and (    PRIO2) and DBG_BG_EN(5);
-	SBGPR1EN(2) := TS(2) and (not sub_dis(2)) and (    PRIO3) and DBG_BG_EN(6);
-	SBGPR1EN(3) := TS(3) and (not sub_dis(3)) and (    PRIO4) and DBG_BG_EN(7);
-	SOBJPR0EN := TS(4) and (not sub_dis(4)) and (not OBJ_PRIO(0)) and (not OBJ_PRIO(1)) and DBG_OBJ_EN(0);
-	SOBJPR1EN := TS(4) and (not sub_dis(4)) and (    OBJ_PRIO(0)) and (not OBJ_PRIO(1)) and DBG_OBJ_EN(0);
-	SOBJPR2EN := TS(4) and (not sub_dis(4)) and (not OBJ_PRIO(0)) and (    OBJ_PRIO(1)) and DBG_OBJ_EN(0);
-	SOBJPR3EN := TS(4) and (not sub_dis(4)) and (    OBJ_PRIO(0)) and (    OBJ_PRIO(1)) and DBG_OBJ_EN(0);
-			
+	if DOT_CLK = '1' then
+		BGPR0EN(0) := TS(0) and (not sub_dis(0)) and (not PRIO1) and DBG_BG_EN(0);
+		BGPR0EN(1) := TS(1) and (not sub_dis(1)) and (not PRIO2) and DBG_BG_EN(1);
+		BGPR0EN(2) := TS(2) and (not sub_dis(2)) and (not PRIO3) and DBG_BG_EN(2);
+		BGPR0EN(3) := TS(3) and (not sub_dis(3)) and (not PRIO4) and DBG_BG_EN(3);
+		BGPR1EN(0) := TS(0) and (not sub_dis(0)) and (    PRIO1) and DBG_BG_EN(4);
+		BGPR1EN(1) := TS(1) and (not sub_dis(1)) and (    PRIO2) and DBG_BG_EN(5);
+		BGPR1EN(2) := TS(2) and (not sub_dis(2)) and (    PRIO3) and DBG_BG_EN(6);
+		BGPR1EN(3) := TS(3) and (not sub_dis(3)) and (    PRIO4) and DBG_BG_EN(7);
+		OBJPR0EN := TS(4) and (not sub_dis(4)) and (not OBJ_PRIO(0)) and (not OBJ_PRIO(1)) and DBG_OBJ_EN(0);
+		OBJPR1EN := TS(4) and (not sub_dis(4)) and (    OBJ_PRIO(0)) and (not OBJ_PRIO(1)) and DBG_OBJ_EN(0);
+		OBJPR2EN := TS(4) and (not sub_dis(4)) and (not OBJ_PRIO(0)) and (    OBJ_PRIO(1)) and DBG_OBJ_EN(0);
+		OBJPR3EN := TS(4) and (not sub_dis(4)) and (    OBJ_PRIO(0)) and (    OBJ_PRIO(1)) and DBG_OBJ_EN(0);
+	else
+		BGPR0EN(0) := TM(0) and (not main_dis(0)) and (not PRIO1) and DBG_BG_EN(0);
+		BGPR0EN(1) := TM(1) and (not main_dis(1)) and (not PRIO2) and DBG_BG_EN(1);
+		BGPR0EN(2) := TM(2) and (not main_dis(2)) and (not PRIO3) and DBG_BG_EN(2);
+		BGPR0EN(3) := TM(3) and (not main_dis(3)) and (not PRIO4) and DBG_BG_EN(3);
+		BGPR1EN(0) := TM(0) and (not main_dis(0)) and (    PRIO1) and DBG_BG_EN(4);
+		BGPR1EN(1) := TM(1) and (not main_dis(1)) and (    PRIO2) and DBG_BG_EN(5);
+		BGPR1EN(2) := TM(2) and (not main_dis(2)) and (    PRIO3) and DBG_BG_EN(6);
+		BGPR1EN(3) := TM(3) and (not main_dis(3)) and (    PRIO4) and DBG_BG_EN(7);
+		OBJPR0EN := TM(4) and (not main_dis(4)) and (not OBJ_PRIO(0)) and (not OBJ_PRIO(1)) and DBG_OBJ_EN(0);
+		OBJPR1EN := TM(4) and (not main_dis(4)) and (    OBJ_PRIO(0)) and (not OBJ_PRIO(1)) and DBG_OBJ_EN(0);
+		OBJPR2EN := TM(4) and (not main_dis(4)) and (not OBJ_PRIO(0)) and (    OBJ_PRIO(1)) and DBG_OBJ_EN(0);
+		OBJPR3EN := TM(4) and (not main_dis(4)) and (    OBJ_PRIO(0)) and (    OBJ_PRIO(1)) and DBG_OBJ_EN(0);
+	end if;
 	
 	if BG_MODE = "000" then	-- MODE0
-		if SPR_PIX_DATA(3 downto 0) /= "0000" and MOBJPR3EN = '1' then
-			CRAM_MAIN_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
+		if SPR_PIX_DATA(3 downto 0) /= "0000" and OBJPR3EN = '1' then
+			CGRAM_FETCH_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
-		elsif BG1_PIX_DATA(1 downto 0) /= "00" and MBGPR1EN(0) = '1' then
-			CRAM_MAIN_ADDR <= "000" & BG1_PIX_DATA(10 downto 8) & BG1_PIX_DATA(1 downto 0);
+		elsif BG1_PIX_DATA(1 downto 0) /= "00" and BGPR1EN(0) = '1' then
+			CGRAM_FETCH_ADDR <= "000" & BG1_PIX_DATA(10 downto 8) & BG1_PIX_DATA(1 downto 0);
 			MATH := CGADSUB(0);
-		elsif BG2_PIX_DATA(1 downto 0) /= "00" and MBGPR1EN(1) = '1' then
-			CRAM_MAIN_ADDR <= "001" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(1 downto 0);
+		elsif BG2_PIX_DATA(1 downto 0) /= "00" and BGPR1EN(1) = '1' then
+			CGRAM_FETCH_ADDR <= "001" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(1 downto 0);
 			MATH := CGADSUB(1);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and MOBJPR2EN = '1' then
-			CRAM_MAIN_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
+		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and OBJPR2EN = '1' then
+			CGRAM_FETCH_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
-		elsif BG1_PIX_DATA(1 downto 0) /= "00" and MBGPR0EN(0) = '1' then
-			CRAM_MAIN_ADDR <= "000" & BG1_PIX_DATA(10 downto 8) & BG1_PIX_DATA(1 downto 0);
+		elsif BG1_PIX_DATA(1 downto 0) /= "00" and BGPR0EN(0) = '1' then
+			CGRAM_FETCH_ADDR <= "000" & BG1_PIX_DATA(10 downto 8) & BG1_PIX_DATA(1 downto 0);
 			MATH := CGADSUB(0);
-		elsif BG2_PIX_DATA(1 downto 0) /= "00" and MBGPR0EN(1) = '1' then
-			CRAM_MAIN_ADDR <= "001" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(1 downto 0);
+		elsif BG2_PIX_DATA(1 downto 0) /= "00" and BGPR0EN(1) = '1' then
+			CGRAM_FETCH_ADDR <= "001" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(1 downto 0);
 			MATH := CGADSUB(1);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and MOBJPR1EN = '1' then
-			CRAM_MAIN_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
+		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and OBJPR1EN = '1' then
+			CGRAM_FETCH_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
-		elsif BG3_PIX_DATA(1 downto 0) /= "00" and MBGPR1EN(2) = '1' then
-			CRAM_MAIN_ADDR <= "010" & BG3_PIX_DATA(4 downto 2) & BG3_PIX_DATA(1 downto 0);
+		elsif BG3_PIX_DATA(1 downto 0) /= "00" and BGPR1EN(2) = '1' then
+			CGRAM_FETCH_ADDR <= "010" & BG3_PIX_DATA(4 downto 2) & BG3_PIX_DATA(1 downto 0);
 			MATH := CGADSUB(2);
-		elsif BG4_PIX_DATA(1 downto 0) /= "00" and MBGPR1EN(3) = '1' then
-			CRAM_MAIN_ADDR <= "011" & BG4_PIX_DATA(4 downto 2) & BG4_PIX_DATA(1 downto 0);
+		elsif BG4_PIX_DATA(1 downto 0) /= "00" and BGPR1EN(3) = '1' then
+			CGRAM_FETCH_ADDR <= "011" & BG4_PIX_DATA(4 downto 2) & BG4_PIX_DATA(1 downto 0);
 			MATH := CGADSUB(3);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and MOBJPR0EN = '1' then
-			CRAM_MAIN_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
+		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and OBJPR0EN = '1' then
+			CGRAM_FETCH_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
-		elsif BG3_PIX_DATA(1 downto 0) /= "00" and MBGPR0EN(2) = '1' then
-			CRAM_MAIN_ADDR <= "010" & BG3_PIX_DATA(4 downto 2) & BG3_PIX_DATA(1 downto 0);
+		elsif BG3_PIX_DATA(1 downto 0) /= "00" and BGPR0EN(2) = '1' then
+			CGRAM_FETCH_ADDR <= "010" & BG3_PIX_DATA(4 downto 2) & BG3_PIX_DATA(1 downto 0);
 			MATH := CGADSUB(2);
-		elsif BG4_PIX_DATA(1 downto 0) /= "00" and MBGPR0EN(3) = '1' then
-			CRAM_MAIN_ADDR <= "011" & BG4_PIX_DATA(4 downto 2) & BG4_PIX_DATA(1 downto 0);
+		elsif BG4_PIX_DATA(1 downto 0) /= "00" and BGPR0EN(3) = '1' then
+			CGRAM_FETCH_ADDR <= "011" & BG4_PIX_DATA(4 downto 2) & BG4_PIX_DATA(1 downto 0);
 			MATH := CGADSUB(3);
 		else
-			CRAM_MAIN_ADDR <= (others => '0');
+			CGRAM_FETCH_ADDR <= (others => '0');
 			MATH := CGADSUB(5);
-		end if;
-		
-		if SPR_PIX_DATA(3 downto 0) /= "0000" and SOBJPR3EN = '1' then
-			CRAM_SUB_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
-		elsif BG1_PIX_DATA(1 downto 0) /= "00" and SBGPR1EN(0) = '1' then
-			CRAM_SUB_ADDR <= "000" & BG1_PIX_DATA(10 downto 8) & BG1_PIX_DATA(1 downto 0);
-		elsif BG2_PIX_DATA(1 downto 0) /= "00" and SBGPR1EN(1) = '1' then
-			CRAM_SUB_ADDR <= "001" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(1 downto 0);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and SOBJPR2EN = '1' then
-			CRAM_SUB_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
-		elsif BG1_PIX_DATA(1 downto 0) /= "00" and SBGPR0EN(0) = '1' then
-			CRAM_SUB_ADDR <= "000" & BG1_PIX_DATA(10 downto 8) & BG1_PIX_DATA(1 downto 0);
-		elsif BG2_PIX_DATA(1 downto 0) /= "00" and SBGPR0EN(1) = '1' then
-			CRAM_SUB_ADDR <= "001" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(1 downto 0);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and SOBJPR1EN = '1' then
-			CRAM_SUB_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
-		elsif BG3_PIX_DATA(1 downto 0) /= "00" and SBGPR1EN(2) = '1' then
-			CRAM_SUB_ADDR <= "010" & BG3_PIX_DATA(4 downto 2) & BG3_PIX_DATA(1 downto 0);
-		elsif BG4_PIX_DATA(1 downto 0) /= "00" and SBGPR1EN(3) = '1' then
-			CRAM_SUB_ADDR <= "011" & BG4_PIX_DATA(4 downto 2) & BG4_PIX_DATA(1 downto 0); 
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and SOBJPR0EN = '1' then
-			CRAM_SUB_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
-		elsif BG3_PIX_DATA(1 downto 0) /= "00" and SBGPR0EN(2) = '1' then
-			CRAM_SUB_ADDR <= "010" & BG3_PIX_DATA(4 downto 2) & BG3_PIX_DATA(1 downto 0);
-		elsif BG4_PIX_DATA(1 downto 0) /= "00" and SBGPR0EN(3) = '1' then
-			CRAM_SUB_ADDR <= "011" & BG4_PIX_DATA(4 downto 2) & BG4_PIX_DATA(1 downto 0);
-		else
-			CRAM_SUB_ADDR <= (others => '0');
-			SUB_BD := '1';
+			BD := '1';
 		end if;
 		
 	elsif BG_MODE = "001" then	-- MODE1
-		if BG3_PIX_DATA(1 downto 0) /= "00" and MBGPR1EN(2) = '1' and BG3PRIO = '1' then
-			CRAM_MAIN_ADDR <= "000" & BG3_PIX_DATA(4 downto 2) & BG3_PIX_DATA(1 downto 0);
+		if BG3_PIX_DATA(1 downto 0) /= "00" and BGPR1EN(2) = '1' and BG3PRIO = '1' then
+			CGRAM_FETCH_ADDR <= "000" & BG3_PIX_DATA(4 downto 2) & BG3_PIX_DATA(1 downto 0);
 			MATH := CGADSUB(2);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and MOBJPR3EN = '1' then
-			CRAM_MAIN_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
+		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and OBJPR3EN = '1' then
+			CGRAM_FETCH_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
-		elsif BG1_PIX_DATA(3 downto 0) /= "0000" and MBGPR1EN(0) = '1' then
-			CRAM_MAIN_ADDR <= "0" & BG1_PIX_DATA(10 downto 8) & BG1_PIX_DATA(3 downto 0);
+		elsif BG1_PIX_DATA(3 downto 0) /= "0000" and BGPR1EN(0) = '1' then
+			CGRAM_FETCH_ADDR <= "0" & BG1_PIX_DATA(10 downto 8) & BG1_PIX_DATA(3 downto 0);
 			MATH := CGADSUB(0);
-		elsif BG2_PIX_DATA(3 downto 0) /= "0000" and MBGPR1EN(1) = '1' then
-			CRAM_MAIN_ADDR <= "0" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(3 downto 0);
+		elsif BG2_PIX_DATA(3 downto 0) /= "0000" and BGPR1EN(1) = '1' then
+			CGRAM_FETCH_ADDR <= "0" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(3 downto 0);
 			MATH := CGADSUB(1);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and MOBJPR2EN = '1' then
-			CRAM_MAIN_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
+		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and OBJPR2EN = '1' then
+			CGRAM_FETCH_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
-		elsif BG1_PIX_DATA(3 downto 0) /= "0000" and MBGPR0EN(0) = '1' then
-			CRAM_MAIN_ADDR <= "0" & BG1_PIX_DATA(10 downto 8) & BG1_PIX_DATA(3 downto 0);
+		elsif BG1_PIX_DATA(3 downto 0) /= "0000" and BGPR0EN(0) = '1' then
+			CGRAM_FETCH_ADDR <= "0" & BG1_PIX_DATA(10 downto 8) & BG1_PIX_DATA(3 downto 0);
 			MATH := CGADSUB(0);
-		elsif BG2_PIX_DATA(3 downto 0) /= "0000" and MBGPR0EN(1) = '1' then
-			CRAM_MAIN_ADDR <= "0" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(3 downto 0);
+		elsif BG2_PIX_DATA(3 downto 0) /= "0000" and BGPR0EN(1) = '1' then
+			CGRAM_FETCH_ADDR <= "0" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(3 downto 0);
 			MATH := CGADSUB(1);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and MOBJPR1EN = '1' then
-			CRAM_MAIN_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
+		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and OBJPR1EN = '1' then
+			CGRAM_FETCH_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
-		elsif BG3_PIX_DATA(1 downto 0) /= "00" and MBGPR1EN(2) = '1' and BG3PRIO = '0' then
-			CRAM_MAIN_ADDR <= "000" & BG3_PIX_DATA(4 downto 2) & BG3_PIX_DATA(1 downto 0);
+		elsif BG3_PIX_DATA(1 downto 0) /= "00" and BGPR1EN(2) = '1' and BG3PRIO = '0' then
+			CGRAM_FETCH_ADDR <= "000" & BG3_PIX_DATA(4 downto 2) & BG3_PIX_DATA(1 downto 0);
 			MATH := CGADSUB(2);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and MOBJPR0EN = '1' then
-			CRAM_MAIN_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
+		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and OBJPR0EN = '1' then
+			CGRAM_FETCH_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
-		elsif BG3_PIX_DATA(1 downto 0) /= "00" and MBGPR0EN(2) = '1' then
-			CRAM_MAIN_ADDR <= "000" & BG3_PIX_DATA(4 downto 2) & BG3_PIX_DATA(1 downto 0);
+		elsif BG3_PIX_DATA(1 downto 0) /= "00" and BGPR0EN(2) = '1' then
+			CGRAM_FETCH_ADDR <= "000" & BG3_PIX_DATA(4 downto 2) & BG3_PIX_DATA(1 downto 0);
 			MATH := CGADSUB(2);
 		else
-			CRAM_MAIN_ADDR <= (others => '0');
+			CGRAM_FETCH_ADDR <= (others => '0');
 			MATH := CGADSUB(5);
-		end if;
-		
-		if BG3_PIX_DATA(1 downto 0) /= "00" and SBGPR1EN(2) = '1' and BG3PRIO = '1' then
-			CRAM_SUB_ADDR <= "000" & BG3_PIX_DATA(4 downto 2) & BG3_PIX_DATA(1 downto 0);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and SOBJPR3EN = '1'then
-			CRAM_SUB_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
-		elsif BG1_PIX_DATA(3 downto 0) /= "0000" and SBGPR1EN(0) = '1' then
-			CRAM_SUB_ADDR <= "0" & BG1_PIX_DATA(10 downto 8) & BG1_PIX_DATA(3 downto 0);
-		elsif BG2_PIX_DATA(3 downto 0) /= "0000" and SBGPR1EN(1) = '1' then
-			CRAM_SUB_ADDR <= "0" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(3 downto 0);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and SOBJPR2EN = '1' then
-			CRAM_SUB_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
-		elsif BG1_PIX_DATA(3 downto 0) /= "0000" and SBGPR0EN(0) = '1' then
-			CRAM_SUB_ADDR <= "0" & BG1_PIX_DATA(10 downto 8) & BG1_PIX_DATA(3 downto 0);
-		elsif BG2_PIX_DATA(3 downto 0) /= "0000" and SBGPR0EN(1) = '1' then
-			CRAM_SUB_ADDR <= "0" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(3 downto 0);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and SOBJPR1EN = '1' then
-			CRAM_SUB_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
-		elsif BG3_PIX_DATA(1 downto 0) /= "00" and SBGPR1EN(2) = '1' and BG3PRIO = '0' then
-			CRAM_SUB_ADDR <= "000" & BG3_PIX_DATA(4 downto 2) & BG3_PIX_DATA(1 downto 0);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and SOBJPR0EN = '1' then
-			CRAM_SUB_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
-		elsif BG3_PIX_DATA(1 downto 0) /= "00" and SBGPR0EN(2) = '1' then
-			CRAM_SUB_ADDR <= "000" & BG3_PIX_DATA(4 downto 2) & BG3_PIX_DATA(1 downto 0);
-		else
-			CRAM_SUB_ADDR <= (others => '0');
-			SUB_BD := '1';
+			BD := '1';
 		end if;
 		
 	elsif BG_MODE = "010" then	-- MODE2
-		if SPR_PIX_DATA(3 downto 0) /= "0000" and MOBJPR3EN = '1' then
-			CRAM_MAIN_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
+		if SPR_PIX_DATA(3 downto 0) /= "0000" and OBJPR3EN = '1' then
+			CGRAM_FETCH_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
-		elsif BG1_PIX_DATA(3 downto 0) /= "0000" and MBGPR1EN(0) = '1' then
-			CRAM_MAIN_ADDR <= "0" & BG1_PIX_DATA(10 downto 8) & BG1_PIX_DATA(3 downto 0);
+		elsif BG1_PIX_DATA(3 downto 0) /= "0000" and BGPR1EN(0) = '1' then
+			CGRAM_FETCH_ADDR <= "0" & BG1_PIX_DATA(10 downto 8) & BG1_PIX_DATA(3 downto 0);
 			MATH := CGADSUB(0);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and MOBJPR2EN = '1' then
-			CRAM_MAIN_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
+		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and OBJPR2EN = '1' then
+			CGRAM_FETCH_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
-		elsif BG2_PIX_DATA(3 downto 0) /= "0000" and MBGPR1EN(1) = '1' then
-			CRAM_MAIN_ADDR <= "0" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(3 downto 0);
+		elsif BG2_PIX_DATA(3 downto 0) /= "0000" and BGPR1EN(1) = '1' then
+			CGRAM_FETCH_ADDR <= "0" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(3 downto 0);
 			MATH := CGADSUB(1);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and MOBJPR1EN = '1' then
-			CRAM_MAIN_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
+		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and OBJPR1EN = '1' then
+			CGRAM_FETCH_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
-		elsif BG1_PIX_DATA(3 downto 0) /= "0000" and MBGPR0EN(0) = '1' then
-			CRAM_MAIN_ADDR <= "0" & BG1_PIX_DATA(10 downto 8) & BG1_PIX_DATA(3 downto 0);
+		elsif BG1_PIX_DATA(3 downto 0) /= "0000" and BGPR0EN(0) = '1' then
+			CGRAM_FETCH_ADDR <= "0" & BG1_PIX_DATA(10 downto 8) & BG1_PIX_DATA(3 downto 0);
 			MATH := CGADSUB(0);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and MOBJPR0EN = '1' then
-			CRAM_MAIN_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
+		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and OBJPR0EN = '1' then
+			CGRAM_FETCH_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
-		elsif BG2_PIX_DATA(3 downto 0) /= "0000" and MBGPR0EN(1) = '1' then
-			CRAM_MAIN_ADDR <= "0" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(3 downto 0);
+		elsif BG2_PIX_DATA(3 downto 0) /= "0000" and BGPR0EN(1) = '1' then
+			CGRAM_FETCH_ADDR <= "0" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(3 downto 0);
 			MATH := CGADSUB(1);
 		else
-			CRAM_MAIN_ADDR <= (others => '0');
+			CGRAM_FETCH_ADDR <= (others => '0');
 			MATH := CGADSUB(5);
-		end if;
-		
-		if SPR_PIX_DATA(3 downto 0) /= "0000" and SOBJPR3EN = '1' then
-			CRAM_SUB_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
-		elsif BG1_PIX_DATA(3 downto 0) /= "0000" and SBGPR1EN(0) = '1' then
-			CRAM_SUB_ADDR <= "0" & BG1_PIX_DATA(10 downto 8) & BG1_PIX_DATA(3 downto 0);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and SOBJPR2EN = '1' then
-			CRAM_SUB_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
-		elsif BG2_PIX_DATA(3 downto 0) /= "0000" and SBGPR1EN(1) = '1' then
-			CRAM_SUB_ADDR <= "0" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(3 downto 0);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and SOBJPR1EN = '1' then
-			CRAM_SUB_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
-		elsif BG1_PIX_DATA(3 downto 0) /= "0000" and SBGPR0EN(0) = '1' then
-			CRAM_SUB_ADDR <= "0" & BG1_PIX_DATA(10 downto 8) & BG1_PIX_DATA(3 downto 0);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and SOBJPR0EN = '1' then
-			CRAM_SUB_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
-		elsif BG2_PIX_DATA(3 downto 0) /= "0000" and SBGPR0EN(1) = '1' then
-			CRAM_SUB_ADDR <= "0" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(3 downto 0);
-		else
-			CRAM_SUB_ADDR <= (others => '0');
-			SUB_BD := '1';
+			BD := '1';
 		end if;
 		
 	elsif BG_MODE = "011" then	-- MODE3
-		if SPR_PIX_DATA(3 downto 0) /= "0000" and MOBJPR3EN = '1' then
-			CRAM_MAIN_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
+		if SPR_PIX_DATA(3 downto 0) /= "0000" and OBJPR3EN = '1' then
+			CGRAM_FETCH_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
-		elsif BG1_PIX_DATA(7 downto 0) /= "00000000" and MBGPR1EN(0) = '1' then
-			CRAM_MAIN_ADDR <= BG1_PIX_DATA(7 downto 0); 
-			MAIN_DCM := CGWSEL(0);
+		elsif BG1_PIX_DATA(7 downto 0) /= "00000000" and BGPR1EN(0) = '1' then
+			CGRAM_FETCH_ADDR <= BG1_PIX_DATA(7 downto 0); 
+			DCM := CGWSEL(0);
 			MATH := CGADSUB(0);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and MOBJPR2EN = '1' then
-			CRAM_MAIN_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
+		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and OBJPR2EN = '1' then
+			CGRAM_FETCH_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
-		elsif BG2_PIX_DATA(3 downto 0) /= "0000" and MBGPR1EN(1) = '1' then
-			CRAM_MAIN_ADDR <= "0" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(3 downto 0);
+		elsif BG2_PIX_DATA(3 downto 0) /= "0000" and BGPR1EN(1) = '1' then
+			CGRAM_FETCH_ADDR <= "0" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(3 downto 0);
 			MATH := CGADSUB(1);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and MOBJPR1EN = '1' then
-			CRAM_MAIN_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
+		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and OBJPR1EN = '1' then
+			CGRAM_FETCH_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
-		elsif BG1_PIX_DATA(7 downto 0) /= "00000000" and MBGPR0EN(0) = '1' then
-			CRAM_MAIN_ADDR <= BG1_PIX_DATA(7 downto 0);
-			MAIN_DCM := CGWSEL(0);
+		elsif BG1_PIX_DATA(7 downto 0) /= "00000000" and BGPR0EN(0) = '1' then
+			CGRAM_FETCH_ADDR <= BG1_PIX_DATA(7 downto 0);
+			DCM := CGWSEL(0);
 			MATH := CGADSUB(0);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and MOBJPR0EN = '1' then
-			CRAM_MAIN_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
+		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and OBJPR0EN = '1' then
+			CGRAM_FETCH_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
-		elsif BG2_PIX_DATA(3 downto 0) /= "0000" and MBGPR0EN(1) = '1' then
-			CRAM_MAIN_ADDR <= "0" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(3 downto 0);
+		elsif BG2_PIX_DATA(3 downto 0) /= "0000" and BGPR0EN(1) = '1' then
+			CGRAM_FETCH_ADDR <= "0" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(3 downto 0);
 			MATH := CGADSUB(1);
 		else
-			CRAM_MAIN_ADDR <= (others => '0');
+			CGRAM_FETCH_ADDR <= (others => '0');
 			MATH := CGADSUB(5);
-		end if;
-		
-		if SPR_PIX_DATA(3 downto 0) /= "0000" and SOBJPR3EN = '1' then
-			CRAM_SUB_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
-		elsif BG1_PIX_DATA(7 downto 0) /= "00000000" and SBGPR1EN(0) = '1' then
-			CRAM_SUB_ADDR <= BG1_PIX_DATA(7 downto 0); 
-			SUB_DCM := CGWSEL(0);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and SOBJPR2EN = '1' then
-			CRAM_SUB_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
-		elsif BG2_PIX_DATA(3 downto 0) /= "0000" and SBGPR1EN(1) = '1' then
-			CRAM_SUB_ADDR <= "0" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(3 downto 0); 
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and SOBJPR1EN = '1' then
-			CRAM_SUB_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
-		elsif BG1_PIX_DATA(7 downto 0) /= "00000000" and SBGPR0EN(0) = '1' then
-			CRAM_SUB_ADDR <= BG1_PIX_DATA(7 downto 0); 
-			SUB_DCM := CGWSEL(0);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and SOBJPR0EN = '1' then
-			CRAM_SUB_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
-		elsif BG2_PIX_DATA(3 downto 0) /= "0000" and SBGPR0EN(1) = '1' then
-			CRAM_SUB_ADDR <= "0" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(3 downto 0);
-		else
-			CRAM_SUB_ADDR <= (others => '0');
-			SUB_BD := '1';
+			BD := '1';
 		end if;
 		
 	elsif BG_MODE = "100" then	-- MODE4
-		if SPR_PIX_DATA(3 downto 0) /= "0000" and MOBJPR3EN = '1' then
-			CRAM_MAIN_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
+		if SPR_PIX_DATA(3 downto 0) /= "0000" and OBJPR3EN = '1' then
+			CGRAM_FETCH_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
-		elsif BG1_PIX_DATA(7 downto 0) /= "00000000" and MBGPR1EN(0) = '1' then
-			CRAM_MAIN_ADDR <= BG1_PIX_DATA(7 downto 0); 
-			MAIN_DCM := CGWSEL(0);
+		elsif BG1_PIX_DATA(7 downto 0) /= "00000000" and BGPR1EN(0) = '1' then
+			CGRAM_FETCH_ADDR <= BG1_PIX_DATA(7 downto 0); 
+			DCM := CGWSEL(0);
 			MATH := CGADSUB(0);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and MOBJPR2EN = '1' then
-			CRAM_MAIN_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
+		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and OBJPR2EN = '1' then
+			CGRAM_FETCH_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
-		elsif BG2_PIX_DATA(1 downto 0) /= "00" and MBGPR1EN(1) = '1' then
-			CRAM_MAIN_ADDR <= "000" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(1 downto 0);
+		elsif BG2_PIX_DATA(1 downto 0) /= "00" and BGPR1EN(1) = '1' then
+			CGRAM_FETCH_ADDR <= "000" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(1 downto 0);
 			MATH := CGADSUB(1);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and MOBJPR1EN = '1' then
-			CRAM_MAIN_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
+		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and OBJPR1EN = '1' then
+			CGRAM_FETCH_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
-		elsif BG1_PIX_DATA(7 downto 0) /= "00000000" and MBGPR0EN(0) = '1' then
-			CRAM_MAIN_ADDR <= BG1_PIX_DATA(7 downto 0); 
-			MAIN_DCM := CGWSEL(0);
+		elsif BG1_PIX_DATA(7 downto 0) /= "00000000" and BGPR0EN(0) = '1' then
+			CGRAM_FETCH_ADDR <= BG1_PIX_DATA(7 downto 0); 
+			DCM := CGWSEL(0);
 			MATH := CGADSUB(0);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and MOBJPR0EN = '1' then
-			CRAM_MAIN_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
+		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and OBJPR0EN = '1' then
+			CGRAM_FETCH_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
-		elsif BG2_PIX_DATA(1 downto 0) /= "00" and MBGPR0EN(1) = '1' then
-			CRAM_MAIN_ADDR <= "000" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(1 downto 0);
+		elsif BG2_PIX_DATA(1 downto 0) /= "00" and BGPR0EN(1) = '1' then
+			CGRAM_FETCH_ADDR <= "000" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(1 downto 0);
 			MATH := CGADSUB(1);
 		else
-			CRAM_MAIN_ADDR <= (others => '0');
+			CGRAM_FETCH_ADDR <= (others => '0');
 			MATH := CGADSUB(5);
-		end if;
-		
-		if SPR_PIX_DATA(3 downto 0) /= "0000" and SOBJPR3EN = '1' then
-			CRAM_SUB_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
-		elsif BG1_PIX_DATA(7 downto 0) /= "00000000" and SBGPR1EN(0) = '1' then
-			CRAM_SUB_ADDR <= BG1_PIX_DATA(7 downto 0); 
-			SUB_DCM := CGWSEL(0);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and SOBJPR2EN = '1' then
-			CRAM_SUB_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
-		elsif BG2_PIX_DATA(1 downto 0) /= "00" and SBGPR1EN(1) = '1' then
-			CRAM_SUB_ADDR <= "000" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(1 downto 0);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and SOBJPR1EN = '1' then
-			CRAM_SUB_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
-		elsif BG1_PIX_DATA(7 downto 0) /= "00000000" and SBGPR0EN(0) = '1' then
-			CRAM_SUB_ADDR <= BG1_PIX_DATA(7 downto 0); 
-			SUB_DCM := CGWSEL(0);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and SOBJPR0EN = '1' then
-			CRAM_SUB_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
-		elsif BG2_PIX_DATA(1 downto 0) /= "00" and SBGPR0EN(1) = '1' then
-			CRAM_SUB_ADDR <= "000" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(1 downto 0);
-		else
-			CRAM_SUB_ADDR <= (others => '0');
-			SUB_BD := '1';
+			BD := '1';
 		end if;
 		
 	elsif BG_MODE = "101" then	-- MODE5
-		if SPR_PIX_DATA(3 downto 0) /= "0000" and MOBJPR3EN = '1' then
-			CRAM_MAIN_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
+		if SPR_PIX_DATA(3 downto 0) /= "0000" and OBJPR3EN = '1' then
+			CGRAM_FETCH_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
-		elsif BG1_PIX_DATA(7 downto 4) /= "0000" and MBGPR1EN(0) = '1' then
-			CRAM_MAIN_ADDR <= "0" & BG1_PIX_DATA(10 downto 8) & BG1_PIX_DATA(7 downto 4);
+		elsif BG1_PIX_DATA(3 downto 0) /= "0000" and BGPR1EN(0) = '1' and DOT_CLK = '1' then
+			CGRAM_FETCH_ADDR <= "0" & BG1_PIX_DATA(10 downto 8) & BG1_PIX_DATA(3 downto 0);
+		elsif BG1_PIX_DATA(7 downto 4) /= "0000" and BGPR1EN(0) = '1' and DOT_CLK = '0' then
+			CGRAM_FETCH_ADDR <= "0" & BG1_PIX_DATA(10 downto 8) & BG1_PIX_DATA(7 downto 4);
 			MATH := CGADSUB(0);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and MOBJPR2EN = '1' then
-			CRAM_MAIN_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
+		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and OBJPR2EN = '1' then
+			CGRAM_FETCH_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
-		elsif BG2_PIX_DATA(3 downto 2) /= "00" and MBGPR1EN(1) = '1' then
-			CRAM_MAIN_ADDR <= "000" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(3 downto 2);
+		elsif BG2_PIX_DATA(1 downto 0) /= "00" and BGPR1EN(1) = '1' and DOT_CLK = '1' then
+			CGRAM_FETCH_ADDR <= "000" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(1 downto 0);
+		elsif BG2_PIX_DATA(3 downto 2) /= "00" and BGPR1EN(1) = '1' and DOT_CLK = '0' then
+			CGRAM_FETCH_ADDR <= "000" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(3 downto 2);
 			MATH := CGADSUB(1);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and MOBJPR1EN = '1' then
-			CRAM_MAIN_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
+		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and OBJPR1EN = '1' then
+			CGRAM_FETCH_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
-		elsif BG1_PIX_DATA(7 downto 4) /= "0000" and MBGPR0EN(0) = '1' then
-			CRAM_MAIN_ADDR <= "0" & BG1_PIX_DATA(10 downto 8) & BG1_PIX_DATA(7 downto 4);
+		elsif BG1_PIX_DATA(3 downto 0) /= "0000" and BGPR0EN(0) = '1' and DOT_CLK = '1' then
+			CGRAM_FETCH_ADDR <= "0" & BG1_PIX_DATA(10 downto 8) & BG1_PIX_DATA(3 downto 0);
+		elsif BG1_PIX_DATA(7 downto 4) /= "0000" and BGPR0EN(0) = '1' and DOT_CLK = '0' then
+			CGRAM_FETCH_ADDR <= "0" & BG1_PIX_DATA(10 downto 8) & BG1_PIX_DATA(7 downto 4);
 			MATH := CGADSUB(0);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and MOBJPR0EN = '1' then
-			CRAM_MAIN_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
+		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and OBJPR0EN = '1' then
+			CGRAM_FETCH_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
-		elsif BG2_PIX_DATA(3 downto 2) /= "00" and MBGPR0EN(1) = '1' then
-			CRAM_MAIN_ADDR <= "000" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(3 downto 2);
+		elsif BG2_PIX_DATA(1 downto 0) /= "00" and BGPR0EN(1) = '1' and DOT_CLK = '1' then
+			CGRAM_FETCH_ADDR <= "000" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(1 downto 0);
+		elsif BG2_PIX_DATA(3 downto 2) /= "00" and BGPR0EN(1) = '1' and DOT_CLK = '0' then
+			CGRAM_FETCH_ADDR <= "000" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(3 downto 2);
 			MATH := CGADSUB(1);
 		else
-			CRAM_MAIN_ADDR <= (others => '0');
+			CGRAM_FETCH_ADDR <= (others => '0');
 			MATH := CGADSUB(5);
-		end if;
-		
-		if SPR_PIX_DATA(3 downto 0) /= "0000" and SOBJPR3EN = '1' then
-			CRAM_SUB_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
-		elsif BG1_PIX_DATA(3 downto 0) /= "0000" and SBGPR1EN(0) = '1' then
-			CRAM_SUB_ADDR <= "0" & BG1_PIX_DATA(10 downto 8) & BG1_PIX_DATA(3 downto 0);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and SOBJPR2EN = '1' then
-			CRAM_SUB_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
-		elsif BG2_PIX_DATA(1 downto 0) /= "00" and SBGPR1EN(1) = '1' then
-			CRAM_SUB_ADDR <= "000" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(1 downto 0);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and SOBJPR1EN = '1' then
-			CRAM_SUB_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
-		elsif BG1_PIX_DATA(3 downto 0) /= "0000" and SBGPR0EN(0) = '1' then
-			CRAM_SUB_ADDR <= "0" & BG1_PIX_DATA(10 downto 8) & BG1_PIX_DATA(3 downto 0);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and SOBJPR0EN = '1' then
-			CRAM_SUB_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
-		elsif BG2_PIX_DATA(1 downto 0) /= "00" and SBGPR0EN(1) = '1' then
-			CRAM_SUB_ADDR <= "000" & BG2_PIX_DATA(6 downto 4) & BG2_PIX_DATA(1 downto 0);
-		else
-			CRAM_SUB_ADDR <= (others => '0');
-			SUB_BD := '1';
+			BD := '1';
 		end if;
 		
 	elsif BG_MODE = "110" then	-- MODE6
-		if SPR_PIX_DATA(3 downto 0) /= "0000" and MOBJPR3EN = '1' then
-			CRAM_MAIN_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
+		if SPR_PIX_DATA(3 downto 0) /= "0000" and OBJPR3EN = '1' then
+			CGRAM_FETCH_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
-		elsif BG1_PIX_DATA(7 downto 4) /= "0000" and MBGPR1EN(0) = '1' then
-			CRAM_MAIN_ADDR <= "0" & BG1_PIX_DATA(10 downto 8) & BG1_PIX_DATA(7 downto 4);
+		elsif BG1_PIX_DATA(3 downto 0) /= "0000" and BGPR1EN(0) = '1' and DOT_CLK = '1' then
+			CGRAM_FETCH_ADDR <= "0" & BG1_PIX_DATA(10 downto 8) & BG1_PIX_DATA(3 downto 0);
+		elsif BG1_PIX_DATA(7 downto 4) /= "0000" and BGPR1EN(0) = '1' and DOT_CLK = '0' then
+			CGRAM_FETCH_ADDR <= "0" & BG1_PIX_DATA(10 downto 8) & BG1_PIX_DATA(7 downto 4);
 			MATH := CGADSUB(0);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and MOBJPR2EN = '1' then
-			CRAM_MAIN_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
+		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and OBJPR2EN = '1' then
+			CGRAM_FETCH_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and MOBJPR1EN = '1' then
-			CRAM_MAIN_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
+		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and OBJPR1EN = '1' then
+			CGRAM_FETCH_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
-		elsif BG1_PIX_DATA(7 downto 4) /= "0000" and MBGPR0EN(0) = '1' then
-			CRAM_MAIN_ADDR <= "0" & BG1_PIX_DATA(10 downto 8) & BG1_PIX_DATA(7 downto 4);
+		elsif BG1_PIX_DATA(3 downto 0) /= "0000" and BGPR0EN(0) = '1' and DOT_CLK = '1' then
+			CGRAM_FETCH_ADDR <= "0" & BG1_PIX_DATA(10 downto 8) & BG1_PIX_DATA(3 downto 0);
+		elsif BG1_PIX_DATA(7 downto 4) /= "0000" and BGPR0EN(0) = '1' and DOT_CLK = '0' then
+			CGRAM_FETCH_ADDR <= "0" & BG1_PIX_DATA(10 downto 8) & BG1_PIX_DATA(7 downto 4);
 			MATH := CGADSUB(0);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and MOBJPR0EN = '1' then
-			CRAM_MAIN_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
+		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and OBJPR0EN = '1' then
+			CGRAM_FETCH_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
 		else
-			CRAM_MAIN_ADDR <= (others => '0');
+			CGRAM_FETCH_ADDR <= (others => '0');
 			MATH := CGADSUB(5);
-		end if;
-		
-		if SPR_PIX_DATA(3 downto 0) /= "0000" and SOBJPR3EN = '1' then
-			CRAM_SUB_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
-		elsif BG1_PIX_DATA(3 downto 0) /= "0000" and SBGPR1EN(0) = '1' then
-			CRAM_SUB_ADDR <= "0" & BG1_PIX_DATA(10 downto 8) & BG1_PIX_DATA(3 downto 0);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and SOBJPR2EN = '1' then
-			CRAM_SUB_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and SOBJPR1EN = '1' then
-			CRAM_SUB_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
-		elsif BG1_PIX_DATA(3 downto 0) /= "0000" and SBGPR0EN(0) = '1' then
-			CRAM_SUB_ADDR <= "0" & BG1_PIX_DATA(10 downto 8) & BG1_PIX_DATA(3 downto 0);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and SOBJPR0EN = '1' then
-			CRAM_SUB_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
-		else
-			CRAM_SUB_ADDR <= (others => '0');
-			SUB_BD := '1';
+			BD := '1';
 		end if;
 		
 	else	-- MODE7
-		if SPR_PIX_DATA(3 downto 0) /= "0000" and MOBJPR3EN = '1' then
-			CRAM_MAIN_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
+		if SPR_PIX_DATA(3 downto 0) /= "0000" and OBJPR3EN = '1' then
+			CGRAM_FETCH_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and MOBJPR2EN = '1' then
-			CRAM_MAIN_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
+		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and OBJPR2EN = '1' then
+			CGRAM_FETCH_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
-		elsif BG2_PIX_DATA(6 downto 0) /= "0000000" and MBGPR1EN(1) = '1' and M7EXTBG = '1' then
-			CRAM_MAIN_ADDR <= "0" & BG2_PIX_DATA(6 downto 0);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and MOBJPR1EN = '1' then
-			CRAM_MAIN_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
+		elsif BG2_PIX_DATA(6 downto 0) /= "0000000" and BGPR1EN(1) = '1' and M7EXTBG = '1' then
+			CGRAM_FETCH_ADDR <= "0" & BG2_PIX_DATA(6 downto 0);
+		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and OBJPR1EN = '1' then
+			CGRAM_FETCH_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
-		elsif BG1_PIX_DATA(7 downto 0) /= "00000000" and MBGPR0EN(0) = '1' then
-			CRAM_MAIN_ADDR <= BG1_PIX_DATA(7 downto 0);
-			MAIN_DCM := CGWSEL(0);
+		elsif BG1_PIX_DATA(7 downto 0) /= "00000000" and BGPR0EN(0) = '1' then
+			CGRAM_FETCH_ADDR <= BG1_PIX_DATA(7 downto 0);
+			DCM := CGWSEL(0);
 			MATH := CGADSUB(0);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and MOBJPR0EN = '1' then
-			CRAM_MAIN_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
+		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and OBJPR0EN = '1' then
+			CGRAM_FETCH_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
-		elsif BG2_PIX_DATA(6 downto 0) /= "0000000" and MBGPR0EN(1) = '1' and M7EXTBG = '1' then
-			CRAM_MAIN_ADDR <= "0" & BG2_PIX_DATA(6 downto 0);
+		elsif BG2_PIX_DATA(6 downto 0) /= "0000000" and BGPR0EN(1) = '1' and M7EXTBG = '1' then
+			CGRAM_FETCH_ADDR <= "0" & BG2_PIX_DATA(6 downto 0);
 		else
-			CRAM_MAIN_ADDR <= (others => '0');
+			CGRAM_FETCH_ADDR <= (others => '0');
 			MATH := CGADSUB(5);
-		end if;
-		
-		if SPR_PIX_DATA(3 downto 0) /= "0000" and SOBJPR3EN = '1' then
-			CRAM_SUB_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and SOBJPR2EN = '1' then
-			CRAM_SUB_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
-		elsif BG2_PIX_DATA(6 downto 0) /= "0000000" and SBGPR1EN(1) = '1' and M7EXTBG = '1' then
-			CRAM_SUB_ADDR <= "0" & BG2_PIX_DATA(6 downto 0);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and SOBJPR1EN = '1' then
-			CRAM_SUB_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
-		elsif BG1_PIX_DATA(7 downto 0) /= "00000000" and SBGPR0EN(0) = '1' then
-			CRAM_SUB_ADDR <= BG1_PIX_DATA(7 downto 0);
-			SUB_DCM := CGWSEL(0);
-		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and SOBJPR0EN = '1' then
-			CRAM_SUB_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
-		elsif BG2_PIX_DATA(6 downto 0) /= "0000000" and SBGPR0EN(1) = '1' and M7EXTBG = '1' then
-			CRAM_SUB_ADDR <= "0" & BG2_PIX_DATA(6 downto 0);
-		else
-			CRAM_SUB_ADDR <= (others => '0');
-			SUB_BD := '1';
+			BD := '1';
 		end if;
 	end if;
 
 	
 	if RST_N = '0' then
 		WINDOW_X <= (others => '0');
+		SUB_R <= (others => '0');
+		SUB_G <= (others => '0');
+		SUB_B <= (others => '0');
+		MAIN_R <= (others => '0');
+		MAIN_G <= (others => '0');
+		MAIN_B <= (others => '0');
+		SUB_BD <= '0';
+		SUB_COLOR <= (others => '0');
 	elsif rising_edge(CLK) then 
-		if ENABLE = '1' and DOT_CLKR_CE = '1' then
-			if BG_GET_PIXEL = '1' then
+		if ENABLE = '1' then
+			if BG_GET_PIXEL = '1' and DOT_CLKR_CE = '1' then
 				WINDOW_X <= GET_PIXEL_X;
 			end if;
 			
 			if BG_MATH = '1' then
-				if MAIN_DCM = '1' then
-					MAIN_COLOR := GetDCM(BG1_PIX_DATA(10 downto 0));
-				else
-					MAIN_COLOR := CRAM_MAIN_Q ;
-				end if;
-				
-				if SUB_DCM = '1' then
-					SUB_COLOR := GetDCM(BG1_PIX_DATA(10 downto 0));
-				else
-					SUB_COLOR := CRAM_SUB_Q ;
-				end if;
-				
-				HALF := CGADSUB(6) and MAIN_EN and not (SUB_BD and CGWSEL(1));
-				SUB_MATH_EN := CGWSEL(1) and not SUB_BD;
-
-				if MAIN_EN = '0' then
-					COLOR_MASK := "00000";
-				else
-					COLOR_MASK := "11111";
-				end if;
-
-				if FORCE_BLANK = '1' then
-					MATH_R := (others => '0');
-					MATH_G := (others => '0');
-					MATH_B := (others => '0');
-				elsif PSEUDOHIRES = '1' and BLEND = '1' then
-					MATH_R := AddSub(unsigned(MAIN_COLOR(4 downto 0) and COLOR_MASK), unsigned(SUB_COLOR(4 downto 0) and COLOR_MASK),  '1', '1');
-					MATH_G := AddSub(unsigned(MAIN_COLOR(9 downto 5) and COLOR_MASK), unsigned(SUB_COLOR(9 downto 5) and COLOR_MASK), '1', '1');
-					MATH_B := AddSub(unsigned(MAIN_COLOR(14 downto 10) and COLOR_MASK), unsigned(SUB_COLOR(14 downto 10) and COLOR_MASK), '1', '1');
-				elsif MATH = '1' and SUB_EN = '1' then
-					if SUB_MATH_EN = '1' then
-						MATH_R := AddSub(unsigned(MAIN_COLOR(4 downto 0) and COLOR_MASK), unsigned(SUB_COLOR(4 downto 0)), not CGADSUB(7), HALF);
-						MATH_G := AddSub(unsigned(MAIN_COLOR(9 downto 5) and COLOR_MASK), unsigned(SUB_COLOR(9 downto 5)), not CGADSUB(7), HALF);
-						MATH_B := AddSub(unsigned(MAIN_COLOR(14 downto 10) and COLOR_MASK), unsigned(SUB_COLOR(14 downto 10)), not CGADSUB(7), HALF);
+				if DOT_CLKF_CE = '1' then
+					if DCM = '1' then
+						SUB_COLOR <= GetDCM(BG1_PIX_DATA(10 downto 0));
 					else
-						MATH_R := AddSub(unsigned(MAIN_COLOR(4 downto 0) and COLOR_MASK), unsigned(SUBCOL(4 downto 0)), not CGADSUB(7), HALF);
-						MATH_G := AddSub(unsigned(MAIN_COLOR(9 downto 5) and COLOR_MASK), unsigned(SUBCOL(9 downto 5)), not CGADSUB(7), HALF);
-						MATH_B := AddSub(unsigned(MAIN_COLOR(14 downto 10) and COLOR_MASK), unsigned(SUBCOL(14 downto 10)), not CGADSUB(7), HALF);
+						SUB_COLOR <= CGRAM_Q;
 					end if;
-				else
-					MATH_R := unsigned(MAIN_COLOR(4 downto 0) and COLOR_MASK);
-					MATH_G := unsigned(MAIN_COLOR(9 downto 5) and COLOR_MASK);
-					MATH_B := unsigned(MAIN_COLOR(14 downto 10) and COLOR_MASK);
-				end if;
-
-				if FORCE_BLANK = '1' then
-					SUB_R <= (others => '0');
-					SUB_G <= (others => '0');
-					SUB_B <= (others => '0');
-				elsif HIRES = '0' and (PSEUDOHIRES = '0' or BLEND = '1') then
-					SUB_R <= MATH_R;
-					SUB_G <= MATH_G;
-					SUB_B <= MATH_B;
-				elsif MATH = '1' and SUB_EN = '1' then
-					if SUB_MATH_EN = '1' then
-						SUB_R <= AddSub(unsigned(SUB_COLOR(4 downto 0) and COLOR_MASK), unsigned(MAIN_COLOR(4 downto 0)), not CGADSUB(7), HALF);
-						SUB_G <= AddSub(unsigned(SUB_COLOR(9 downto 5) and COLOR_MASK), unsigned(MAIN_COLOR(9 downto 5)), not CGADSUB(7), HALF);
-						SUB_B <= AddSub(unsigned(SUB_COLOR(14 downto 10) and COLOR_MASK), unsigned(MAIN_COLOR(14 downto 10)), not CGADSUB(7), HALF);
+					SUB_BD <= BD;
+				elsif DOT_CLKR_CE = '1' then
+					if DCM = '1' then
+						MAIN_COLOR := GetDCM(BG1_PIX_DATA(10 downto 0));
 					else
-						SUB_R <= AddSub(unsigned(SUB_COLOR(4 downto 0) and COLOR_MASK), unsigned(SUBCOL(4 downto 0)), not CGADSUB(7), HALF);
-						SUB_G <= AddSub(unsigned(SUB_COLOR(9 downto 5) and COLOR_MASK), unsigned(SUBCOL(9 downto 5)), not CGADSUB(7), HALF);
-						SUB_B <= AddSub(unsigned(SUB_COLOR(14 downto 10) and COLOR_MASK), unsigned(SUBCOL(14 downto 10)), not CGADSUB(7), HALF);
+						MAIN_COLOR := CGRAM_Q;
 					end if;
-				else
-					SUB_R <= unsigned(SUB_COLOR(4 downto 0) and COLOR_MASK);
-					SUB_G <= unsigned(SUB_COLOR(9 downto 5) and COLOR_MASK);
-					SUB_B <= unsigned(SUB_COLOR(14 downto 10) and COLOR_MASK);
-				end if;
+				
+					HALF := CGADSUB(6) and MAIN_EN and not (SUB_BD and CGWSEL(1));
+					SUB_MATH_EN := CGWSEL(1) and not SUB_BD;
 
-				MAIN_R <= MATH_R;
-				MAIN_G <= MATH_G;
-				MAIN_B <= MATH_B;
+					if MAIN_EN = '0' then
+						COLOR_MASK := "00000";
+					else
+						COLOR_MASK := "11111";
+					end if;
+				
+					if FORCE_BLANK = '1' then
+						MATH_R := (others => '0');
+						MATH_G := (others => '0');
+						MATH_B := (others => '0');
+					elsif PSEUDOHIRES = '1' and BLEND = '1' then
+						MATH_R := AddSub(unsigned(MAIN_COLOR(4 downto 0) and COLOR_MASK), unsigned(SUB_COLOR(4 downto 0) and COLOR_MASK),  '1', '1');
+						MATH_G := AddSub(unsigned(MAIN_COLOR(9 downto 5) and COLOR_MASK), unsigned(SUB_COLOR(9 downto 5) and COLOR_MASK), '1', '1');
+						MATH_B := AddSub(unsigned(MAIN_COLOR(14 downto 10) and COLOR_MASK), unsigned(SUB_COLOR(14 downto 10) and COLOR_MASK), '1', '1');
+					elsif MATH = '1' and SUB_EN = '1' then
+						if SUB_MATH_EN = '1' then
+							MATH_R := AddSub(unsigned(MAIN_COLOR(4 downto 0) and COLOR_MASK), unsigned(SUB_COLOR(4 downto 0)), not CGADSUB(7), HALF);
+							MATH_G := AddSub(unsigned(MAIN_COLOR(9 downto 5) and COLOR_MASK), unsigned(SUB_COLOR(9 downto 5)), not CGADSUB(7), HALF);
+							MATH_B := AddSub(unsigned(MAIN_COLOR(14 downto 10) and COLOR_MASK), unsigned(SUB_COLOR(14 downto 10)), not CGADSUB(7), HALF);
+						else
+							MATH_R := AddSub(unsigned(MAIN_COLOR(4 downto 0) and COLOR_MASK), unsigned(SUBCOLBD(4 downto 0)), not CGADSUB(7), HALF);
+							MATH_G := AddSub(unsigned(MAIN_COLOR(9 downto 5) and COLOR_MASK), unsigned(SUBCOLBD(9 downto 5)), not CGADSUB(7), HALF);
+							MATH_B := AddSub(unsigned(MAIN_COLOR(14 downto 10) and COLOR_MASK), unsigned(SUBCOLBD(14 downto 10)), not CGADSUB(7), HALF);
+						end if;
+					else
+						MATH_R := unsigned(MAIN_COLOR(4 downto 0) and COLOR_MASK);
+						MATH_G := unsigned(MAIN_COLOR(9 downto 5) and COLOR_MASK);
+						MATH_B := unsigned(MAIN_COLOR(14 downto 10) and COLOR_MASK);
+					end if;
+	
+					if FORCE_BLANK = '1' then
+						SUB_R <= (others => '0');
+						SUB_G <= (others => '0');
+						SUB_B <= (others => '0');
+					elsif HIRES = '0' and (PSEUDOHIRES = '0' or BLEND = '1') then
+						SUB_R <= MATH_R;
+						SUB_G <= MATH_G;
+						SUB_B <= MATH_B;
+					elsif MATH = '1' and SUB_EN = '1' then
+						if SUB_MATH_EN = '1' then
+							SUB_R <= AddSub(unsigned(SUB_COLOR(4 downto 0) and COLOR_MASK), unsigned(MAIN_COLOR(4 downto 0)), not CGADSUB(7), HALF);
+							SUB_G <= AddSub(unsigned(SUB_COLOR(9 downto 5) and COLOR_MASK), unsigned(MAIN_COLOR(9 downto 5)), not CGADSUB(7), HALF);
+							SUB_B <= AddSub(unsigned(SUB_COLOR(14 downto 10) and COLOR_MASK), unsigned(MAIN_COLOR(14 downto 10)), not CGADSUB(7), HALF);
+						else
+							SUB_R <= AddSub(unsigned(SUB_COLOR(4 downto 0) and COLOR_MASK), unsigned(SUBCOLBD(4 downto 0)), not CGADSUB(7), HALF);
+							SUB_G <= AddSub(unsigned(SUB_COLOR(9 downto 5) and COLOR_MASK), unsigned(SUBCOLBD(9 downto 5)), not CGADSUB(7), HALF);
+							SUB_B <= AddSub(unsigned(SUB_COLOR(14 downto 10) and COLOR_MASK), unsigned(SUBCOLBD(14 downto 10)), not CGADSUB(7), HALF);
+						end if;
+					else
+						SUB_R <= unsigned(SUB_COLOR(4 downto 0) and COLOR_MASK);
+						SUB_G <= unsigned(SUB_COLOR(9 downto 5) and COLOR_MASK);
+						SUB_B <= unsigned(SUB_COLOR(14 downto 10) and COLOR_MASK);
+					end if;
+	
+					MAIN_R <= MATH_R;
+					MAIN_G <= MATH_G;
+					MAIN_B <= MATH_B;
+				end if;
 			end if;
 		end if;
 	end if;
@@ -2396,11 +2270,11 @@ begin
 		OUT_X <= (others => '0');
 	elsif rising_edge(CLK) then 
 		if ENABLE = '1' and DOT_CLKR_CE = '1' then
-			if H_CNT = 339 and V_CNT >= 1 and V_CNT <= LAST_VIS_LINE then
+			if H_CNT = LAST_DOT and V_CNT >= 1 and V_CNT <= LAST_VIS_LINE then
 				OUT_Y <= OUT_Y + 1;
 			end if;
 			
-			if H_CNT = 339 and V_CNT = 261 then
+			if H_CNT = LAST_DOT and V_CNT = LAST_LINE then
 				OUT_Y <= (others => '0');
 			end if;
 			
@@ -2418,6 +2292,7 @@ COLOR_OUT <= Bright(MB, SUB_B) & Bright(MB, SUB_G) & Bright(MB, SUB_R) when DOT_
 DOTCLK <= DOT_CLK;
 HBLANK <= IN_HBL;
 VBLANK <= IN_VBL;
+HIGH_RES <= HIRES or (PSEUDOHIRES and not BLEND);
 
 FRAME_OUT <= BG_OUT;
 X_OUT <= std_logic_vector(OUT_X & DOT_CLK);
@@ -2457,7 +2332,7 @@ process( CLK, RST_N, DBG_REG, FORCE_BLANK, MB, OBJSIZE, OBJNAME, OBJADDR, OAMADD
 			MOSAIC_SIZE, BG_MOSAIC_EN, BG_SC_ADDR, BG_SC_SIZE, BG_NBA, TM, TS, BG_HOFS, BG_VOFS, WH0, WH1, WH2, WH3,
 			W12SEL, W34SEL, WOBJSEL, WBGLOG, WOBJLOG, TMW, TSW, CGWSEL, CGADSUB, VMAIN_ADDRINC, VMAIN_ADDRTRANS,
 			OPHCT, OPVCT, H_CNT, V_CNT, FIELD, VMADD, OBJ_TIME_OFL, OBJ_RANGE_OFL, M7SEL, M7A, M7B, M7C, M7D, M7X, M7Y, 
-			M7HOFS, M7VOFS, CGADD, FRAME_CNT, VRAM_DAI, VRAM_DBI, CRAM_IO_Q, OAM_Q_A, HOAM_Q_A)
+			M7HOFS, M7VOFS, CGADD, FRAME_CNT, VRAM_DAI, VRAM_DBI, CGRAM_Q, OAM_Q, HOAM_Q)
 begin
 	case DBG_REG is
 		when x"00" => DBG_DAT_OUT <= FORCE_BLANK & "000" & MB;
@@ -2540,17 +2415,17 @@ begin
 		
 		when x"80" => DBG_DAT_OUT <= VRAM_DAI;
 		when x"81" => DBG_DAT_OUT <= VRAM_DBI;
-		when x"82" => DBG_DAT_OUT <= CRAM_IO_Q(7 downto 0);
-		when x"83" => DBG_DAT_OUT <= "0" & CRAM_IO_Q(14 downto 8);
-		when x"84" => DBG_DAT_OUT <= OAM_Q_A(7 downto 0);
-		when x"85" => DBG_DAT_OUT <= OAM_Q_A(15 downto 8);
-		when x"86" => DBG_DAT_OUT <= HOAM_Q_A;
+		when x"82" => DBG_DAT_OUT <= CGRAM_Q(7 downto 0);
+		when x"83" => DBG_DAT_OUT <= "0" & CGRAM_Q(14 downto 8);
+		when x"84" => DBG_DAT_OUT <= OAM_Q(7 downto 0);
+		when x"85" => DBG_DAT_OUT <= OAM_Q(15 downto 8);
+		when x"86" => DBG_DAT_OUT <= HOAM_Q;
 		when others => DBG_DAT_OUT <= x"00";
 	end case; 
 	
 	if RST_N = '0' then
 		DBG_VRAM_ADDR <= (others => '0');
-		--DBG_CRAM_ADDR <= (others => '0');
+		DBG_CGRAM_ADDR <= (others => '0');
 		DBG_OAM_ADDR <= (others => '0');
 		DBG_DAT_WRr <= '0';
 	elsif rising_edge(CLK) then
@@ -2560,7 +2435,7 @@ begin
 				when x"80" => DBG_VRAM_ADDR(7 downto 0) <= DBG_DAT_IN;
 				when x"81" => DBG_VRAM_ADDR(15 downto 8) <= DBG_DAT_IN;
 				when x"82" => DBG_VRAM_ADDR(16) <= DBG_DAT_IN(0);
-				--when x"83" => DBG_CRAM_ADDR <= DBG_DAT_IN;
+				when x"83" => DBG_CGRAM_ADDR <= DBG_DAT_IN;
 				when x"84" => DBG_OAM_ADDR <= DBG_DAT_IN;
 				when x"85" => DBG_CTRL <= DBG_DAT_IN;
 				when x"86" => DBG_BRK_HCNT(7 downto 0) <= DBG_DAT_IN;

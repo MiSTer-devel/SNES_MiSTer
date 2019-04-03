@@ -38,12 +38,12 @@ module hps_io #(parameter STRLEN=0, PS2DIV=2000, WIDE=0, VDNUM=1, PS2WE=0)
 	// parameter STRLEN and the actual length of conf_str have to match
 	input [(8*STRLEN)-1:0] conf_str,
 
-	output reg [15:0] joystick_0,
-	output reg [15:0] joystick_1,
-	output reg [15:0] joystick_2,
-	output reg [15:0] joystick_3,
-	output reg [15:0] joystick_4,
-	output reg [15:0] joystick_5,
+	output reg [31:0] joystick_0,
+	output reg [31:0] joystick_1,
+	output reg [31:0] joystick_2,
+	output reg [31:0] joystick_3,
+	output reg [31:0] joystick_4,
+	output reg [31:0] joystick_5,
 	output reg [15:0] joystick_analog_0,
 	output reg [15:0] joystick_analog_1,
 	output reg [15:0] joystick_analog_2,
@@ -330,13 +330,13 @@ always@(posedge clk_sys) begin
 
 				case(cmd)
 					// buttons and switches
-					'h01: cfg        <= io_din[7:0];
-					'h02: joystick_0 <= io_din;
-					'h03: joystick_1 <= io_din;
-					'h10: joystick_2 <= io_din;
-					'h11: joystick_3 <= io_din;
-					'h12: joystick_4 <= io_din;
-					'h13: joystick_5 <= io_din;
+					'h01: cfg <= io_din[7:0];
+					'h02: if(byte_cnt==1) joystick_0[15:0] <= io_din; else joystick_0[31:16] <= io_din;
+					'h03: if(byte_cnt==1) joystick_1[15:0] <= io_din; else joystick_1[31:16] <= io_din;
+					'h10: if(byte_cnt==1) joystick_2[15:0] <= io_din; else joystick_2[31:16] <= io_din;
+					'h11: if(byte_cnt==1) joystick_3[15:0] <= io_din; else joystick_3[31:16] <= io_din;
+					'h12: if(byte_cnt==1) joystick_4[15:0] <= io_din; else joystick_4[31:16] <= io_din;
+					'h13: if(byte_cnt==1) joystick_5[15:0] <= io_din; else joystick_5[31:16] <= io_din;
 
 					// store incoming ps2 mouse bytes
 					'h04: begin

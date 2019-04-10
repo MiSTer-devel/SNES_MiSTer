@@ -478,7 +478,7 @@ begin
 				OLD_NMI_N <= NMI_N;
 				if NMI_N = '0' and OLD_NMI_N = '1' and NMI_SYNC = '0' then
 					NMI_SYNC <= '1';
-				elsif NMI_ACTIVE = '1' and LAST_CYCLE = '1' then
+				elsif NMI_ACTIVE = '1' and LAST_CYCLE = '1' and EN = '1' then
 					NMI_SYNC <= '0';
 				end if;
 				IRQ_SYNC <= not IRQ_N;
@@ -496,11 +496,11 @@ begin
 			NMI_ACTIVE <= '0';
 			IRQ_ACTIVE <= '0';
 		elsif rising_edge(CLK) then
-			if EN = '1' then
+			if RDY_IN = '1' and CE = '1' then
 				NMI_ACTIVE <= NMI_SYNC;
-				IRQ_ACTIVE <= IRQ_SYNC and not P(2);
+				IRQ_ACTIVE <= not IRQ_N and not P(2);
 				
-				if LAST_CYCLE = '1' then
+				if LAST_CYCLE = '1' and EN = '1' then
 					if GotInterrupt = '0' then
 						GotInterrupt <= IRQ_ACTIVE or NMI_ACTIVE;
 						NMI_ACTIVE <= '0';
@@ -535,7 +535,7 @@ begin
 				end if;
 			end if;
 			
-			if CE = '1' then
+			if RDY_IN = '1' and CE = '1' then
 				if ( NMI_SYNC = '1' or IRQ_SYNC = '1' or ABORT_N = '0' ) and WAIExec = '1' then
 					WAIExec <= '0';
 				end if;

@@ -58,6 +58,7 @@ architecture rtl of SCPU is
 	signal INT_CLKR_CE, INT_CLKF_CE, DOT_CLK_CE : std_logic;
 	signal P65_CLK_CNT : unsigned(3 downto 0);
 	signal DMA_CLK_CNT : unsigned(2 downto 0);
+	signal CPU_LAST_CLOCK : unsigned(3 downto 0);
 	signal CPU_ACTIVEr, DMA_ACTIVEr : std_logic;
 	signal H_CNT : unsigned(8 downto 0);
 	signal V_CNT : unsigned(8 downto 0);
@@ -116,7 +117,8 @@ architecture rtl of SCPU is
 	signal MATH_CLK_CNT	: unsigned(3 downto 0);
 	signal MATH_TEMP	: std_logic_vector(22 downto 0);
 	signal HBLANK_OLD, VBLANK_OLD, VBLANK_OLD2 : std_logic;
-	signal IRQ_FLAG_OLD, HIRQ_FLAG, VIRQ_VALID_OLD : std_logic;
+	signal HIRQ_VALID, IRQ_VALID : std_logic;
+	signal IRQ_LOCK, IRQ_VALID_OLD : std_logic;
 
 	-- DMA registers
 	type DmaReg8 is array (0 to 7) of std_logic_vector(7 downto 0);
@@ -226,32 +228,31 @@ begin
 
 	DMA_ACTIVE <= DMA_RUN or HDMA_RUN;
 
+	process( SPEED, MEMSEL, REFRESHED, CPU_ACTIVEr )
+	begin
+		if REFRESHED = '1' and CPU_ACTIVEr = '1' then
+			CPU_LAST_CLOCK <= x"7";
+		elsif SPEED = FAST or (SPEED = SLOWFAST and MEMSEL = '1') then
+			CPU_LAST_CLOCK <= x"5";
+		elsif SPEED = SLOW or (SPEED = SLOWFAST and MEMSEL = '0') then
+			CPU_LAST_CLOCK <= x"7";
+		else
+			CPU_LAST_CLOCK <= x"B";
+		end if;
+	end process;
+	
 	process( RST_N, CLK )
-		variable CPU_CYCLES : unsigned(3 downto 0);
 	begin
 		if RST_N = '0' then
 			P65_CLK_CNT <= (others => '0');
 			DMA_CLK_CNT <= (others => '0');
 			INT_CLK <= '1';
-			INT_CLKF_CE <= '0';
-			INT_CLKR_CE <= '0';
-			DOT_CLK_CE <= '0';
 			CPU_ACTIVEr <= '1';
 			DMA_ACTIVEr <= '0';
-		elsif falling_edge(CLK) then
-			if REFRESHED = '1' and CPU_ACTIVEr = '1' then
-				CPU_CYCLES := x"8";
-			elsif SPEED = FAST or (SPEED = SLOWFAST and MEMSEL = '1') then
-				CPU_CYCLES := x"6";
-			elsif SPEED = SLOW or (SPEED = SLOWFAST and MEMSEL = '0') then
-				CPU_CYCLES := x"8";
-			else
-				CPU_CYCLES := x"C";
-			end if;
-			
+		elsif rising_edge(CLK) then
 			DMA_CLK_CNT <= DMA_CLK_CNT + 1;
 			P65_CLK_CNT <= P65_CLK_CNT + 1;
-			if P65_CLK_CNT = CPU_CYCLES-1  then
+			if P65_CLK_CNT = CPU_LAST_CLOCK  then
 				P65_CLK_CNT <= (others => '0');
 			end if;
 			
@@ -263,12 +264,35 @@ begin
 			
 			if CPU_ACTIVEr = '1' and DMA_ACTIVE = '1' and DMA_ACTIVEr = '0' and REFRESHED = '0' then
 				CPU_ACTIVEr <= '0';
-			elsif CPU_ACTIVEr = '0' and DMA_ACTIVE = '0' and P65_CLK_CNT = CPU_CYCLES-1 and REFRESHED = '0' then
+			elsif CPU_ACTIVEr = '0' and DMA_ACTIVE = '0' and P65_CLK_CNT = CPU_LAST_CLOCK and REFRESHED = '0' then
 				CPU_ACTIVEr <= '1';
 			end if;
-			
+
+			if DMA_ACTIVEr = '1' or ENABLE = '0' then
+				if DMA_CLK_CNT = 4-1 then
+					INT_CLK <= '1';
+				elsif DMA_CLK_CNT = 8-1 then
+					INT_CLK <= '0';
+				end if;
+			elsif CPU_ACTIVEr = '1' then
+				if P65_CLK_CNT = 3-1 then
+					INT_CLK <= '1';
+				elsif P65_CLK_CNT = CPU_LAST_CLOCK then
+					INT_CLK <= '0';
+				end if;
+			end if;
+		end if;
+	end process;
+	
+	process( RST_N, CLK )
+	begin
+		if RST_N = '0' then
+			INT_CLKF_CE <= '0';
+			INT_CLKR_CE <= '0';
 			DOT_CLK_CE <= '0';
-			if DMA_CLK_CNT(1 downto 0) = 4-1-1 then
+		elsif falling_edge(CLK) then
+			DOT_CLK_CE <= '0';
+			if DMA_CLK_CNT(1 downto 0) = 4-1 then
 				DOT_CLK_CE <= '1';
 			end if;
 				
@@ -276,26 +300,14 @@ begin
 			INT_CLKR_CE <= '0';
 			if DMA_ACTIVEr = '1' or ENABLE = '0' then
 				if DMA_CLK_CNT = 4-1 then
-					INT_CLK <= '1';
-				elsif DMA_CLK_CNT = 8-1 then
-					INT_CLK <= '0';
-				end if;
-				
-				if DMA_CLK_CNT = 4-1 then
 					INT_CLKR_CE <= '1';
 				elsif DMA_CLK_CNT = 8-1 then
 					INT_CLKF_CE <= '1';
 				end if;
 			elsif CPU_ACTIVEr = '1' then
 				if P65_CLK_CNT = 3-1 then
-					INT_CLK <= '1';
-				elsif P65_CLK_CNT = CPU_CYCLES-1  then
-					INT_CLK <= '0';
-				end if;
-				
-				if P65_CLK_CNT = 3-1 then
 					INT_CLKR_CE <= '1';
-				elsif P65_CLK_CNT = CPU_CYCLES-1  then
+				elsif P65_CLK_CNT = CPU_LAST_CLOCK  then
 					INT_CLKF_CE <= '1';
 				end if;
 			end if;
@@ -526,13 +538,14 @@ begin
 	P65_NMI_N <= not (NMI_FLAG and NMI_EN);
 	
 	process( RST_N, CLK )
-	variable HIRQ_VALID, VIRQ_VALID, IRQ_VALID : std_logic;
 	variable TIMEUP_READ, HVIRQ_DISABLE : std_logic;
 	begin
 		if RST_N = '0' then
 			IRQ_FLAG <= '0';
-			HIRQ_FLAG <= '0';
-			IRQ_FLAG_OLD <= '0';
+			HIRQ_VALID <= '0';
+			IRQ_VALID <= '0';
+			IRQ_VALID_OLD <= '0';
+			IRQ_LOCK <= '0';
 		elsif rising_edge(CLK) then
 			if P65_R_WN = '1' and P65_A(15 downto 0) = x"4211" and IO_SEL = '1' then
 				TIMEUP_READ := '1';
@@ -545,51 +558,38 @@ begin
 			else
 				HVIRQ_DISABLE := '0'; 
 			end if;
-			
-			if HVIRQ_EN = "01" and H_CNT = unsigned(HTIME) then											--H-IRQ
-				HIRQ_VALID := '1';
-			elsif HVIRQ_EN = "11" and H_CNT = unsigned(HTIME) and V_CNT = unsigned(VTIME) then	--HV-IRQ
-				HIRQ_VALID := '1';
-			else
-				HIRQ_VALID := '0';
-			end if;
-			
-			if (HVIRQ_EN = "10" or HVIRQ_EN = "11") and V_CNT = unsigned(VTIME) then				--V-IRQ/HV-IRQ
-				VIRQ_VALID := '1';
-			else
-				VIRQ_VALID := '0'; 
-			end if;
-				
+					
 			if ENABLE = '1' then 
 				if DOT_CLK_CE = '1' then
-					IRQ_FLAG_OLD <= IRQ_FLAG;
-				end if;
-				
-				if HIRQ_VALID = '1' and DOT_CLK_CE = '1' then
-					HIRQ_FLAG <= '1';
-				elsif HIRQ_FLAG = '1' and IRQ_FLAG = '1' and IRQ_FLAG_OLD = '0' and DOT_CLK_CE = '1' then
-					HIRQ_FLAG <= '0';
-				elsif HIRQ_FLAG = '1' and (TIMEUP_READ = '1' or HVIRQ_DISABLE = '1') and INT_CLKF_CE = '1' then
-					HIRQ_FLAG <= '0'; 
-				end if;
-				
-				if HVIRQ_EN = "01" and HIRQ_FLAG = '1' then											--H-IRQ:  every scanline, H=HTIME+~3.5
-					IRQ_VALID := '1';
-				elsif HVIRQ_EN = "10" and VIRQ_VALID = '1' and VIRQ_VALID_OLD = '0' then	--V-IRQ:  V=VTIME, H=~2.5
-					IRQ_VALID := '1';
-				elsif HVIRQ_EN = "11" and HIRQ_FLAG = '1' and VIRQ_VALID = '1' then			--HV-IRQ: V=VTIME, H=HTIME+~3.5
-					IRQ_VALID := '1';
-				else
-					IRQ_VALID := '0';
-				end if;
-				
-				if INT_CLKF_CE = '1' then
-					VIRQ_VALID_OLD <= VIRQ_VALID;
-					if HVIRQ_EN /= "00" and IRQ_VALID = '1' then--
-						IRQ_FLAG <= '1';
-					elsif TIMEUP_READ = '1' or HVIRQ_DISABLE = '1' then
-						IRQ_FLAG <= '0'; 
+					if H_CNT = unsigned(HTIME) then
+						HIRQ_VALID <= '1';
+					else
+						HIRQ_VALID <= '0'; 
 					end if;
+					
+					if HVIRQ_EN = "01" and HIRQ_VALID = '1' then												--H-IRQ:  every scanline, H=HTIME+~3.5
+						IRQ_VALID <= '1';
+					elsif HVIRQ_EN = "10" and V_CNT = unsigned(VTIME) then								--V-IRQ:  V=VTIME, H=~2.5
+						IRQ_VALID <= '1';
+					elsif HVIRQ_EN = "11" and HIRQ_VALID = '1' and V_CNT = unsigned(VTIME) then	--HV-IRQ: V=VTIME, H=HTIME+~3.5
+						IRQ_VALID <= '1';
+					else
+						IRQ_VALID <= '0';
+					end if;
+					
+					IRQ_VALID_OLD <= IRQ_VALID;
+					IRQ_LOCK <= '0';
+				end if;
+	
+				if HVIRQ_EN /= "00" and IRQ_VALID = '1' and IRQ_VALID_OLD = '0' and DOT_CLK_CE = '1' then
+					IRQ_FLAG <= '1';
+					IRQ_LOCK <= '1';
+				elsif TIMEUP_READ = '1' and IRQ_LOCK = '0' and INT_CLKF_CE = '1' then
+					IRQ_FLAG <= '0'; 
+				end if;
+				
+				if HVIRQ_DISABLE = '1' and INT_CLKF_CE = '1' then
+					IRQ_FLAG <= '0'; 
 				end if;
 			end if;
 		end if;
@@ -748,9 +748,9 @@ begin
 			elsif P65_A(15 downto 8) = x"40" then
 				case P65_A(7 downto 0) is
 					when x"16" =>
-						P65_DI <= MDR(7 downto 2) & (not JOY1_DI(1)) & ((not JOY1_DI(0)));-- or AUTO_JOY_EN
+						P65_DI <= MDR(7 downto 2) & (not JOY1_DI(1)) & ((not JOY1_DI(0)));
 					when x"17" =>
-						P65_DI <= MDR(7 downto 5) & "111" & (not JOY2_DI(1)) & ((not JOY2_DI(0)));-- or AUTO_JOY_EN
+						P65_DI <= MDR(7 downto 5) & "111" & (not JOY2_DI(1)) & ((not JOY2_DI(0)));
 					when others => 
 						P65_DI <= MDR;
 				end case;
@@ -822,9 +822,9 @@ begin
 			REFRESHED <= '0';
 		elsif rising_edge(CLK) then
 			if ENABLE = '1' and (INT_CLKF_CE = '1' or INT_CLKR_CE = '1') then
-				if REFRESHED = '0' and H_CNT >= 134 and H_CNT < 134 + 10 then
+				if REFRESHED = '0' and H_CNT >= 133 and H_CNT < 133 + 10 then
 					REFRESHED <= '1';
-				elsif REFRESHED = '1' and H_CNT >= 134 + 10 then
+				elsif REFRESHED = '1' and H_CNT >= 133 + 10 then
 					REFRESHED <= '0';
 				end if;
 			end if;

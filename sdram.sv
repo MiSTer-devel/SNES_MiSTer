@@ -42,7 +42,7 @@ module sdram
 	input             wr,
 	input             word,
 	input      [15:0] din,
-	output reg [15:0] dout,
+	output     [15:0] dout,
 	output reg        busy
 );
 
@@ -70,12 +70,12 @@ reg        we;
 reg        ds;
 reg        ram_req=0;
 wire       ram_req_test = (we || (a[24:1] != addr[24:1]));
+reg [15:0] last_data;
 
 // access manager
 always @(posedge clk) begin
 	reg old_ref;
 	reg old_rd,old_wr;
-	reg [15:0] last_data;
 
 	old_rd <= old_rd & rd;
 	old_wr <= old_wr & wr;
@@ -103,15 +103,12 @@ always @(posedge clk) begin
 		busy <= 0;
 		if(ram_req) begin
 			if(we) begin
-				dout <= data;
 				a <= '1;
 			end
 			else begin
-				dout <= ds ? SDRAM_DQ : a[0] ? {SDRAM_DQ[15:8],SDRAM_DQ[15:8]} : {SDRAM_DQ[7:0],SDRAM_DQ[7:0]};
 				last_data <= SDRAM_DQ;
 			end
 		end
-		else dout <= ds ? last_data : a[0] ? {last_data[15:8],last_data[15:8]} : {last_data[7:0],last_data[7:0]};
 	end
 
 	if(mode != MODE_NORMAL || state != STATE_IDLE || reset) begin
@@ -119,6 +116,9 @@ always @(posedge clk) begin
 		if(state == STATE_LAST) state <= STATE_IDLE;
 	end
 end
+
+assign dout = ram_req ? ((~ds & a[0]) ? {SDRAM_DQ[7:0], SDRAM_DQ[15:8]}  : SDRAM_DQ) :
+								((~ds & a[0]) ? {last_data[7:0],last_data[15:8]} : last_data);
 
 localparam MODE_NORMAL = 2'b00;
 localparam MODE_RESET  = 2'b01;

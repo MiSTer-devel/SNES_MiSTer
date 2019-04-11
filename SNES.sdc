@@ -38,6 +38,7 @@ set_max_delay 23 -from [get_registers { emu:emu|hps_io:hps_io|* \
 													 emu:emu|sdram:sdram|SDRAM_BA[*] \
 													 emu:emu|sdram:sdram|SDRAM_DQM* }] 
 
-#set_max_delay 11.6 -from [get_registers { emu:emu|sdram:sdram|dout[*] }] -to [get_registers { emu:emu|* }] 
+set_max_delay 23 -from [get_registers { emu:emu|sdram:sdram|* }] \
+						-to  [get_registers { emu:emu|main:main|* }] 
 
 set_false_path -to [get_registers { emu:emu|sdram:sdram|ds emu:emu|sdram:sdram|data[*]}]

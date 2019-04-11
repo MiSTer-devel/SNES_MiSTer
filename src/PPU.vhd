@@ -1229,7 +1229,7 @@ begin
 				BG_MOSAIC_Y <= (others => '0');
 			end if;
 			
-			if H_CNT = LAST_DOT then
+			if BG_FETCH = '0' then
 				BG_FORCE_BLANK <= FORCE_BLANK;
 			elsif BG_FETCH = '1' and H_CNT(2 downto 0) = 0 then
 				BG_FORCE_BLANK <= FORCE_BLANK;

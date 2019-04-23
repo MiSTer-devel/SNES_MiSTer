@@ -1608,7 +1608,8 @@ begin
 	end if;
 end process;
 
-OAM_RANGE_INDEX <= std_logic_vector( H_CNT(7 downto 1) + unsigned(OAMADD(7 downto 1)) );
+OAM_RANGE_INDEX <= std_logic_vector( H_CNT(7 downto 1) + unsigned(OAMADD(7 downto 1)) ) when OAM_PRIO = '1' else
+						 std_logic_vector( H_CNT(7 downto 1) + 0 );
 
 INT_OAM_ADDR <= OAM_RANGE_INDEX when OBJ_RANGE = '1' else OAM_TIME_INDEX;
 

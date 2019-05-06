@@ -39,7 +39,7 @@ begin
 	
 	S <= std_logic_vector(res);
 	VO <= (not (A(7) xor tempB(7))) and (A(7) xor res(7));
-	HO <= (not (A(3) xor tempB(3))) and (A(3) xor res(3));
+	HO <= (A(4) xor B(4) xor res(4)) xor not ADD;
 	CO <= C7;
 
 end rtl;

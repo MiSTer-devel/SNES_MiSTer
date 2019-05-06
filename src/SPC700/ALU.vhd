@@ -12,7 +12,6 @@ entity SPC700_ALU is
 		  L		: in std_logic_vector(7 downto 0); 
 		  R		: in std_logic_vector(7 downto 0); 
 		  CTRL	: in ALUCtrl_r;
-		  w16		: in std_logic;
 		  CI		: in std_logic; 
 		  VI		: in std_logic; 
 		  SI		: in std_logic; 
@@ -33,7 +32,7 @@ end SPC700_ALU;
 architecture rtl of SPC700_ALU is
 
 	signal tIntR : std_logic_vector(7 downto 0);
-	signal CR, COut, HOut, tZ, SaveC  : std_logic;
+	signal CR, COut, HOut, VOut, tZ, SaveC  : std_logic;
 	signal CIIn, ADDIn: std_logic;
 	
 	signal AddR, BCDR : std_logic_vector(7 downto 0);
@@ -148,26 +147,27 @@ begin
 		end case;
 	end process;
 	
-	process(CTRL, VI, SI, tResult, AddVO, DivVI)
+	process(CTRL, VI, AddVO, DivVI)
 	begin
-		VO <= VI; 
-		SO <= tResult(7);  
+		VOut <= VI; 
 		case CTRL.secOp is
-			when "1000" | "1001" => 
-				VO <= AddVO;		--ADC,ADD
-			when "1010" | "1011" => 
-				VO <= AddVO;		--SBC,SUB
-			when "1111" =>			--DIV
-				VO <= DivVI;
+			when "1000" | "1001" => --ADC,ADD
+				VOut <= AddVO;	
+			when "1010" | "1011" => --SBC,SUB
+				VOut <= AddVO;
+			when "1111" =>				--DIV
+				VOut <= DivVI;
 			when others => null;
 		end case;
 	end process;
 	
 	tZ <= DivZI when CTRL.secOp(3 downto 1) = "111" else 
 			'1' when tResult = x"00" else '0'; 
-	ZO <= ZI and tZ when w16 = '1' else tZ;
+	ZO <= ZI and tZ when CTRL.w = '1' else tZ;
 	CO <= COut when CTRL.chgCO = '1' else CI;
+	VO <= VOut when CTRL.chgVO = '1' else VI;
 	HO <= HOut when CTRL.chgHO = '1' else HI;
+	SO <= tResult(7);  
 	
 	RES <= tResult;
 	

@@ -121,7 +121,7 @@ assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 assign AUDIO_S   = 1;
 assign AUDIO_MIX = status[20:19];
 
-assign LED_USER  = ioctl_download;
+assign LED_USER  = cart_download;
 assign LED_DISK  = 0;
 assign LED_POWER = 0;
 
@@ -148,7 +148,7 @@ pll pll
 	.locked(clock_locked)
 );
 
-wire reset = RESET | buttons[1] | status[0] | ioctl_download | bk_loading;
+wire reset = RESET | buttons[1] | status[0] | cart_download | bk_loading;
 
 
 ////////////////////////////  HPS I/O  //////////////////////////////////
@@ -159,7 +159,9 @@ parameter CONF_STR1 = {
 	"FS,SFCSMCBIN;",
 	"-;",
 	"O13,ROM Header,Auto,No Header,LoROM,HiROM,ExHiROM;",
-	"-;"
+	"FC,GG,Game Genie Code;",
+	"OO,Game Genie,ON,OFF;",
+	"-;",
 };
 
 parameter CONF_STR2 = {
@@ -209,6 +211,7 @@ wire        ioctl_download;
 wire [24:0] ioctl_addr;
 wire [15:0] ioctl_dout;
 wire        ioctl_wr;
+wire  [7:0] ioctl_index;
 
 wire [11:0] joy0,joy1,joy2,joy3,joy4;
 wire [24:0] ps2_mouse;
@@ -236,6 +239,7 @@ hps_io #(.STRLEN(($size(CONF_STR1)>>3) + ($size(CONF_STR2)>>3) + ($size(CONF_STR
 	.ioctl_dout(ioctl_dout),
 	.ioctl_wr(ioctl_wr),
 	.ioctl_download(ioctl_download),
+	.ioctl_index(ioctl_index),
 
 	.sd_lba(sd_lba),
 	.sd_rd(sd_rd),
@@ -257,6 +261,10 @@ wire       PAL = (!status[15:14]) ? rom_region : status[15];
 wire [1:0] mouse_mode = status[6:5];
 wire       joy_swap = status[7];
 wire [2:0] LHRom_type = status[3:1];
+
+wire code_index = ioctl_index == 3;
+wire code_download = ioctl_download & code_index;
+wire cart_download = ioctl_download & ~code_index;
 
 reg new_vmode;
 always @(posedge clk_sys) begin
@@ -283,40 +291,42 @@ always @(posedge clk_sys) begin
 	reg [3:0] rom_size;
 	reg [3:0] ram_size;
 
-	if(ioctl_wr) begin
-		if (ioctl_addr == 0) begin
-			rom_size <= 4'hC;
-			ram_size <= 4'h0;
-			if(!LHRom_type && ioctl_dout[7:0]) {ram_size,rom_size} <= ioctl_dout[7:0];
+	if (cart_download) begin
+		if(ioctl_wr) begin
+			if (ioctl_addr == 0) begin
+				rom_size <= 4'hC;
+				ram_size <= 4'h0;
+				if(!LHRom_type && ioctl_dout[7:0]) {ram_size,rom_size} <= ioctl_dout[7:0];
 
-			case(LHRom_type)
-				1: rom_type <= 0;
-				2: rom_type <= 0;
-				3: rom_type <= 1;
-				4: rom_type <= 2;
-				default: rom_type <= ioctl_dout[15:8];
-			endcase
-		end
+				case(LHRom_type)
+					1: rom_type <= 0;
+					2: rom_type <= 0;
+					3: rom_type <= 1;
+					4: rom_type <= 2;
+					default: rom_type <= ioctl_dout[15:8];
+				endcase
+			end
 
-		if (ioctl_addr == 2) begin
-			rom_region <= ioctl_dout[8];
-		end
+			if (ioctl_addr == 2) begin
+				rom_region <= ioctl_dout[8];
+			end
 
-		if(LHRom_type == 2) begin
-			if(ioctl_addr == ('h7FD6+'h200)) rom_size <= ioctl_dout[11:8];
-			if(ioctl_addr == ('h7FD8+'h200)) ram_size <= ioctl_dout[3:0];
-		end
-		else if(LHRom_type == 3) begin
-			if(ioctl_addr == ('hFFD6+'h200)) rom_size <= ioctl_dout[11:8];
-			if(ioctl_addr == ('hFFD8+'h200)) ram_size <= ioctl_dout[3:0];
-		end
-		else if(LHRom_type == 4) begin
-			if(ioctl_addr == ('h40FFD6+'h200)) rom_size <= ioctl_dout[11:8];
-			if(ioctl_addr == ('h40FFD8+'h200)) ram_size <= ioctl_dout[3:0];
-		end
+			if(LHRom_type == 2) begin
+				if(ioctl_addr == ('h7FD6+'h200)) rom_size <= ioctl_dout[11:8];
+				if(ioctl_addr == ('h7FD8+'h200)) ram_size <= ioctl_dout[3:0];
+			end
+			else if(LHRom_type == 3) begin
+				if(ioctl_addr == ('hFFD6+'h200)) rom_size <= ioctl_dout[11:8];
+				if(ioctl_addr == ('hFFD8+'h200)) ram_size <= ioctl_dout[3:0];
+			end
+			else if(LHRom_type == 4) begin
+				if(ioctl_addr == ('h40FFD6+'h200)) rom_size <= ioctl_dout[11:8];
+				if(ioctl_addr == ('h40FFD8+'h200)) ram_size <= ioctl_dout[3:0];
+			end
 
-		rom_mask <= (24'd1024 << rom_size) - 1'd1;
-		ram_mask <= ram_size ? (24'd1024 << ram_size) - 1'd1 : 24'd0;
+			rom_mask <= (24'd1024 << rom_size) - 1'd1;
+			ram_mask <= ram_size ? (24'd1024 << ram_size) - 1'd1 : 24'd0;
+		end
 	end
 end
 
@@ -327,6 +337,7 @@ wire GSU_ACTIVE;
 main main
 (
 	.RESET_N(~reset),
+	.RESET_COLD(cart_download),
 
 	.MCLK(clk_sys), // 21.47727 / 21.28137
 	.ACLK(clk_sys),
@@ -395,10 +406,46 @@ main main
 	.JOY2_CLK(JOY2_CLK),
 	.JOY1_P6(JOY1_P6),
 	.JOY2_P6(JOY2_P6),
+
+	.GG_EN(status[24]),
+	.GG_CODE(gg_code),
 	
 	.AUDIO_L(AUDIO_L),
 	.AUDIO_R(AUDIO_R)
 );
+
+////////////////////////////  CODES  ///////////////////////////////////
+
+reg [128:0] gg_code;
+
+// Code layout:
+// {clock bit, code flags,     32'b address, 32'b compare, 32'b replace}
+//  128        127:96          95:64         63:32         31:0
+// Integer values are in BIG endian byte order, so it up to the loader
+// or generator of the code to re-arrange them correctly.
+
+// SNES files come in with 512 extra words of data at the start
+wire [24:0] code_addr = ioctl_addr - 10'd512;
+
+always_ff @(posedge clk_sys) begin
+	gg_code[128] <= 1'b0;
+
+	if (code_download & ioctl_wr & (ioctl_addr > 510)) begin
+		case (code_addr[3:0])
+			0:  gg_code[111:96]  <= ioctl_dout; // Flags Bottom Word
+			2:  gg_code[127:112] <= ioctl_dout; // Flags Top Word
+			4:  gg_code[79:64]   <= ioctl_dout; // Address Bottom Word
+			6:  gg_code[95:80]   <= ioctl_dout; // Address Top Word
+			8:  gg_code[47:32]   <= ioctl_dout; // Compare Bottom Word
+			10: gg_code[63:48]   <= ioctl_dout; // Compare top Word
+			12: gg_code[15:0]    <= ioctl_dout; // Replace Bottom Word
+			14: begin
+				gg_code[31:16]   <= ioctl_dout; // Replace Top Word
+				gg_code[128]     <=  1'b1;      // Clock it in
+			end
+		endcase
+	end
+end
 
 ////////////////////////////  MEMORY  ///////////////////////////////////
 
@@ -414,12 +461,12 @@ sdram sdram
 	.init(~clock_locked),
 	.clk(clk_mem),
 	
-	.addr(ioctl_download ? ioctl_addr-10'd512 : ROM_ADDR),
+	.addr(cart_download ? ioctl_addr-10'd512 : ROM_ADDR),
 	.din(ioctl_dout),
 	.dout(ROM_Q),
-	.rd(~ioctl_download & ~ROM_CE_N & ~ROM_OE_N),
-	.wr(ioctl_wr),
-	.word(ioctl_download | ROM_WORD),
+	.rd(~cart_download & ~ROM_CE_N & ~ROM_OE_N),
+	.wr(ioctl_wr & cart_download),
+	.word(cart_download | ROM_WORD),
 	.busy()
 );
 
@@ -437,7 +484,7 @@ dpram #(17)	wram
 
 	// clear the RAM on loading
 	.address_b(ioctl_addr[16:0]),
-	.wren_b(ioctl_wr)
+	.wren_b(ioctl_wr & cart_download)
 );
 
 wire [15:0] VRAM1_ADDR;
@@ -453,7 +500,7 @@ dpram #(15)	vram1
 
 	// clear the RAM on loading
 	.address_b(ioctl_addr[14:0]),
-	.wren_b(ioctl_wr)
+	.wren_b(ioctl_wr & cart_download)
 );
 
 wire [15:0] VRAM2_ADDR;
@@ -469,7 +516,7 @@ dpram #(15) vram2
 
 	// clear the RAM on loading
 	.address_b(ioctl_addr[14:0]),
-	.wren_b(ioctl_wr)
+	.wren_b(ioctl_wr & cart_download)
 );
 
 wire [15:0] ARAM_ADDR;
@@ -486,7 +533,7 @@ dpram #(16) aram
 
 	// clear the RAM on loading
 	.address_b(ioctl_addr[15:0]),
-	.wren_b(ioctl_wr)
+	.wren_b(ioctl_wr & cart_download)
 );
 
 localparam  BSRAM_BITS = 17; // 1Mbits
@@ -499,9 +546,9 @@ dpram_dif #(BSRAM_BITS,8,BSRAM_BITS-1,16) bsram
 	.clock(clk_sys),
 
 	//Thrash the BSRAM upon ROM loading
-	.address_a(ioctl_download ? ioctl_addr[BSRAM_BITS-1:0] : BSRAM_ADDR[BSRAM_BITS-1:0]),
-	.data_a(ioctl_download ? ioctl_addr[7:0] : BSRAM_D),
-	.wren_a(ioctl_download ? ioctl_wr : ~BSRAM_CE_N & ~BSRAM_WE_N),
+	.address_a(cart_download ? ioctl_addr[BSRAM_BITS-1:0] : BSRAM_ADDR[BSRAM_BITS-1:0]),
+	.data_a(cart_download ? ioctl_addr[7:0] : BSRAM_D),
+	.wren_a(cart_download ? ioctl_wr : ~BSRAM_CE_N & ~BSRAM_WE_N),
 	.q_a(BSRAM_Q),
 
 	.address_b({sd_lba[BSRAM_BITS-10:0],sd_buff_addr}),
@@ -621,11 +668,11 @@ ioport port2
 reg bk_ena = 0;
 reg old_downloading = 0;
 always @(posedge clk_sys) begin
-	old_downloading <= ioctl_download;
-	if(~old_downloading & ioctl_download) bk_ena <= 0;
+	old_downloading <= cart_download;
+	if(~old_downloading & cart_download) bk_ena <= 0;
 	
 	//Save file always mounted in the end of downloading state.
-	if(ioctl_download && img_mounted && !img_readonly) bk_ena <= |ram_mask;
+	if(cart_download && img_mounted && !img_readonly) bk_ena <= |ram_mask;
 end
 
 wire bk_load    = status[12];
@@ -650,7 +697,7 @@ always @(posedge clk_sys) begin
 			sd_rd <=  bk_load;
 			sd_wr <= ~bk_load;
 		end
-		if(old_downloading & ~ioctl_download & |img_size & bk_ena) begin
+		if(old_downloading & ~cart_download & |img_size & bk_ena) begin
 			bk_state <= 1;
 			bk_loading <= 1;
 			sd_lba <= 0;

@@ -8,6 +8,7 @@
 module main
 (
    input             RESET_N,
+   input             RESET_COLD,
 
    input             MCLK,
    input             ACLK,
@@ -78,6 +79,9 @@ module main
    output            JOY1_P6,
    output            JOY2_P6,
 
+   input             GG_EN,
+   input     [128:0] GG_CODE,
+
    output     [15:0] AUDIO_L,
    output     [15:0] AUDIO_R
 );
@@ -105,6 +109,7 @@ SNES SNES
 	.dspclk(ACLK),
 
 	.rst_n(RESET_N),
+	.rst_cold(RESET_COLD),
 	.enable(1),
 
 	.ca(CA),
@@ -171,6 +176,9 @@ SNES SNES
 	.vde(VBLANKn),
 	.hsync(HSYNC),
 	.vsync(VSYNC),
+
+	.gg_en(GG_EN),
+	.gg_code(GG_CODE),
 
 	.audio_l(AUDIO_L),
 	.audio_r(AUDIO_R)

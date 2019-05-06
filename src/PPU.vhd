@@ -151,6 +151,7 @@ signal VRAM2_WRITE 		: std_logic;
 signal VRAM_ADDR_INC 	: std_logic;
 signal EXTLATCHr 			: std_logic;
 signal OAM_ADDR_REQ 		: std_logic;
+signal OAM_PRIO_REQ 		: std_logic;
 signal VRAMPRERD_REQ 	: std_logic;
 signal VRAMRD_CNT 		: unsigned(1 downto 0);
 
@@ -199,23 +200,20 @@ signal M7_TILE_OUTSIDE 	: std_logic;
 
 -- OBJ
 signal OAM_D 				: std_logic_vector(15 downto 0);
-signal OAM_Q 				: std_logic_vector(15 downto 0);
-signal OAM_ADDR_WR 		: std_logic_vector(7 downto 0);
-signal OAM_ADDR_RD 		: std_logic_vector(7 downto 0);
+signal OAM_Q 				: std_logic_vector(31 downto 0);
+signal OAMIO_Q 			: std_logic_vector(15 downto 0);
+signal OAM_ADDR_A 		: std_logic_vector(7 downto 0);
+signal OAM_ADDR_B 		: std_logic_vector(6 downto 0);
 signal OAM_WE 				: std_logic;
-signal OAM_CS 				: std_logic;
 signal HOAM_Q 				: std_logic_vector(7 downto 0);
-signal HOAM_ADDR_RD 		: std_logic_vector(4 downto 0);
-signal HOAM_ADDR_WR 		: std_logic_vector(4 downto 0);
+signal HOAM_ADDR 			: std_logic_vector(4 downto 0);
 signal HOAM_WE 			: std_logic;
-signal HOAM_CS 			: std_logic;
 signal HOAM_X8 			: std_logic;
 signal HOAM_S 				: std_logic;
 
 signal OAM_ADDR 			: std_logic_vector(9 downto 0);
-signal INT_OAM_ADDR 		: std_logic_vector(6 downto 0);
 signal OAM_RANGE 			: RangeOam_t;
-signal OAM_RANGE_INDEX 	: std_logic_vector(6 downto 0);
+signal OAM_PRIO_INDEX 	: std_logic_vector(6 downto 0);
 signal OAM_TIME_INDEX 	: std_logic_vector(6 downto 0);
 signal RANGE_CNT 			: unsigned(5 downto 0);
 signal TILES_OAM_CNT 	: unsigned(5 downto 0);
@@ -227,9 +225,6 @@ signal OBJ_FETCH 			: std_logic;
 signal OBJ_RANGE_DONE 	: std_logic;
 signal OBJ_TIME_DONE 	: std_logic;
 
-signal OAM_OBJ_X			: unsigned(8 downto 0);
-signal OAM_OBJ_Y			: unsigned(7 downto 0);
-signal OAM_OBJ_S 			: std_logic;
 signal OBJ_TILE_COL 		: unsigned(3 downto 0);
 signal OBJ_TILE_ROW 		: unsigned(3 downto 0);
 signal OBJ_TILE_LINE 	: unsigned(2 downto 0);
@@ -256,8 +251,6 @@ signal SPR_PIX_ADDR_A 	: std_logic_vector(7 downto 0);
 signal SPR_PIX_WE_A 		: std_logic;
 signal SPR_PIX_WE_B 		: std_logic;
 signal SPR_PIX_CNT 		: unsigned(2 downto 0);
-
-signal OBJ_FORCE_BLANK	: std_logic;
 
 -- CRAM
 signal CGRAM_Q 			: std_logic_vector(14 downto 0);
@@ -405,6 +398,8 @@ begin
 		
 		VRAMDATA_Prefetch <= (others => '0');
 		VMADD_INC <= x"01";
+		VRAMPRERD_REQ <= '0';
+		VRAMRD_CNT <= (others => '0');
 		
 		OPHCT_latch <= '0';
 		OPVCT_latch <= '0';
@@ -417,267 +412,294 @@ begin
 		OAM_ADDR <= (others => '0');
 		OAM_PRIO <= '0';
 		OAM_latch <= (others => '0');
+		OAM_PRIO_INDEX <= (others => '0');
+		OAM_ADDR_REQ <= '0';
+		OAM_PRIO_REQ <= '0';
 		
 		CGRAM_Lsb <= (others => '0');
-
-		OAM_ADDR_REQ <= '0';
-		VRAMPRERD_REQ <= '0';
-		VRAMRD_CNT <= (others => '0');
 	elsif rising_edge(CLK) then
-		if OAM_ADDR_REQ = '1' then
-			OAM_ADDR <= OAMADD & "0";
-			OAM_ADDR_REQ <= '0';
-		end if;
-		
-		if VRAMPRERD_REQ = '1' then
-			if VRAMRD_CNT = 3 then
-				if FORCE_BLANK = '1' or IN_VBL = '1' then
-					VRAMDATA_Prefetch <= VRAM_DBI & VRAM_DAI;
-				else
-					VRAMDATA_Prefetch <= (others => '0');
-				end if;
-				VRAMPRERD_REQ <= '0';
+		if ENABLE = '1' then
+			if OAM_ADDR_REQ = '1' and DOT_CLKR_CE = '1' then
+				OAM_ADDR <= OAMADD & "0";
+				OAM_PRIO_INDEX <= OAMADD(7 downto 1);
+				OAM_ADDR_REQ <= '0';
 			end if;
-			VRAMRD_CNT <= VRAMRD_CNT + 1;
-		end if;
-		
-		if PAWR_N = '0' and SYSCLK_CE = '1' then
-			case PA is
-				when x"00" =>						--INIDISP
-					FORCE_BLANK <= DI(7);
-					MB <= DI(3 downto 0);
-					if FORCE_BLANK = '1' and V_CNT = LAST_VIS_LINE + 1 then
+	
+			if OAM_PRIO_REQ = '1' and DOT_CLKR_CE = '1' then
+				OAM_PRIO_INDEX <= OAM_ADDR(8 downto 2);
+				OAM_PRIO_REQ <= '0';
+			end if;
+	
+			if H_CNT = LAST_DOT and (V_CNT < LAST_VIS_LINE or V_CNT = LAST_LINE) and FORCE_BLANK = '0' and DOT_CLKR_CE = '1' then
+				if OAM_PRIO = '0' then
+					OAM_ADDR <= (others => '0');
+				else
+					OAM_ADDR <= "0" & OAM_PRIO_INDEX & "00";
+				end if;
+			end if;
+	
+			if OBJ_RANGE = '1' and FORCE_BLANK = '0' and H_CNT(0) = '1' and DOT_CLKR_CE = '1' then
+				OAM_ADDR <= std_logic_vector(unsigned(OAM_ADDR) + 4);
+			end if;
+	
+			if OBJ_TIME = '1' and H_CNT(0) = '0' and FORCE_BLANK = '0' and DOT_CLKR_CE = '1' then
+				OAM_ADDR <= "0" & OAM_TIME_INDEX & "00";
+			end if;
+	
+			
+			if VRAMPRERD_REQ = '1' then
+				if VRAMRD_CNT = 3 then
+					if FORCE_BLANK = '1' or IN_VBL = '1' then
+						VRAMDATA_Prefetch <= VRAM_DBI & VRAM_DAI;
+					else
+						VRAMDATA_Prefetch <= (others => '0');
+					end if;
+					VRAMPRERD_REQ <= '0';
+				end if;
+				VRAMRD_CNT <= VRAMRD_CNT + 1;
+			end if;
+			
+			if PAWR_N = '0' and SYSCLK_CE = '1' then
+				case PA is
+					when x"00" =>						--INIDISP
+						FORCE_BLANK <= DI(7);
+						MB <= DI(3 downto 0);
+						if FORCE_BLANK = '1' and V_CNT = LAST_VIS_LINE + 1 then
+							OAM_ADDR_REQ <= '1';
+						end if;
+					when x"01" =>						--OBSEL
+						OBJADDR <= DI(2 downto 0);
+						OBJNAME <= DI(4 downto 3);
+						OBJSIZE <= DI(7 downto 5);
+					when x"02" =>						--OAMADDL
+						OAMADD(7 downto 0) <= DI;
 						OAM_ADDR_REQ <= '1';
-					end if;
-				when x"01" =>						--OBSEL
-					OBJADDR <= DI(2 downto 0);
-					OBJNAME <= DI(4 downto 3);
-					OBJSIZE <= DI(7 downto 5);
-				when x"02" =>						--OAMADDL
-					OAMADD(7 downto 0) <= DI;
-					OAM_ADDR_REQ <= '1';
-				when x"03" =>						--OAMADDH
-					OAMADD(8) <= DI(0);
-					OAM_PRIO <= DI(7);
-					OAM_ADDR_REQ <= '1';
-				when x"04" =>						--OAMDI
-					if OAM_ADDR(0) = '0' then
-						OAM_latch <= DI;
-					end if;
-					OAM_ADDR <= std_logic_vector(unsigned(OAM_ADDR) + 1);
-				when x"05" =>						--BGMODE
-					BG_MODE <= DI(2 downto 0);
-					BG3PRIO <= DI(3);
-					BG_SIZE <= DI(7 downto 4);
-				when x"06" =>						--MOSAIC
-					BG_MOSAIC_EN <= DI(3 downto 0);
-					MOSAIC_SIZE <= DI(7 downto 4);
-				when x"07" =>						--BG1SC
-					BG_SC_SIZE(BG1) <= DI(1 downto 0);
-					BG_SC_ADDR(BG1) <= DI(7 downto 2);
-				when x"08" =>						--BG2SC
-					BG_SC_SIZE(BG2) <= DI(1 downto 0);
-					BG_SC_ADDR(BG2) <= DI(7 downto 2);
-				when x"09" =>						--BG3SC
-					BG_SC_SIZE(BG3) <= DI(1 downto 0);
-					BG_SC_ADDR(BG3) <= DI(7 downto 2);
-				when x"0A" =>						--BG4SC
-					BG_SC_SIZE(BG4) <= DI(1 downto 0);
-					BG_SC_ADDR(BG4) <= DI(7 downto 2);
-				when x"0B" =>						--BG12NBA
-					BG_NBA(BG1) <= DI(3 downto 0);
-					BG_NBA(BG2) <= DI(7 downto 4);
-				when x"0C" =>						--BG34NBA
-					BG_NBA(BG3) <= DI(3 downto 0);
-					BG_NBA(BG4) <= DI(7 downto 4);
-				when x"0D" =>						--BG1HOFS
-					BGOFS_latch <= DI;
-					BGHOFS_latch <= DI(2 downto 0);
-					BG_HOFS(BG1) <= DI(1 downto 0) & BGOFS_latch(7 downto 3) & BGHOFS_latch;
-					
-					M7_latch <= DI;
-					M7HOFS <= DI(4 downto 0) & M7_latch;
-				when x"0E" =>						--BG1VOFS
-					BGOFS_latch <= DI;
-					BG_VOFS(BG1) <= DI(1 downto 0) & BGOFS_latch;
-					
-					M7_latch <= DI;
-					M7VOFS <= DI(4 downto 0) & M7_latch;
-				when x"0F" =>						--BG2HOFS
-					BGOFS_latch <= DI;
-					BGHOFS_latch <= DI(2 downto 0);
-					BG_HOFS(BG2) <= DI(1 downto 0) & BGOFS_latch(7 downto 3) & BGHOFS_latch;
-				when x"10" =>						--BG2VOFS
-					BGOFS_latch <= DI;
-					BG_VOFS(BG2) <= DI(1 downto 0) & BGOFS_latch;
-				when x"11" =>						--BG3HOFS
-					BGOFS_latch <= DI;
-					BGHOFS_latch <= DI(2 downto 0);
-					BG_HOFS(BG3) <= DI(1 downto 0) & BGOFS_latch(7 downto 3) & BGHOFS_latch;
-				when x"12" =>						--BG3VOFS
-					BGOFS_latch <= DI;
-					BG_VOFS(BG3) <= DI(1 downto 0) & BGOFS_latch;
-				when x"13" =>						--BG4HOFS
-					BGOFS_latch <= DI;
-					BGHOFS_latch <= DI(2 downto 0);
-					BG_HOFS(BG4) <= DI(1 downto 0) & BGOFS_latch(7 downto 3) & BGHOFS_latch;
-				when x"14" =>						--BG4VOFS
-					BGOFS_latch <= DI;
-					BG_VOFS(BG4) <= DI(1 downto 0) & BGOFS_latch;
-				when x"15" =>						--VMAIN
-					VMAIN_ADDRINC <= DI(7);
-					VMAIN_ADDRTRANS <= DI(3 downto 2);
-					case DI(1 downto 0) is
-						when "00" =>
-							VMADD_INC <= x"01";
-						when "01" =>
-							VMADD_INC <= x"20";
-						when others =>
-							VMADD_INC <= x"80";
-					end case;
-				when x"16" =>						--VMADDL
-					VMADD(7 downto 0) <= DI;
-					VRAMPRERD_REQ <= '1';
-				when x"17" =>						--VMADDH
-					VMADD(15 downto 8) <= DI;
-					VRAMPRERD_REQ <= '1';
-				when x"18" =>						--VMDIL
-					if VMAIN_ADDRINC = '0' then
-						VMADD <= std_logic_vector(unsigned(VMADD) + VMADD_INC);
-					end if;
-				when x"19" =>						--VMDIH
-					if VMAIN_ADDRINC = '1' then
-						VMADD <= std_logic_vector(unsigned(VMADD) + VMADD_INC);
-					end if;
-				when x"1A" =>						--M7SEL
-					M7SEL <= DI;
-				when x"1B" =>						--M7A
-					M7_latch <= DI;
-					M7A <= DI & M7_latch;
-				when x"1C" =>						--M7B
-					M7_latch <= DI;
-					M7B <= DI & M7_latch;
-				when x"1D" =>						--M7C
-					M7_latch <= DI;
-					M7C <= DI & M7_latch;
-				when x"1E" =>						--M7D
-					M7_latch <= DI;
-					M7D <= DI & M7_latch;
-				when x"1F" =>						--M7X
-					M7_latch <= DI;
-					M7X <= DI(4 downto 0) & M7_latch;
-				when x"20" =>						--M7Y
-					M7_latch <= DI;
-					M7Y <= DI(4 downto 0) & M7_latch;
-				when x"21" =>						--CGADD
-					CGADD <= DI & '0';
-				when x"22" =>						--CGDI
-					if CGADD(0) = '0' then
-						CGRAM_Lsb <= DI;
-					end if;
-					CGADD <= std_logic_vector(unsigned(CGADD) + 1);
-				when x"23" =>						--W12SEL
-					W12SEL <= DI;
-				when x"24" =>						--W34SEL
-					W34SEL <= DI;
-				when x"25" =>						--WOBJSEL
-					WOBJSEL <= DI;
-				when x"26" =>						--WH0
-					WH0 <= DI;
-				when x"27" =>						--WH1
-					WH1 <= DI;
-				when x"28" =>						--WH2
-					WH2 <= DI;
-				when x"29" =>						--WH3
-					WH3 <= DI;
-				when x"2A" =>						--WBGLOG
-					WBGLOG <= DI;
-				when x"2B" =>						--WOBJLOG
-					WOBJLOG <= DI;
-				when x"2C" =>						--TM
-					TM <= DI;
-				when x"2D" =>						--TS
-					TS <= DI;
-				when x"2E" =>						--TMW
-					TMW <= DI;
-				when x"2F" =>						--TSW
-					TSW <= DI;
-				when x"30" =>						--CGWSEL
-					CGWSEL <= DI;
-				when x"31" =>						--CGADSUB
-					CGADSUB <= DI;
-				when x"32" =>						--COLDI
-					if DI(7) = '1' then
-						SUBCOLBD(14 downto 10) <= DI(4 downto 0);
-					end if;
-					if DI(6) = '1' then
-						SUBCOLBD(9 downto 5) <= DI(4 downto 0);
-					end if;
-					if DI(5) = '1' then
-						SUBCOLBD(4 downto 0) <= DI(4 downto 0);
-					end if;
-				when x"33" =>						--SETINI
-					BGINTERLACE <= DI(0);
-					OBJINTERLACE <= DI(1);
-					OVERSCAN <= DI(2);
-					PSEUDOHIRES <= DI(3);		--Always out H512
-					M7EXTBG <= DI(6);
-				when others => null;
-			end case;
-
-		elsif PARD_N = '0' and SYSCLK_CE = '1' then
-			case PA is
-				when x"37" =>						--SLHV
-					if EXTLATCH = '1' then
-						OPHCT <= std_logic_vector(H_CNT);
-						OPVCT <= std_logic_vector(V_CNT);	
-						F_LATCH <= '1';
-					end if;
-				when x"38" =>			--RDOAM
-					OAM_ADDR <= std_logic_vector(unsigned(OAM_ADDR) + 1);
-				when x"3B" =>			--RDCGRAM
-					CGADD <= std_logic_vector(unsigned(CGADD) + 1);
-				when x"39" =>						--RDVRAML
-					if VMAIN_ADDRINC = '0' then
-						VMADD <= std_logic_vector(unsigned(VMADD) + VMADD_INC);
-						if FORCE_BLANK = '1' or IN_VBL = '1' then
-							VRAMDATA_Prefetch <= VRAM_DBI & VRAM_DAI;
-						else
-							VRAMDATA_Prefetch <= (others => '0');
+					when x"03" =>						--OAMADDH
+						OAMADD(8) <= DI(0);
+						OAM_PRIO <= DI(7);
+						OAM_ADDR_REQ <= '1';
+					when x"04" =>						--OAMDI
+						if OAM_ADDR(0) = '0' then
+							OAM_latch <= DI;
 						end if;
-					end if;
-				when x"3A" =>						--RDVRAMH
-					if VMAIN_ADDRINC = '1' then
-						VMADD <= std_logic_vector(unsigned(VMADD) + VMADD_INC);
-						if FORCE_BLANK = '1' or IN_VBL = '1' then
-							VRAMDATA_Prefetch <= VRAM_DBI & VRAM_DAI;
-						else
-							VRAMDATA_Prefetch <= (others => '0');
+						OAM_ADDR <= std_logic_vector(unsigned(OAM_ADDR) + 1);
+						OAM_PRIO_REQ <= '1';
+					when x"05" =>						--BGMODE
+						BG_MODE <= DI(2 downto 0);
+						BG3PRIO <= DI(3);
+						BG_SIZE <= DI(7 downto 4);
+					when x"06" =>						--MOSAIC
+						BG_MOSAIC_EN <= DI(3 downto 0);
+						MOSAIC_SIZE <= DI(7 downto 4);
+					when x"07" =>						--BG1SC
+						BG_SC_SIZE(BG1) <= DI(1 downto 0);
+						BG_SC_ADDR(BG1) <= DI(7 downto 2);
+					when x"08" =>						--BG2SC
+						BG_SC_SIZE(BG2) <= DI(1 downto 0);
+						BG_SC_ADDR(BG2) <= DI(7 downto 2);
+					when x"09" =>						--BG3SC
+						BG_SC_SIZE(BG3) <= DI(1 downto 0);
+						BG_SC_ADDR(BG3) <= DI(7 downto 2);
+					when x"0A" =>						--BG4SC
+						BG_SC_SIZE(BG4) <= DI(1 downto 0);
+						BG_SC_ADDR(BG4) <= DI(7 downto 2);
+					when x"0B" =>						--BG12NBA
+						BG_NBA(BG1) <= DI(3 downto 0);
+						BG_NBA(BG2) <= DI(7 downto 4);
+					when x"0C" =>						--BG34NBA
+						BG_NBA(BG3) <= DI(3 downto 0);
+						BG_NBA(BG4) <= DI(7 downto 4);
+					when x"0D" =>						--BG1HOFS
+						BGOFS_latch <= DI;
+						BGHOFS_latch <= DI(2 downto 0);
+						BG_HOFS(BG1) <= DI(1 downto 0) & BGOFS_latch(7 downto 3) & BGHOFS_latch;
+						
+						M7_latch <= DI;
+						M7HOFS <= DI(4 downto 0) & M7_latch;
+					when x"0E" =>						--BG1VOFS
+						BGOFS_latch <= DI;
+						BG_VOFS(BG1) <= DI(1 downto 0) & BGOFS_latch;
+						
+						M7_latch <= DI;
+						M7VOFS <= DI(4 downto 0) & M7_latch;
+					when x"0F" =>						--BG2HOFS
+						BGOFS_latch <= DI;
+						BGHOFS_latch <= DI(2 downto 0);
+						BG_HOFS(BG2) <= DI(1 downto 0) & BGOFS_latch(7 downto 3) & BGHOFS_latch;
+					when x"10" =>						--BG2VOFS
+						BGOFS_latch <= DI;
+						BG_VOFS(BG2) <= DI(1 downto 0) & BGOFS_latch;
+					when x"11" =>						--BG3HOFS
+						BGOFS_latch <= DI;
+						BGHOFS_latch <= DI(2 downto 0);
+						BG_HOFS(BG3) <= DI(1 downto 0) & BGOFS_latch(7 downto 3) & BGHOFS_latch;
+					when x"12" =>						--BG3VOFS
+						BGOFS_latch <= DI;
+						BG_VOFS(BG3) <= DI(1 downto 0) & BGOFS_latch;
+					when x"13" =>						--BG4HOFS
+						BGOFS_latch <= DI;
+						BGHOFS_latch <= DI(2 downto 0);
+						BG_HOFS(BG4) <= DI(1 downto 0) & BGOFS_latch(7 downto 3) & BGHOFS_latch;
+					when x"14" =>						--BG4VOFS
+						BGOFS_latch <= DI;
+						BG_VOFS(BG4) <= DI(1 downto 0) & BGOFS_latch;
+					when x"15" =>						--VMAIN
+						VMAIN_ADDRINC <= DI(7);
+						VMAIN_ADDRTRANS <= DI(3 downto 2);
+						case DI(1 downto 0) is
+							when "00" =>
+								VMADD_INC <= x"01";
+							when "01" =>
+								VMADD_INC <= x"20";
+							when others =>
+								VMADD_INC <= x"80";
+						end case;
+					when x"16" =>						--VMADDL
+						VMADD(7 downto 0) <= DI;
+						VRAMPRERD_REQ <= '1';
+					when x"17" =>						--VMADDH
+						VMADD(15 downto 8) <= DI;
+						VRAMPRERD_REQ <= '1';
+					when x"18" =>						--VMDIL
+						if VMAIN_ADDRINC = '0' then
+							VMADD <= std_logic_vector(unsigned(VMADD) + VMADD_INC);
 						end if;
-					end if;
-				when x"3C" =>						--OPHCT
-					OPHCT_latch <= not OPHCT_latch;
-				when x"3D" =>						--OPVCT
-					OPVCT_latch <= not OPVCT_latch;
-				when x"3F" =>						--STAT78
-					OPHCT_latch <= '0';
-					OPVCT_latch <= '0';
-					if EXTLATCH = '1' then
-						F_LATCH <= '0';
-					end if;
-				when others => null;
-			end case;
-		end if;
-		
-		if (H_CNT = LAST_DOT and V_CNT = LAST_VIS_LINE and FORCE_BLANK = '0') then
-			OAM_ADDR_REQ <= '1';
-		end if;
-		
-		EXTLATCHr <= EXTLATCH;
-		if EXTLATCH = '0' and EXTLATCHr = '1' then
-			OPHCT <= std_logic_vector(H_CNT);
-			OPVCT <= std_logic_vector(V_CNT);	
-			F_LATCH <= '1';
+					when x"19" =>						--VMDIH
+						if VMAIN_ADDRINC = '1' then
+							VMADD <= std_logic_vector(unsigned(VMADD) + VMADD_INC);
+						end if;
+					when x"1A" =>						--M7SEL
+						M7SEL <= DI;
+					when x"1B" =>						--M7A
+						M7_latch <= DI;
+						M7A <= DI & M7_latch;
+					when x"1C" =>						--M7B
+						M7_latch <= DI;
+						M7B <= DI & M7_latch;
+					when x"1D" =>						--M7C
+						M7_latch <= DI;
+						M7C <= DI & M7_latch;
+					when x"1E" =>						--M7D
+						M7_latch <= DI;
+						M7D <= DI & M7_latch;
+					when x"1F" =>						--M7X
+						M7_latch <= DI;
+						M7X <= DI(4 downto 0) & M7_latch;
+					when x"20" =>						--M7Y
+						M7_latch <= DI;
+						M7Y <= DI(4 downto 0) & M7_latch;
+					when x"21" =>						--CGADD
+						CGADD <= DI & '0';
+					when x"22" =>						--CGDI
+						if CGADD(0) = '0' then
+							CGRAM_Lsb <= DI;
+						end if;
+						CGADD <= std_logic_vector(unsigned(CGADD) + 1);
+					when x"23" =>						--W12SEL
+						W12SEL <= DI;
+					when x"24" =>						--W34SEL
+						W34SEL <= DI;
+					when x"25" =>						--WOBJSEL
+						WOBJSEL <= DI;
+					when x"26" =>						--WH0
+						WH0 <= DI;
+					when x"27" =>						--WH1
+						WH1 <= DI;
+					when x"28" =>						--WH2
+						WH2 <= DI;
+					when x"29" =>						--WH3
+						WH3 <= DI;
+					when x"2A" =>						--WBGLOG
+						WBGLOG <= DI;
+					when x"2B" =>						--WOBJLOG
+						WOBJLOG <= DI;
+					when x"2C" =>						--TM
+						TM <= DI;
+					when x"2D" =>						--TS
+						TS <= DI;
+					when x"2E" =>						--TMW
+						TMW <= DI;
+					when x"2F" =>						--TSW
+						TSW <= DI;
+					when x"30" =>						--CGWSEL
+						CGWSEL <= DI;
+					when x"31" =>						--CGADSUB
+						CGADSUB <= DI;
+					when x"32" =>						--COLDI
+						if DI(7) = '1' then
+							SUBCOLBD(14 downto 10) <= DI(4 downto 0);
+						end if;
+						if DI(6) = '1' then
+							SUBCOLBD(9 downto 5) <= DI(4 downto 0);
+						end if;
+						if DI(5) = '1' then
+							SUBCOLBD(4 downto 0) <= DI(4 downto 0);
+						end if;
+					when x"33" =>						--SETINI
+						BGINTERLACE <= DI(0);
+						OBJINTERLACE <= DI(1);
+						OVERSCAN <= DI(2);
+						PSEUDOHIRES <= DI(3);		--Always out H512
+						M7EXTBG <= DI(6);
+					when others => null;
+				end case;
+	
+			elsif PARD_N = '0' and SYSCLK_CE = '1' then
+				case PA is
+					when x"37" =>						--SLHV
+						if EXTLATCH = '1' then
+							OPHCT <= std_logic_vector(H_CNT);
+							OPVCT <= std_logic_vector(V_CNT);	
+							F_LATCH <= '1';
+						end if;
+					when x"38" =>			--RDOAM
+						OAM_ADDR <= std_logic_vector(unsigned(OAM_ADDR) + 1);
+						OAM_PRIO_REQ <= '1';
+					when x"3B" =>			--RDCGRAM
+						CGADD <= std_logic_vector(unsigned(CGADD) + 1);
+					when x"39" =>						--RDVRAML
+						if VMAIN_ADDRINC = '0' then
+							VMADD <= std_logic_vector(unsigned(VMADD) + VMADD_INC);
+							if FORCE_BLANK = '1' or IN_VBL = '1' then
+								VRAMDATA_Prefetch <= VRAM_DBI & VRAM_DAI;
+							else
+								VRAMDATA_Prefetch <= (others => '0');
+							end if;
+						end if;
+					when x"3A" =>						--RDVRAMH
+						if VMAIN_ADDRINC = '1' then
+							VMADD <= std_logic_vector(unsigned(VMADD) + VMADD_INC);
+							if FORCE_BLANK = '1' or IN_VBL = '1' then
+								VRAMDATA_Prefetch <= VRAM_DBI & VRAM_DAI;
+							else
+								VRAMDATA_Prefetch <= (others => '0');
+							end if;
+						end if;
+					when x"3C" =>						--OPHCT
+						OPHCT_latch <= not OPHCT_latch;
+					when x"3D" =>						--OPVCT
+						OPVCT_latch <= not OPVCT_latch;
+					when x"3F" =>						--STAT78
+						OPHCT_latch <= '0';
+						OPVCT_latch <= '0';
+						if EXTLATCH = '1' then
+							F_LATCH <= '0';
+						end if;
+					when others => null;
+				end case;
+			end if;
+			
+			if H_CNT = LAST_DOT and V_CNT = LAST_VIS_LINE and FORCE_BLANK = '0' and DOT_CLKR_CE = '1' then
+				OAM_ADDR <= OAMADD & "0";
+				OAM_PRIO_INDEX <= OAMADD(7 downto 1);
+			end if;
+			
+			EXTLATCHr <= EXTLATCH;
+			if EXTLATCH = '0' and EXTLATCHr = '1' then
+				OPHCT <= std_logic_vector(H_CNT);
+				OPVCT <= std_logic_vector(V_CNT);	
+				F_LATCH <= '1';
+			end if;
 		end if;
 	end if;
 end process;
@@ -699,7 +721,7 @@ begin
 	end if;
 end process;
 
-process( PA, MPY, OAM_ADDR, OAM_Q, HOAM_Q, VRAMDATA_Prefetch, OBJ_TIME_OFL, OBJ_RANGE_OFL, 
+process( PA, MPY, OAM_ADDR, OAMIO_Q, HOAM_Q, VRAMDATA_Prefetch, OBJ_TIME_OFL, OBJ_RANGE_OFL, 
 			CGADD, CGRAM_Q, OPHCT_latch, OPHCT, OPVCT_latch, OPVCT, FIELD, F_LATCH, EXTLATCH, PAL, MDR1, MDR2, DI)
 begin 
 	case PA is
@@ -716,9 +738,9 @@ begin
 		when x"38" =>						--RDOAM
 			if OAM_ADDR(9) = '0' then
 				if OAM_ADDR(0) = '0' then
-					D_OUT <= OAM_Q(7 downto 0);
+					D_OUT <= OAMIO_Q(7 downto 0);
 				else
-					D_OUT <= OAM_Q(15 downto 8);
+					D_OUT <= OAMIO_Q(15 downto 8);
 				end if;
 			else
 				D_OUT <= HOAM_Q;
@@ -768,11 +790,11 @@ VRAM2_WRITE <= '1' when PAWR_N = '0' and PA = x"19" and (BG_FORCE_BLANK = '1' or
 		
 VRAM_ADDRA <= DBG_VRAM_ADDR(16 downto 1) when ENABLE = '0' else
 				  BG_VRAM_ADDRA when BG_FETCH = '1' and BG_FORCE_BLANK = '0'else 
-				  OBJ_VRAM_ADDR when OBJ_FETCH = '1' and OBJ_FORCE_BLANK = '0' else
+				  OBJ_VRAM_ADDR when OBJ_FETCH = '1' and FORCE_BLANK = '0' else
 				  VMADD_TRANS;
 VRAM_ADDRB <= DBG_VRAM_ADDR(16 downto 1) when ENABLE = '0' else
 				  BG_VRAM_ADDRB when BG_FETCH = '1' and BG_FORCE_BLANK = '0'else 
-				  OBJ_VRAM_ADDR when OBJ_FETCH = '1' and OBJ_FORCE_BLANK= '0' else
+				  OBJ_VRAM_ADDR when OBJ_FETCH = '1' and FORCE_BLANK= '0' else
 				  VMADD_TRANS;			 
 				 
 
@@ -1241,7 +1263,7 @@ begin
 				else
 					if M7SEL(7 downto 6) = "10" and M7_TILE_OUTSIDE = '1' then 
 						M7_PIX := (others => '0');
-					else 
+					else  
 						M7_PIX := VRAM_DBI;
 					end if;
 					BG_DATA(to_integer(H_CNT(2 downto 0)))(15 downto 8) <= M7_PIX;
@@ -1370,46 +1392,37 @@ end process;
 
 
 --Sprites engine
-OAM : entity work.dpram generic map(8,16)
+OAM : entity work.dpram_dif generic map(8,16,7,32)
 port map(
 	clock			=> CLK,
 	data_a		=> OAM_D,
-	address_a	=> OAM_ADDR_WR,
-	address_b	=> OAM_ADDR_RD,
+	address_a	=> OAM_ADDR_A,
+	address_b	=> OAM_ADDR_B,
 	wren_a		=> OAM_WE,
-	cs_a			=> OAM_CS,
+	q_a			=> OAMIO_Q,
 	q_b			=> OAM_Q
 );
 OAM_D <= DI & OAM_latch;
-OAM_ADDR_WR <= OAM_ADDR(8 downto 1) when OBJ_FORCE_BLANK = '1' or IN_VBL = '1' else
-				   INT_OAM_ADDR & OAM_ADDR(1);
-OAM_ADDR_RD <= DBG_OAM_ADDR when ENABLE = '0' else 
-				   OAM_ADDR(8 downto 1) when OBJ_FORCE_BLANK = '1' or IN_VBL = '1' else
-				   INT_OAM_ADDR & H_CNT(0);
-OAM_WE <= ENABLE when PAWR_N = '0' and PA = x"04" and SYSCLK_CE = '1' else '0';
-OAM_CS <= '1' when (OAM_ADDR(9) = '0' or (IN_VBL = '0' and OBJ_FORCE_BLANK = '0')) and OAM_ADDR(0) = '1' else '0';
+OAM_ADDR_A <= DBG_OAM_ADDR when ENABLE = '0' else 
+				  OAM_ADDR(8 downto 1);
+OAM_ADDR_B <= OAM_ADDR(8 downto 2);
+OAM_WE <= ENABLE when (OAM_ADDR(9) = '0' or (IN_VBL = '0' and FORCE_BLANK = '0')) and OAM_ADDR(0) = '1' and PAWR_N = '0' and PA = x"04" and SYSCLK_CE = '1' else '0';
 
-
-HOAM : entity work.dpram generic map(5,8)
+HOAM : entity work.spram generic map(5,8)
 port map(
-	clock			=> CLK,
-	data_a		=> DI,
-	address_a	=> HOAM_ADDR_WR,
-	address_b	=> HOAM_ADDR_RD,
-	wren_a		=> HOAM_WE,
-	cs_a			=> HOAM_CS,
-	q_b			=> HOAM_Q
+	clock		=> CLK,
+	data		=> DI,
+	address	=> HOAM_ADDR,
+	wren		=> HOAM_WE,
+	q			=> HOAM_Q
 );
-HOAM_ADDR_WR <= OAM_ADDR(4 downto 0) when OBJ_FORCE_BLANK = '1' or IN_VBL = '1' else
-				    INT_OAM_ADDR(6 downto 2);
-HOAM_ADDR_RD <= DBG_OAM_ADDR(4 downto 0) when ENABLE = '0' else 
-					 OAM_ADDR(4 downto 0) when OBJ_FORCE_BLANK = '1' or IN_VBL = '1' else
-				    INT_OAM_ADDR(6 downto 2);
-HOAM_WE <= ENABLE when PAWR_N = '0' and PA = x"04" and SYSCLK_CE = '1' else '0';
-HOAM_CS <= '1' when OAM_ADDR(9) = '1' or (IN_VBL = '0' and OBJ_FORCE_BLANK = '0') else '0';
+HOAM_ADDR <= DBG_OAM_ADDR(4 downto 0) when ENABLE = '0' else 
+				 OAM_ADDR(8 downto 4) when IN_VBL = '0' and FORCE_BLANK = '0' else
+				 OAM_ADDR(4 downto 0);
+HOAM_WE <= ENABLE when (OAM_ADDR(9) = '1' or (IN_VBL = '0' and FORCE_BLANK = '0')) and PAWR_N = '0' and PA = x"04" and SYSCLK_CE = '1' else '0';
 
-HOAM_X8 <= HOAM_Q(to_integer(unsigned(INT_OAM_ADDR(1 downto 0))&"0"));
-HOAM_S  <= HOAM_Q(to_integer(unsigned(INT_OAM_ADDR(1 downto 0))&"1"));
+HOAM_X8 <= HOAM_Q(to_integer(unsigned(OAM_ADDR(3 downto 2))&"0"));
+HOAM_S  <= HOAM_Q(to_integer(unsigned(OAM_ADDR(3 downto 2))&"1"));
 
 
 process( RST_N, CLK )
@@ -1420,6 +1433,9 @@ variable W, H, H2 		: unsigned(5 downto 0);
 variable NEW_RANGE_CNT 	: unsigned(5 downto 0);
 variable TILE_X 			: unsigned(8 downto 0);
 variable CUR_TILES_CNT 	: unsigned(2 downto 0);
+variable OAM_OBJ_X			: unsigned(8 downto 0);
+variable OAM_OBJ_Y			: unsigned(7 downto 0);
+variable OAM_OBJ_S 			: std_logic;
 variable OAM_OBJ_TILE	: unsigned(7 downto 0);
 variable OAM_OBJ_N		: std_logic;
 variable OAM_OBJ_PAL		: std_logic_vector(2 downto 0);
@@ -1439,9 +1455,6 @@ begin
 		OBJ_TIME_DONE <= '0';
 		OBJ_TIME_SAVE <= '0';
 		OAM_TIME_INDEX <= (others => '0');
-		OAM_OBJ_X <= (others => '0');
-		OAM_OBJ_Y <= (others => '0');
-		OAM_OBJ_S <= '0';
 		OBJ_TILE_LINE <= (others => '0');
 		OBJ_TILE_COL <= (others => '0');
 		OBJ_TILE_ROW <= (others => '0');
@@ -1455,15 +1468,8 @@ begin
 		SPR_TILE_PAL <= (others => '0');
 		SPR_TILE_PRIO <= (others => '0');
 		SPR_TILE_DATA_TEMP <= (others => '0');
-		OBJ_FORCE_BLANK <= '1';
 	elsif rising_edge(CLK) then 
-		if ENABLE = '1' and DOT_CLKR_CE = '1' then
-			if FORCE_BLANK = '1' then
-				OBJ_FORCE_BLANK <= '1';
-			elsif H_CNT = LAST_DOT and FORCE_BLANK = '0' then
-				OBJ_FORCE_BLANK <= '0';
-			end if;
-		
+		if ENABLE = '1' and  DOT_CLKR_CE = '1' then
 			if H_CNT = LAST_DOT and V_CNT < LAST_VIS_LINE then
 				RANGE_CNT <= (others => '1');
 				if RANGE_CNT(5) /= '1' and TILES_OAM_CNT = 34 then
@@ -1472,25 +1478,21 @@ begin
 				OBJ_RANGE_DONE <= '0';
 			end if;
 			
-			if V_CNT < LAST_VIS_LINE and OBJ_FORCE_BLANK = '0' then
-				if H_CNT = OBJ_TIME_START-1 then
-					if RANGE_CNT(5) /= '1' then
-						OAM_TIME_INDEX <= OAM_RANGE(to_integer(RANGE_CNT(4 downto 0)));
-					end if;
-				end if;
-			end if;
-			
-			if H_CNT = LAST_DOT and V_CNT = LAST_LINE and OBJ_FORCE_BLANK = '0' then
+			if H_CNT = LAST_DOT and V_CNT = LAST_LINE and FORCE_BLANK = '0' then
 				OBJ_RANGE_OFL <= '0';
 				OBJ_TIME_OFL <= '0';
 			end if;
 			
-			if H_CNT(0) = '0' then
-				OAM_OBJ_X <= HOAM_X8 & unsigned(OAM_Q(7 downto 0));
-				OAM_OBJ_Y <= unsigned(OAM_Q(15 downto 8));
-				OAM_OBJ_S <= HOAM_S;
-			end if;	
-			
+			OAM_OBJ_X := HOAM_X8 & unsigned(OAM_Q(7 downto 0));
+			OAM_OBJ_Y := unsigned(OAM_Q(15 downto 8));
+			OAM_OBJ_S := HOAM_S;	
+			OAM_OBJ_TILE := unsigned(OAM_Q(23 downto 16));
+			OAM_OBJ_N := OAM_Q(24);
+			OAM_OBJ_PAL := OAM_Q(27 downto 25);
+			OAM_OBJ_PRIO := OAM_Q(29 downto 28);
+			OAM_OBJ_HFLIP := OAM_Q(30);
+			OAM_OBJ_VFLIP := OAM_Q(31);
+					
 			SCREEN_Y := V_CNT(7 downto 0);
 			W := SprWidth(OAM_OBJ_S & OBJSIZE);
 			H := SprHeight(OAM_OBJ_S & OBJSIZE);
@@ -1500,11 +1502,11 @@ begin
 				H2 := H;
 			end if;		
 			
-			if OBJ_RANGE = '1' and H_CNT(0) = '1' and OBJ_FORCE_BLANK = '0' then
+			if OBJ_RANGE = '1' and H_CNT(0) = '1' and FORCE_BLANK = '0' then
 				if (OAM_OBJ_X <= 256 or (0 - OAM_OBJ_X) <= W) and (SCREEN_Y - OAM_OBJ_Y) <= H2 then
 					if OBJ_RANGE_DONE = '0' then
 						NEW_RANGE_CNT := RANGE_CNT + 1;
-						OAM_RANGE(to_integer(NEW_RANGE_CNT(4 downto 0))) <= OAM_RANGE_INDEX;
+						OAM_RANGE(to_integer(NEW_RANGE_CNT(4 downto 0))) <= OAM_ADDR(8 downto 2);
 						RANGE_CNT <= NEW_RANGE_CNT;
 						if NEW_RANGE_CNT = 31 then
 							OBJ_RANGE_DONE <= '1';
@@ -1515,21 +1517,21 @@ begin
 				end if;
 			end if;
 			
+			
+			if H_CNT = OBJ_TIME_START-1 and V_CNT < LAST_VIS_LINE then
+				if RANGE_CNT(5) /= '1' then
+					OAM_TIME_INDEX <= OAM_RANGE(to_integer(RANGE_CNT(4 downto 0)));
+				end if;
+			end if;
+			
 			if H_CNT = OBJ_TIME_START-1 and V_CNT < LAST_VIS_LINE then
 				TILES_OAM_CNT <= (others => '0');
 				TILES_CNT <= (others => '0');
 				OBJ_TIME_DONE <= '1';
 			end if;
 			
-			if OBJ_TIME = '1' and H_CNT(0) = '1' and OBJ_FORCE_BLANK = '0' then 
+			if OBJ_TIME = '1' and H_CNT(0) = '1' then
 				if RANGE_CNT(5) /= '1' then
-					OAM_OBJ_TILE := unsigned(OAM_Q(7 downto 0));
-					OAM_OBJ_N := OAM_Q(8);
-					OAM_OBJ_PAL := OAM_Q(11 downto 9);
-					OAM_OBJ_PRIO := OAM_Q(13 downto 12);
-					OAM_OBJ_HFLIP := OAM_Q(14);
-					OAM_OBJ_VFLIP := OAM_Q(15);
-					
 					if OAM_OBJ_X(8) = '1' and TILES_CNT = 0 then
 						TEMP := 0 - unsigned(OAM_OBJ_X(5 downto 0));
 						CUR_TILES_CNT := TEMP(5 downto 3);
@@ -1583,7 +1585,7 @@ begin
 				end if;
 			end if;
 			
-			if OBJ_FETCH = '1' and OBJ_FORCE_BLANK = '0' then 
+			if OBJ_FETCH = '1' and FORCE_BLANK = '0' then 
 				if OBJ_TIME_DONE = '0' then
 					case H_CNT(0) is
 						when '0' =>
@@ -1607,11 +1609,6 @@ begin
 		end if;
 	end if;
 end process;
-
-OAM_RANGE_INDEX <= std_logic_vector( H_CNT(7 downto 1) + unsigned(OAMADD(7 downto 1)) ) when OAM_PRIO = '1' else
-						 std_logic_vector( H_CNT(7 downto 1) + 0 );
-
-INT_OAM_ADDR <= OAM_RANGE_INDEX when OBJ_RANGE = '1' else OAM_TIME_INDEX;
 
 OBJ_VRAM_ADDR <= std_logic_vector( (resize(unsigned(OBJADDR), OBJ_VRAM_ADDR'length) sll 13) + 
 												resize(OBJ_TILE_GAP, OBJ_VRAM_ADDR'length) + 

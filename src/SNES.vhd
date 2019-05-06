@@ -12,6 +12,7 @@ entity SNES is
 		DSPCLK		: in std_logic;
 		
 		RST_N			: in std_logic;
+		RST_COLD	: in std_logic;
 		ENABLE		: in std_logic;
 		PAL			: in std_logic;
 		BLEND			: in std_logic;
@@ -89,6 +90,9 @@ entity SNES is
 		DBG_DAT_IN	: in std_logic_vector(7 downto 0);
 		DBG_DAT_OUT	: out std_logic_vector(7 downto 0);
 		DBG_BREAK	: out std_logic;
+
+		GG_EN		: in std_logic;
+		GG_CODE		: in std_logic_vector(128 downto 0);
 		
 		AUDIO_L		: out std_logic_vector(15 downto 0);
 		AUDIO_R		: out std_logic_vector(15 downto 0)
@@ -139,12 +143,52 @@ architecture rtl of SNES is
 	signal APU_RAM_DI	: std_logic_vector(7 downto 0);
 	signal APU_RAM_CE, APU_RAM_OE, APU_RAM_WE : std_logic;
 
+	signal GENIE		: boolean;
+	signal GENIE_DO	: std_logic_vector(7 downto 0);
+	signal GENIE_DI   : std_logic_vector(7 downto 0);
+
 	-- DEBUG
 	signal DBG_CPU_DAT, DBG_SCPU_DAT, DBG_WRAM_DAT, DBG_PPU_DAT, DBG_SMP_DAT, DBG_SPC700_DAT, DBG_DSP_DAT : std_logic_vector(7 downto 0);
 	signal CPU_BRK, SMP_BRK, PPU_DBG_BRK	: std_logic;
 	signal CPU_DBG_WR, WRAM_DBG_WR, SPC700_DAT_WR, SMP_DAT_WR, PPU_DBG_WR, DSP_DBG_WR : std_logic;
 
+	component CODES is
+		generic(
+			ADDR_WIDTH  : in integer := 16;
+			DATA_WIDTH  : in integer := 8
+		);
+		port(
+			clk         : in  std_logic;
+			cold_reset  : in  std_logic;
+			enable      : in  std_logic;
+			addr_in     : in  std_logic_vector(23 downto 0);
+			data_in     : in  std_logic_vector(7 downto 0);
+			code        : in  std_logic_vector(128 downto 0);
+			genie_ovr   : out boolean;
+			genie_data  : out std_logic_vector(7 downto 0)
+		);
+	end component;
+
 begin
+
+	-- Game Genie
+	GAMEGENIE : component CODES
+	generic map(
+		ADDR_WIDTH => 24,
+		DATA_WIDTH => 8
+	)
+	port map(
+		clk => MCLK,
+		cold_reset => RST_COLD,
+		enable => not GG_EN,
+		addr_in => INT_CA,
+		data_in => CPU_DO,
+		code => GG_CODE,
+		genie_ovr => GENIE,
+		genie_data => GENIE_DO
+	);
+	
+	GENIE_DI <= GENIE_DO when GENIE else CPU_DI;
 
 	-- CPU
 	CPU : entity work.SCPU
@@ -165,7 +209,7 @@ begin
 		PA				=> INT_PA,
 		PARD_N		=> INT_PARD_N,
 		PAWR_N		=> INT_PAWR_N,
-		DI				=> CPU_DI,
+		DI				=> GENIE_DI,
 		DO				=> CPU_DO,
 		
 		RAMSEL_N		=> INT_RAMSEL_N,

@@ -54,7 +54,6 @@ architecture rtl of SPC700 is
 	signal AluR: std_logic_vector(7 downto 0);
 	signal MulDivR: std_logic_vector(15 downto 0);
 	signal CO, VO, SO, ZO, HO, DivZO, DivVO, DivHO : std_logic;
-	signal w16 : std_logic;
 	signal BitMask: std_logic_vector(7 downto 0);
 	signal nBit : integer range 0 to 7;
 	
@@ -63,7 +62,7 @@ architecture rtl of SPC700 is
 	--debug
 	signal DBG_NEXT_PC : std_logic_vector(15 downto 0);
 	signal DBG_RUN_LAST : std_logic;
-	signal DBG_DAT_WRr : std_logic;
+	signal DBG_DAT_WRr : std_logic_vector(3 downto 0);
 	signal DBG_BRK_ADDR : std_logic_vector(15 downto 0) := (others => '1');
 	signal DBG_CTRL : std_logic_vector(7 downto 0) := (others => '0');
 
@@ -94,7 +93,7 @@ begin
 						when x"F" => JumpTaken <=     PSW(1); -- BEQ
 						when others => null;
 					end case; 
-				elsif STATE = "0011" and IR(3 downto 0) = x"3" then
+				elsif STATE = "0010" and IR(3 downto 0) = x"3" then
 					case IR(7 downto 4) is
 						when x"0" => JumpTaken <=     D_IN(0); -- BBS0
 						when x"1" => JumpTaken <= not D_IN(0); -- BBC0
@@ -118,9 +117,9 @@ begin
 					JumpTaken <= not ZO;
 				elsif STATE = "0010" and IR = x"6E" then 
 					JumpTaken <= not ZO;
-				elsif STATE = "0011" and IR = x"2E" then -- CBNE
+				elsif STATE = "0010" and IR = x"2E" then -- CBNE
 					JumpTaken <= not ZO;
-				elsif STATE = "0100" and IR = x"DE" then
+				elsif STATE = "0011" and IR = x"DE" then
 					JumpTaken <= not ZO;
 				elsif MC.STATE_CTRL = "10" then
 					JumpTaken <= '0';
@@ -227,14 +226,6 @@ begin
 			CToBit  when MC.BUS_CTRL(2 downto 0) = "100" else
 			T       when MC.BUS_CTRL(2 downto 0) = "101" else
 			x"00";
-			
-	w16 <= '1' when (IR = x"BA" and STATE = "0100") or 
-						 (IR = x"3A" and STATE = "0100") or 
-						 (IR = x"1A" and STATE = "0100") or 
-						 (IR = x"7A" and STATE = "0100") or
-						 (IR = x"5A" and STATE = "0100") or
-						 (IR = x"DA" and STATE = "0100") or
-						 (IR = x"9A" and STATE = "0100") else '0';
 	
 	ALU: entity work.SPC700_ALU
 	port map (
@@ -244,7 +235,6 @@ begin
 		L     	=> SB,
 		R     	=> DB,
 		CTRL   	=> MC.ALU_CTRL,
-		w16   	=> w16,
 		CI   	 	=> PSW(0),
 		VI  		=> PSW(6),
 		SI  		=> PSW(7),
@@ -351,11 +341,12 @@ begin
 				end case;
 
 				case MC.LOAD_P is
-					when "000" => null;      -- No Op
+					when "000" =>       -- No Op
+						PSW <= PSW;
 					when "001" => 
 						PSW(1 downto 0) <= ZO & CO; PSW(3) <= HO; PSW(7 downto 6) <= SO & VO; -- ALU
---					when "010" => PSW(2) <= '1';     -- BRK
-					when "011" => PSW <= D_IN(7 downto 5) & "0" & D_IN(3 downto 0); -- RETI/POP PSW
+					when "010" => PSW(2) <= '0'; PSW(4) <= '1';    -- BRK
+					when "011" => PSW <= D_IN; -- RETI/POP PSW
 					when "100" => 
 						case IR(7 downto 5) is
 							when "001" => PSW(5) <= '0'; -- CLRP 20
@@ -370,7 +361,8 @@ begin
 						end case;
 					when "101" => 
 						PSW(0) <= AluR(0);
-					when others => null;
+					when others =>
+						PSW <= PSW;
 				end case;
 			end if;
 		end if;
@@ -378,7 +370,7 @@ begin
 
 	D_OUT <= SB when MC.OUT_BUS = "001" else
 				AluR when MC.OUT_BUS = "010" else
-				PSW(7 downto 5) & not GotInterrupt & PSW(3 downto 0) when MC.OUT_BUS = "011" else
+				PSW when MC.OUT_BUS = "011" else
 				PC(7 downto 0) when MC.OUT_BUS = "100" else
 				PC(15 downto 8) when MC.OUT_BUS = "101" else
 				x"FF";
@@ -453,7 +445,6 @@ begin
 			end if;
 		end if;
 	end process;
-			
 
 	
 	--debug
@@ -496,10 +487,10 @@ begin
 		end case; 
 
 		if RST_N = '0' then
-			DBG_DAT_WRr <= '0';
+			DBG_DAT_WRr <= (others=>'0');
 		elsif rising_edge(CLK) then
-			DBG_DAT_WRr <= DBG_DAT_WR;
-			if DBG_DAT_WR = '1' and DBG_DAT_WRr = '0' then
+			DBG_DAT_WRr <= DBG_DAT_WRr(2 downto 0) & DBG_DAT_WR;
+			if DBG_DAT_WRr = "0001" then
 				case DBG_REG is
 					when x"80" => DBG_BRK_ADDR(7 downto 0) <= DBG_DAT_IN;
 					when x"81" => DBG_BRK_ADDR(15 downto 8) <= DBG_DAT_IN;
@@ -509,6 +500,7 @@ begin
 				end case;
 			end if;
 		end if;
+
 	end process;
 	
 end rtl;

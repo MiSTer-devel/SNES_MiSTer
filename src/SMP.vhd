@@ -144,6 +144,10 @@ begin
 		if RST_N = '0' then
 			CPUI <= (others => (others => '0'));
 		elsif rising_edge(CLK) then
+			if PAWR_N = '0' and CS = '1' and CS_N = '0' and SYSCLKF_CE = '1' then
+				CPUI(to_integer(unsigned(PA))) <= CPU_DI;
+			end if;
+			
 			if ENABLE = '0' then
 				if DBG_SMP_DAT_WR = '1' then
 					case DBG_REG is
@@ -163,10 +167,6 @@ begin
 					CPUI(2) <= (others=>'0');
 					CPUI(3) <= (others=>'0');
 				end if;
-			end if;
-			
-			if PAWR_N = '0' and CS = '1' and CS_N = '0' and SYSCLKF_CE = '1' then
-				CPUI(to_integer(unsigned(PA))) <= CPU_DI;
 			end if;
 		end if;
 	end process;

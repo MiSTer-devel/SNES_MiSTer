@@ -4,29 +4,31 @@ use IEEE.Std_Logic_1164.all;
 package SPC700_pkg is  
 
 	type MicroInst_r is record
-		stateCtrl    : std_logic_vector(1 downto 0);
-		addrBus      : std_logic_vector(1 downto 0);
-		addrCtrl     : std_logic_vector(5 downto 0);
-		regMode      : std_logic_vector(4 downto 0);
-		regAXY       : std_logic_vector(1 downto 0);
-		busCtrl      : std_logic_vector(5 downto 0); 
-		ALUCtrl      : std_logic_vector(5 downto 0);
-		outBus       : std_logic_vector(2 downto 0);
+		stateCtrl	: std_logic_vector(1 downto 0);
+		addrBus		: std_logic_vector(1 downto 0);
+		addrCtrl		: std_logic_vector(5 downto 0);
+		regMode		: std_logic_vector(4 downto 0);
+		regAXY		: std_logic_vector(1 downto 0);
+		busCtrl		: std_logic_vector(5 downto 0); 
+		ALUCtrl		: std_logic_vector(5 downto 0);
+		outBus		: std_logic_vector(2 downto 0);
 	end record;
 	
 	type ALUCtrl_r is record
-		fstOp        : std_logic_vector(2 downto 0);
-		secOp        : std_logic_vector(3 downto 0);
-		chgHO        : std_logic;
-		intC         : std_logic;
-		chgCO        : std_logic;
+		fstOp			: std_logic_vector(2 downto 0);
+		secOp			: std_logic_vector(3 downto 0);
+		chgVO			: std_logic;
+		chgHO			: std_logic;
+		intC			: std_logic;
+		chgCO			: std_logic;
+		w        	: std_logic;
 	end record;
 	
 	type RegCtrl_r is record
-		loadPC       : std_logic_vector(2 downto 0);
-		loadSP       : std_logic_vector(1 downto 0);
-		loadP        : std_logic_vector(2 downto 0);
-		loadT        : std_logic_vector(1 downto 0);
+		loadPC		: std_logic_vector(2 downto 0);
+		loadSP		: std_logic_vector(1 downto 0);
+		loadP			: std_logic_vector(2 downto 0);
+		loadT			: std_logic_vector(1 downto 0);
 	end record;
 	
 	type MCode_r is record

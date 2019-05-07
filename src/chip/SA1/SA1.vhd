@@ -47,7 +47,6 @@ architecture rtl of SA1 is
 
 signal CLK_CE					: std_logic;
 signal EN						: std_logic;
-signal EN_F						: std_logic;
 signal WIN_CLK_CNT			: unsigned(3 downto 0); 
 signal WINDOW					: std_logic;
 signal DOT_CLK					: std_logic; 
@@ -65,6 +64,7 @@ signal P65_RST_N				: std_logic;
 signal P65_EN					: std_logic;
 signal P65_VDA					: std_logic;
 signal P65_VPA					: std_logic;
+signal P65_VPB					: std_logic;
 signal P65_BRK					: std_logic;
 signal P65_WR					: std_logic;
 signal P65_RD					: std_logic;
@@ -290,7 +290,6 @@ end process;
 WINDOW <= '1' when WIN_CLK_CNT <= 3 or SNES_SYSCLK = '0' else '0';
 
 EN <= ENABLE and CLK_CE;
-EN_F <= ENABLE and not CLK_CE;
 
 -- 65C816
 P65_RST_N <= not SA1RST and RST_N;
@@ -313,6 +312,7 @@ port map (
 	ABORT_N		=> '1',
 	VPA      	=> P65_VPA,
 	VDA      	=> P65_VDA,
+	VPB      	=> P65_VPB,
 	
 	BRK_OUT     => P65_BRK,
 	DBG_REG     => DBG_REG,
@@ -414,7 +414,7 @@ begin
 	end if;
 end process;
 
-process( P65_A, CPU_ROM_DAT, SA1_MMIO_READ_ACCESS, SA1_BWRAM_ACCESS, SA1_BBF_ACCESS, SA1_IRAM_ACCESS, SA1_ROM_ACCESS, IRAM_DO, BWRAM_DI, SBW46, 
+process( P65_A, P65_VPB, CPU_ROM_DAT, SA1_MMIO_READ_ACCESS, SA1_BWRAM_ACCESS, SA1_BBF_ACCESS, SA1_IRAM_ACCESS, SA1_ROM_ACCESS, IRAM_DO, BWRAM_DI, SBW46, 
 			CRV, CIV, CNV, SA1_IRQ_FLAG, TM_IRQ_FLAG, DMA_IRQ_FLAG, SA1_NMI_FLAG, SMSG, MR, MOF, VDP, BBF, HCR, VCR, H_CNT, MDR)
 begin
 	if SA1_MMIO_READ_ACCESS = '1' then	--SA1 Port Read
@@ -467,19 +467,19 @@ begin
 			end case;
 		end if;
 	elsif SA1_ROM_ACCESS = '1' then												--ROM 00h-3Fh/80h-BFh:8000h-FFFFh, C0h-FFh:0000h-FFFFh 
-		if P65_A(23 downto 5) = x"00FF" & "111" and P65_A(3 downto 1) = "110" then	--00FFEC/D, 00FFFC/D
+		if P65_A(3 downto 1) = "110" and P65_VPB = '0' then	--00FFEC/D, 00FFFC/D
 			if P65_A(0) = '0' then
 				P65_DI <= CRV(7 downto 0);
 			else
 				P65_DI <= CRV(15 downto 8);
 			end if;
-		elsif P65_A(23 downto 5) = x"00FF" & "111" and P65_A(3 downto 1) = "111" then	--00FFEE/F, 00FFFE/F
+		elsif P65_A(3 downto 1) = "111" and P65_VPB = '0' then	--00FFEE/F, 00FFFE/F
 			if P65_A(0) = '0' then
 				P65_DI <= CIV(7 downto 0);
 			else
 				P65_DI <= CIV(15 downto 8);
 			end if;
-		elsif P65_A(23 downto 5) = x"00FF" & "111" and P65_A(3 downto 1) = "101" then	--00FFEA/B, 00FFFA/B
+		elsif P65_A(3 downto 1) = "101" and P65_VPB = '0' then	--00FFEA/B, 00FFFA/B
 			if P65_A(0) = '0' then
 				P65_DI <= CNV(7 downto 0);
 			else

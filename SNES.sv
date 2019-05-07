@@ -121,7 +121,7 @@ assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 assign AUDIO_S   = 1;
 assign AUDIO_MIX = status[20:19];
 
-assign LED_USER  = cart_download;
+assign LED_USER  = cart_download | (status[23] & bk_pending);
 assign LED_DISK  = 0;
 assign LED_POWER = 0;
 
@@ -169,7 +169,8 @@ parameter CONF_STR2 = {
 };
 
 parameter CONF_STR3 = {
-	"D,Save Backup RAM;", 
+	"D,Save Backup RAM;",
+	"ON,Autosave,OFF,ON;",
 };
 
 parameter CONF_STR4 = {
@@ -665,6 +666,16 @@ ioport port2
 
 /////////////////////////  STATE SAVE/LOAD  /////////////////////////////
 
+wire bk_save_write = ~BSRAM_CE_N & ~BSRAM_WE_N;
+reg bk_pending;
+
+always @(posedge clk_sys) begin
+	if (bk_ena && ~OSD_STATUS && bk_save_write)
+		bk_pending <= 1'b1;
+	else if (bk_state)
+		bk_pending <= 1'b0;
+end
+
 reg bk_ena = 0;
 reg old_downloading = 0;
 always @(posedge clk_sys) begin
@@ -676,7 +687,7 @@ always @(posedge clk_sys) begin
 end
 
 wire bk_load    = status[12];
-wire bk_save    = status[13];
+wire bk_save    = status[13] | (bk_pending & OSD_STATUS && status[23]);
 reg  bk_loading = 0;
 reg  bk_state   = 0;
 

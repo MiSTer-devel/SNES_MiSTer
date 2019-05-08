@@ -29,9 +29,10 @@ localparam DATA_S      = DATA_WIDTH - 1;
 localparam COMP_S      = DATA_S + DATA_WIDTH;
 localparam ADDR_S      = COMP_S + ADDR_WIDTH;
 localparam COMP_F_S    = ADDR_S + 1;
-localparam CODE_WIDTH  = COMP_F_S + 1;
+localparam ENA_F_S     = COMP_F_S + 1;
+localparam CODE_WIDTH  = ENA_F_S + 1;
 
-reg [COMP_F_S:0] codes[MAX_CODES];
+reg [ENA_F_S:0] codes[MAX_CODES];
 
 wire [ADDR_WIDTH-1: 0] code_addr    = code[64+:ADDR_WIDTH];
 wire [DATA_WIDTH-1: 0] code_compare = code[32+:DATA_WIDTH];
@@ -74,7 +75,7 @@ always_ff @(posedge clk) begin
 		code_change <= code[128];
 		if (code[128] && ~code_change && (found_dup || next_index < MAX_CODES)) begin // detect posedge
 			// replace it enabled if it has the same address, otherwise, add a new code
-			codes[index] <= code_trimmed;
+			codes[index] <= {1'b1, code_trimmed};
 			if (~found_dup) next_index <= next_index + 1'b1;
 		end
 	end
@@ -84,11 +85,10 @@ always_comb begin
 	int x;
 	genie_ovr = 0;
 	genie_data = '0;
-	x = 0;
 
 	if (enable) begin
 		for (x = 0; x < MAX_CODES; x = x + 1) begin
-			if (codes[x][ADDR_S-:ADDR_WIDTH] == addr_in) begin
+			if (codes[x][ENA_F_S] && codes[x][ADDR_S-:ADDR_WIDTH] == addr_in) begin
 				if (!codes[x][COMP_F_S] || (codes[x][COMP_S-:DATA_WIDTH] == data_in)) begin
 					genie_ovr = 1;
 					genie_data = codes[x][DATA_S-:DATA_WIDTH];

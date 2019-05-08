@@ -374,6 +374,7 @@ set_global_assignment -name VHDL_FILE src/DSP_PKG.vhd
 set_global_assignment -name VHDL_FILE src/DSP.vhd
 set_global_assignment -name VHDL_FILE src/SNES.vhd
 set_global_assignment -name VERILOG_FILE src/main.v
+set_global_assignment -name SYSTEMVERILOG_FILE cheatcodes.sv
 set_global_assignment -name VHDL_FILE bram.vhd
 set_global_assignment -name SYSTEMVERILOG_FILE sdram.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ioport.sv

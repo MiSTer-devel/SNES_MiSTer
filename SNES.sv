@@ -159,25 +159,29 @@ parameter CONF_STR1 = {
 	"FS,SFCSMCBIN;",
 	"-;",
 	"O13,ROM Header,Auto,No Header,LoROM,HiROM,ExHiROM;",
-	"FC,GG,Game Genie Code;",
-	"OO,Game Genie,ON,OFF;",
 	"-;",
+	"C,Cheats;",
 };
 
 parameter CONF_STR2 = {
-	"C,Load Backup RAM;"
+	"O,Cheats Enabled,Yes,No;",
+	"-;",
 };
 
 parameter CONF_STR3 = {
+	"C,Load Backup RAM;"
+};
+
+parameter CONF_STR4 = {
 	"D,Save Backup RAM;",
 	"ON,Autosave,OFF,ON;",
 };
 
-parameter CONF_STR4 = {
+parameter CONF_STR5 = {
 	";",
 };
 
-parameter CONF_STR5 = {
+parameter CONF_STR6 = {
 	"I,SuperFX speed,Original,Turbo;",
 	"OEF,Video Region,Auto,NTSC,PAL;",
 	"O8,Aspect ratio,4:3,16:9;",
@@ -217,11 +221,11 @@ wire  [7:0] ioctl_index;
 wire [11:0] joy0,joy1,joy2,joy3,joy4;
 wire [24:0] ps2_mouse;
 
-hps_io #(.STRLEN(($size(CONF_STR1)>>3) + ($size(CONF_STR2)>>3) + ($size(CONF_STR3)>>3) + ($size(CONF_STR4)>>3) + ($size(CONF_STR5)>>3) + 4), .WIDE(1)) hps_io
+hps_io #(.STRLEN((($size(CONF_STR1)+$size(CONF_STR2)+$size(CONF_STR3)+$size(CONF_STR4)+$size(CONF_STR5)+$size(CONF_STR6))>>3) + 5), .WIDE(1)) hps_io
 (
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
-	.conf_str({CONF_STR1,bk_ena ? "R" : "+",CONF_STR2,bk_ena ? "R" : "+",CONF_STR3,bk_ena ? "-" : "+",CONF_STR4,GSU_ACTIVE ? "O" : "+",CONF_STR5}),
+	.conf_str({CONF_STR1,gg_available ? "O" : "+",CONF_STR2,bk_ena ? "R" : "+",CONF_STR3,bk_ena ? "R" : "+",CONF_STR4,bk_ena ? "-" : "+",CONF_STR5,GSU_ACTIVE ? "O" : "+",CONF_STR6}),
 
 	.buttons(buttons),
 	.forced_scandoubler(forced_scandoubler),
@@ -263,7 +267,7 @@ wire [1:0] mouse_mode = status[6:5];
 wire       joy_swap = status[7];
 wire [2:0] LHRom_type = status[3:1];
 
-wire code_index = ioctl_index == 3;
+wire code_index = &ioctl_index;
 wire code_download = ioctl_download & code_index;
 wire cart_download = ioctl_download & ~code_index;
 
@@ -338,7 +342,6 @@ wire GSU_ACTIVE;
 main main
 (
 	.RESET_N(~reset),
-	.RESET_COLD(cart_download),
 
 	.MCLK(clk_sys), // 21.47727 / 21.28137
 	.ACLK(clk_sys),
@@ -410,7 +413,9 @@ main main
 
 	.GG_EN(status[24]),
 	.GG_CODE(gg_code),
-	
+	.GG_RESET((code_download && ioctl_wr && !ioctl_addr) || cart_download),
+	.GG_AVAILABLE(gg_available),
+
 	.AUDIO_L(AUDIO_L),
 	.AUDIO_R(AUDIO_R)
 );
@@ -418,6 +423,7 @@ main main
 ////////////////////////////  CODES  ///////////////////////////////////
 
 reg [128:0] gg_code;
+wire gg_available;
 
 // Code layout:
 // {clock bit, code flags,     32'b address, 32'b compare, 32'b replace}
@@ -431,7 +437,7 @@ wire [24:0] code_addr = ioctl_addr - 10'd512;
 always_ff @(posedge clk_sys) begin
 	gg_code[128] <= 1'b0;
 
-	if (code_download & ioctl_wr & (ioctl_addr > 510)) begin
+	if (code_download & ioctl_wr) begin
 		case (code_addr[3:0])
 			0:  gg_code[111:96]  <= ioctl_dout; // Flags Bottom Word
 			2:  gg_code[127:112] <= ioctl_dout; // Flags Top Word

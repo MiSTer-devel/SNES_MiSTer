@@ -8,7 +8,6 @@
 module main
 (
    input             RESET_N,
-   input             RESET_COLD,
 
    input             MCLK,
    input             ACLK,
@@ -81,6 +80,8 @@ module main
 
    input             GG_EN,
    input     [128:0] GG_CODE,
+   input             GG_RESET,
+   output            GG_AVAILABLE,
 
    output     [15:0] AUDIO_L,
    output     [15:0] AUDIO_R
@@ -109,7 +110,6 @@ SNES SNES
 	.dspclk(ACLK),
 
 	.rst_n(RESET_N),
-	.rst_cold(RESET_COLD),
 	.enable(1),
 
 	.ca(CA),
@@ -179,6 +179,8 @@ SNES SNES
 
 	.gg_en(GG_EN),
 	.gg_code(GG_CODE),
+	.gg_reset(GG_RESET),
+	.gg_available(GG_AVAILABLE),
 
 	.audio_l(AUDIO_L),
 	.audio_r(AUDIO_R)

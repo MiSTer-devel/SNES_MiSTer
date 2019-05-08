@@ -53,7 +53,7 @@ architecture rtl of SPC700 is
 	-- ALU 
 	signal AluR: std_logic_vector(7 downto 0);
 	signal MulDivR: std_logic_vector(15 downto 0);
-	signal CO, VO, SO, ZO, HO, DivZO, DivVO, DivHO : std_logic;
+	signal CO, VO, SO, ZO, HO, DivZO, DivVO, DivHO, DivSO : std_logic;
 	signal BitMask: std_logic_vector(7 downto 0);
 	signal nBit : integer range 0 to 7;
 	
@@ -243,6 +243,7 @@ begin
 		DivZI		=> DivZO,
 		DivVI		=> DivVO,
 		DivHI		=> DivHO,
+		DivSI		=> DivSO,
 		CO   		=> CO,
 		VO    	=> VO,
 		SO   		=> SO,
@@ -263,7 +264,8 @@ begin
 		RES		=> MulDivR,
 		ZO			=> DivZO,
 		VO			=> DivVO,
-		HO			=> DivHO
+		HO			=> DivHO,
+		SO			=> DivSO
 	);
 	
 	AYLoad <= '1' when IR = x"CF" or IR = x"9E" else '0';	--MUL/DIV

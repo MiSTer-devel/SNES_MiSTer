@@ -17,14 +17,15 @@ entity MulDiv is
         RES		: out std_logic_vector(15 downto 0);
 		  ZO 		: out std_logic;
 		  VO 		: out std_logic;
-		  HO 		: out std_logic
+		  HO 		: out std_logic;
+		  SO 		: out std_logic
     );
 end MulDiv;
 
 architecture rtl of MulDiv is
 
 	signal tResult  : std_logic_vector(15 downto 0);
-	signal tV, tZ  : std_logic;
+	signal tV, tZ, tS : std_logic;
 	signal mulRes, mulTemp  : unsigned(15 downto 0);
 	signal mulA  : unsigned(15 downto 0);
 	signal mulY  : unsigned(7 downto 0);
@@ -85,6 +86,7 @@ begin
 				tZ <= '0';
 			end if;
 			tV <= '0';
+			tS <= mulTemp(15);
 		elsif CTRL.secOp = "1111" then
 			tResult <= std_logic_vector(remainder(7 downto 0) & quotient(7 downto 0));
 			if quotient(7 downto 0) = 0 then
@@ -93,16 +95,19 @@ begin
 				tZ <= '0';
 			end if;
 			tV <= quotient(8);
+			tS <= quotient(7);
 		else
 			tResult <= (others=>'0');
 			tZ <= '0';
 			tV <= '0';
+			tS <= '0';
 		end if;
 	end process;
 	
 	RES <= tResult;
 	ZO <= tZ;
 	VO <= tV;
+	SO <= tS;
 	HO <= '1' when Y(3 downto 0) >= X(3 downto 0) else '0';
 	
 end rtl;

@@ -20,6 +20,7 @@ entity SPC700_ALU is
 		  DivZI	: in std_logic; 
 		  DivVI  : in std_logic; 
 		  DivHI  : in std_logic; 
+		  DivSI  : in std_logic; 
         CO		: out std_logic; 
 		  VO		: out std_logic; 
 		  SO		: out std_logic; 
@@ -32,7 +33,7 @@ end SPC700_ALU;
 architecture rtl of SPC700_ALU is
 
 	signal tIntR : std_logic_vector(7 downto 0);
-	signal CR, COut, HOut, VOut, tZ, SaveC  : std_logic;
+	signal CR, COut, HOut, VOut, SOut, tZ, SaveC  : std_logic;
 	signal CIIn, ADDIn: std_logic;
 	
 	signal AddR, BCDR : std_logic_vector(7 downto 0);
@@ -161,13 +162,26 @@ begin
 		end case;
 	end process;
 	
+	process(CTRL, SI, tResult, DivSI)
+	begin
+		SOut <= SI; 
+		case CTRL.secOp is
+			when "1110" =>				--MUL
+				SOut <= DivSI;
+			when "1111" =>				--DIV
+				SOut <= DivSI;
+			when others =>
+				SOut <= tResult(7);
+		end case;
+	end process;
+	
 	tZ <= DivZI when CTRL.secOp(3 downto 1) = "111" else 
 			'1' when tResult = x"00" else '0'; 
 	ZO <= ZI and tZ when CTRL.w = '1' else tZ;
 	CO <= COut when CTRL.chgCO = '1' else CI;
 	VO <= VOut when CTRL.chgVO = '1' else VI;
 	HO <= HOut when CTRL.chgHO = '1' else HI;
-	SO <= tResult(7);  
+	SO <= SOut;  
 	
 	RES <= tResult;
 	

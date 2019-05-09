@@ -368,7 +368,7 @@ set_location_assignment PIN_W21 -to SW[2]
 set_location_assignment PIN_W20 -to SW[3]
 
 set_global_assignment -name PRE_FLOW_SCRIPT_FILE "quartus_sh:sys/build_id.tcl"
-set_global_assignment -name SYSTEMVERILOG_FILE cheatcodes.sv
+
 set_global_assignment -name CDF_FILE jtag.cdf
 set_global_assignment -name QIP_FILE sys/sys.qip
 set_global_assignment -name QIP_FILE src/65C816/65C816.qip
@@ -384,6 +384,7 @@ set_global_assignment -name VHDL_FILE src/DSP_PKG.vhd
 set_global_assignment -name VHDL_FILE src/DSP.vhd
 set_global_assignment -name VHDL_FILE src/SNES.vhd
 set_global_assignment -name VERILOG_FILE src/main.v
+set_global_assignment -name SYSTEMVERILOG_FILE cheatcodes.sv
 set_global_assignment -name VHDL_FILE bram.vhd
 set_global_assignment -name SYSTEMVERILOG_FILE sdram.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ioport.sv

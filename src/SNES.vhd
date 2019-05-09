@@ -12,7 +12,6 @@ entity SNES is
 		DSPCLK		: in std_logic;
 		
 		RST_N			: in std_logic;
-		RST_COLD	: in std_logic;
 		ENABLE		: in std_logic;
 		PAL			: in std_logic;
 		BLEND			: in std_logic;
@@ -91,9 +90,11 @@ entity SNES is
 		DBG_DAT_OUT	: out std_logic_vector(7 downto 0);
 		DBG_BREAK	: out std_logic;
 
-		GG_EN		: in std_logic;
+		GG_EN			: in std_logic;
 		GG_CODE		: in std_logic_vector(128 downto 0);
-		
+		GG_RESET		: in std_logic;
+		GG_AVAILABLE: out std_logic;
+
 		AUDIO_L		: out std_logic_vector(15 downto 0);
 		AUDIO_R		: out std_logic_vector(15 downto 0)
 	);
@@ -143,7 +144,7 @@ architecture rtl of SNES is
 	signal APU_RAM_DI	: std_logic_vector(7 downto 0);
 	signal APU_RAM_CE, APU_RAM_OE, APU_RAM_WE : std_logic;
 
-	signal GENIE		: boolean;
+	signal GENIE		: std_logic;
 	signal GENIE_DO	: std_logic_vector(7 downto 0);
 	signal GENIE_DI   : std_logic_vector(7 downto 0);
 
@@ -159,12 +160,13 @@ architecture rtl of SNES is
 		);
 		port(
 			clk         : in  std_logic;
-			cold_reset  : in  std_logic;
+			reset       : in  std_logic;
 			enable      : in  std_logic;
 			addr_in     : in  std_logic_vector(23 downto 0);
 			data_in     : in  std_logic_vector(7 downto 0);
 			code        : in  std_logic_vector(128 downto 0);
-			genie_ovr   : out boolean;
+			available   : out std_logic;
+			genie_ovr   : out std_logic;
 			genie_data  : out std_logic_vector(7 downto 0)
 		);
 	end component;
@@ -179,16 +181,17 @@ begin
 	)
 	port map(
 		clk => MCLK,
-		cold_reset => RST_COLD,
+		reset => GG_RESET,
 		enable => not GG_EN,
 		addr_in => INT_CA,
 		data_in => CPU_DO,
 		code => GG_CODE,
+		available => GG_AVAILABLE,
 		genie_ovr => GENIE,
 		genie_data => GENIE_DO
 	);
 	
-	GENIE_DI <= GENIE_DO when GENIE else CPU_DI;
+	GENIE_DI <= GENIE_DO when GENIE = '1' else CPU_DI;
 
 	-- CPU
 	CPU : entity work.SCPU

@@ -46,97 +46,151 @@ end GSU;
 architecture rtl of GSU is
 	
 	--CPU Registers
-	signal R	: Reg_t;
-	signal FLAG_B, FLAG_ALT1, FLAG_ALT2 : std_logic;
-	signal FLAG_GO, FLAG_R, FLAG_IRQ : std_logic;
-	signal FLAG_Z, FLAG_CY, FLAG_S, FLAG_OV : std_logic;
-	signal DREG, SREG : unsigned(3 downto 0);
-	signal CBR : std_logic_vector(15 downto 0);
-	signal PBR, ROMBR, RAMBR : std_logic_vector(7 downto 0);
-	signal ROMADDR, RAMADDR : std_logic_vector(15 downto 0);
-	signal ROMDR : std_logic_vector(7 downto 0);
-	signal RAMDR : std_logic_vector(15 downto 0);
-	signal BRAMR, SCBR : std_logic_vector(7 downto 0);
-	signal MS0, IRQ_OFF, CLS_INT, CLS : std_logic;
-	signal COLR : std_logic_vector(7 downto 0);
-	signal POR_TRANS, POR_DITH, POR_HN, POR_FH, POR_OBJ : std_logic;
-	signal SCMR_MD, SCMR_HT : std_logic_vector(1 downto 0);
-	signal RAN, RON : std_logic;
+	signal R						: Reg_t;
+	signal CBR 					: std_logic_vector(15 downto 0);
+	signal PBR 					: std_logic_vector(7 downto 0);
+	signal ROMBR 				: std_logic_vector(7 downto 0);
+	signal RAMBR 				: std_logic_vector(7 downto 0);
+	signal ROMADDR 			: std_logic_vector(15 downto 0);
+	signal RAMADDR 			: std_logic_vector(15 downto 0);
+	signal ROMDR 				: std_logic_vector(7 downto 0);
+	signal RAMDR 				: std_logic_vector(15 downto 0);
+	signal BRAMR 				: std_logic_vector(7 downto 0);
+	signal SCBR 				: std_logic_vector(7 downto 0);
+	signal MS0 					: std_logic;
+	signal IRQ_OFF 			: std_logic;
+	signal CLS 					: std_logic;
+	signal DREG 				: unsigned(3 downto 0);
+	signal SREG 				: unsigned(3 downto 0);
+	signal FLAG_B 				: std_logic;
+	signal FLAG_ALT1 			: std_logic;
+	signal FLAG_ALT2 			: std_logic;
+	signal FLAG_GO 			: std_logic;
+	signal FLAG_R 				: std_logic;
+	signal FLAG_IRQ 			: std_logic;
+	signal FLAG_Z 				: std_logic;
+	signal FLAG_CY 			: std_logic;
+	signal FLAG_S 				: std_logic;
+	signal FLAG_OV 			: std_logic;
+	signal COLR 				: std_logic_vector(7 downto 0);
+	signal POR_TRANS 			: std_logic;
+	signal POR_DITH 			: std_logic;
+	signal POR_HN 				: std_logic;
+	signal POR_FH 				: std_logic;
+	signal POR_OBJ 			: std_logic;
+	signal SCMR_MD 			: std_logic_vector(1 downto 0);
+	signal SCMR_HT 			: std_logic_vector(1 downto 0);
+	signal RON 					: std_logic;
+	signal RAN 					: std_logic;
 
 	--CPU opcode logic
-	signal OP_CYCLES : unsigned(2 downto 0);
-	signal OP_CYCLE_CNT : unsigned(2 downto 0);
-	signal OP_CYCLE_EN : std_logic;
-	signal OPS : OpcodeAlt_r;
-	signal OP : Opcode_r;
-	signal MC : Microcode_r;
-	signal LAST_CYCLE : std_logic;
-	signal STATE : integer range 0 to 4;
+	signal OPS 					: OpcodeAlt_r;
+	signal OP 					: Opcode_r;
+	signal MC 					: Microcode_r;
+	signal OPCODE 				: std_logic_vector(7 downto 0);
+	signal OPDATA 				: std_logic_vector(7 downto 0);
+	signal OP_N 				: unsigned(3 downto 0);
+	signal LAST_CYCLE 		: std_logic;
+	signal STATE 				: integer range 0 to 4;
+	signal OP_CYCLES 			: unsigned(2 downto 0);
+	signal OP_CYCLE_CNT 		: unsigned(2 downto 0);
+	signal OP_CYCLE_EN 		: std_logic;
 	
 	--CPU Core
-	signal EN, CPU_EN, CLK_CE : std_logic;
-	signal OPCODE, OPDATA : std_logic_vector(7 downto 0);
-	signal OP_N : unsigned(3 downto 0);
-	signal ALUR, MULR : std_logic_vector(15 downto 0);
-	signal ALUZ, ALUS, ALUOV, ALUCY : std_logic;
-	signal REG_LSB : std_logic_vector(7 downto 0);
-	signal DST_REG : unsigned(3 downto 0);
-	signal R14_CHANGE : std_logic;
-	
-	type ROMState_t is (ROMST_IDLE, ROMST_FETCH, ROMST_CACHE, ROMST_LOAD);
-	signal ROMST : ROMState_t;
-	type RAMState_t is (RAMST_IDLE, RAMST_FETCH, RAMST_CACHE, RAMST_LOAD, RAMST_SAVE, RAMST_PCF, RAMST_RPIX);
-	signal RAMST : RAMState_t;
-	
-	signal ROM_FETCH_EN, RAM_FETCH_EN, CACHE_FETCH_EN : std_logic;
-	signal ROM_CACHE_EN, RAM_CACHE_EN, ROM_LOAD_EN, RAM_LOAD_EN : std_logic;
-	signal ROM_ACCESS_CNT, RAM_ACCESS_CNT : unsigned(2 downto 0);
-	signal ROM_NEED_WAIT, RAM_NEED_WAIT : std_logic;
-	signal CODE_IN_ROM, CODE_IN_RAM : std_logic;
-	signal RAM_BYTES, RAM_WORD, RAM_RW : std_logic;	
-	signal RAM_LOAD_DATA : std_logic_vector(15 downto 0);
+	signal EN 					: std_logic;
+	signal CPU_EN 				: std_logic;
+	signal CLK_CE 				: std_logic;
+	signal SPEED 				: std_logic;
+	signal ALUR 				: std_logic_vector(15 downto 0);
+	signal MULR 				: std_logic_vector(15 downto 0);
+	signal ALUZ 				: std_logic;
+	signal ALUS 				: std_logic;
+	signal ALUOV 				: std_logic;
+	signal ALUCY 				: std_logic;
+	signal REG_LSB 			: std_logic_vector(7 downto 0);
+	signal DST_REG 			: unsigned(3 downto 0);
+	signal R14_CHANGE 		: std_logic;
+	signal ROMST 				: ROMState_t;
+	signal RAMST 				: RAMState_t;
+	signal ROM_FETCH_EN 		: std_logic;
+	signal RAM_FETCH_EN 		: std_logic;
+	signal CACHE_FETCH_EN 	: std_logic;
+	signal ROM_CACHE_EN 		: std_logic;
+	signal RAM_CACHE_EN 		: std_logic;
+	signal ROM_LOAD_EN 		: std_logic;
+	signal RAM_LOAD_EN 		: std_logic;
+	signal ROM_ACCESS_CNT 	: unsigned(2 downto 0);
+	signal RAM_ACCESS_CNT 	: unsigned(2 downto 0);
+	signal ROM_NEED_WAIT 	: std_logic;
+	signal RAM_NEED_WAIT 	: std_logic;
+	signal CODE_IN_ROM 		: std_logic;
+	signal CODE_IN_RAM 		: std_logic;
+	signal RAM_BYTES			: std_logic;	
+	signal RAM_WORD			: std_logic;	
+	signal RAM_LOAD_DATA		: std_logic_vector(15 downto 0);
 
 	--CPU Code Cache
-	signal CACHE_VALID : std_logic_vector(31 downto 0);
-	signal CACHE_POS : unsigned(15 downto 0);
-	signal CACHE_DST_ADDR : unsigned(8 downto 0);
-	signal CACHE_SRC_ADDR : std_logic_vector(23 downto 0);
-	signal CACHE_RUN : std_logic;
-	signal IN_CACHE, VAL_CACHE : std_logic;
-	signal BRAM_CACHE_ADDR_A, BRAM_CACHE_ADDR_B : std_logic_vector(8 downto 0);
-	signal BRAM_CACHE_DI_A, BRAM_CACHE_DI_B : std_logic_vector(7 downto 0);
-	signal BRAM_CACHE_Q_A, BRAM_CACHE_Q_B : std_logic_vector(7 downto 0);
-	signal BRAM_CACHE_WE_A, BRAM_CACHE_WE_B : std_logic;
+	signal CACHE_VALID		: std_logic_vector(31 downto 0);
+	signal CACHE_POS			: unsigned(15 downto 0);
+	signal CACHE_DST_ADDR	: unsigned(8 downto 0);
+	signal CACHE_SRC_ADDR	: std_logic_vector(23 downto 0);
+	signal CACHE_RUN			: std_logic;
+	signal IN_CACHE			: std_logic;
+	signal VAL_CACHE			: std_logic;
+	signal BRAM_CACHE_ADDR_A: std_logic_vector(8 downto 0);
+	signal BRAM_CACHE_ADDR_B: std_logic_vector(8 downto 0);
+	signal BRAM_CACHE_DI_A	: std_logic_vector(7 downto 0);
+	signal BRAM_CACHE_DI_B	: std_logic_vector(7 downto 0);
+	signal BRAM_CACHE_Q_A	: std_logic_vector(7 downto 0);
+	signal BRAM_CACHE_Q_B	: std_logic_vector(7 downto 0);
+	signal BRAM_CACHE_WE_A	: std_logic;
+	signal BRAM_CACHE_WE_B	: std_logic;
 	
 	--CPU Pixel Cache
-	signal PIX_CACHE : PixCaches_t;
-	signal PCF_RAM_A, RPIX_RAM_A : std_logic_vector(16 downto 0);
-	signal PCF_RD_DATA, PCF_WR_DATA, CACHED_PCF_DATA, RPIX_DATA : std_logic_vector(7 downto 0);
-	signal PCF_RW : std_logic;
-	signal PCN, PC0_FULL, PC1_FULL : std_logic;
-	signal PC0, PC1 : integer range 0 to 1;	
-	signal PC_X, PC_Y : unsigned(7 downto 0);
-	signal BPP_CNT : unsigned(2 downto 0);
+	signal PIX_CACHE 			: PixCaches_t;
+	signal PCF_RAM_A 			: std_logic_vector(16 downto 0);
+	signal RPIX_RAM_A 		: std_logic_vector(16 downto 0);
+	signal PCF_RD_DATA 		: std_logic_vector(7 downto 0);
+	signal PCF_WR_DATA 		: std_logic_vector(7 downto 0);
+	signal RPIX_DATA 			: std_logic_vector(7 downto 0);
+	signal PCF_RW 				: std_logic;
+	signal PCN 					: std_logic;
+	signal PC0_FULL 			: std_logic;
+	signal PC1_FULL 			: std_logic;
+	signal PC0 					: integer range 0 to 1;
+	signal PC1 					: integer range 0 to 1;
+	signal PC_X 				: unsigned(7 downto 0);
+	signal PC_Y 				: unsigned(7 downto 0);
+	signal PC0_OFFS_HIT 		: std_logic;
+	signal BPP_CNT 			: unsigned(2 downto 0);
+	signal PLOT_EXEC 			: std_logic;
 	
 	--MMIO
-	signal MMIO_SEL, MMIO_CACHE_SEL, MMIO_REG_SEL: std_logic;
-	signal ROM_SEL, SRAM_SEL : std_logic;
-	signal MMIO_WR, MMIO_RD, MMIO_CACHE_WR, MMIO_REG_WR : std_logic;
-	signal GSU_MEM_ACCESS : std_logic;
-	signal GSU_ROM_ACCESS, GSU_RAM_ACCESS : std_logic;
-	signal SFR : std_logic_vector(15 downto 0);
-	signal SNES_RAM_A : std_logic_vector(16 downto 0);
-	signal INT_ROM_A : std_logic_vector(23 downto 0);
-	signal SNES_CACHE_ADDR : std_logic_vector(8 downto 0);
-	signal ROM_RD_CNT : unsigned(1 downto 0);
+	signal MMIO_SEL			: std_logic;
+	signal MMIO_CACHE_SEL	: std_logic;
+	signal MMIO_REG_SEL		: std_logic;
+	signal ROM_SEL 			: std_logic;
+	signal SRAM_SEL 			: std_logic;
+	signal MMIO_WR 			: std_logic;
+	signal MMIO_RD 			: std_logic;
+	signal MMIO_CACHE_WR 	: std_logic;
+	signal MMIO_REG_WR 		: std_logic;
+	signal GSU_MEM_ACCESS 	: std_logic;
+	signal GSU_ROM_ACCESS 	: std_logic;
+	signal GSU_RAM_ACCESS 	: std_logic;
+	signal SFR 					: std_logic_vector(15 downto 0);
+	signal SNES_RAM_A 		: std_logic_vector(16 downto 0);
+	signal INT_ROM_A 			: std_logic_vector(23 downto 0);
+	signal SNES_CACHE_ADDR 	: std_logic_vector(8 downto 0);
+	signal ROM_RD_CNT 		: unsigned(1 downto 0);
 	
 	--debug
-	signal DBG_RUN_LAST : std_logic;
-	signal DBG_DAT_WRr : std_logic;
-	signal DBG_BRK_ADDR : std_logic_vector(23 downto 0) := (others => '1');
-	signal DBG_RAM_ADDR : std_logic_vector(16 downto 0);
-	signal DBG_CACHE_ADDR : std_logic_vector(8 downto 0);
-	signal DBG_CTRL : std_logic_vector(7 downto 0) := (others => '0');
+	signal DBG_RUN_LAST 		: std_logic;
+	signal DBG_DAT_WRr 		: std_logic;
+	signal DBG_BRK_ADDR 		: std_logic_vector(23 downto 0) := (others => '1');
+	signal DBG_RAM_ADDR 		: std_logic_vector(16 downto 0);
+	signal DBG_CACHE_ADDR 	: std_logic_vector(8 downto 0);
+	signal DBG_CTRL 			: std_logic_vector(7 downto 0) := (others => '0');
 
 begin
 
@@ -190,23 +244,12 @@ begin
 			MS0 <= '0';
 			IRQ_OFF <= '0';
 			SCBR <= (others => '0');
-			CLS_INT <= '0';
+			CLS <= '0';
 			SCMR_MD <= (others => '0');
 			SCMR_HT <= (others => '0');
 			RAN <= '0';
 			RON <= '0';
 			GSU_MEM_ACCESS <= '0';
--- synthesis translate_off;
-			PBR <= x"01";
-			SCBR <= x"20";
-			SCMR_MD <= "01";
-			SCMR_HT <= "11";
-			RAN <= '1';
-			RON <= '1';
-			FLAG_GO <= '1';
-			GSU_MEM_ACCESS <= '1';
-			MS0 <= '0';
--- synthesis translate_on 
 		elsif rising_edge(CLK) then
 			if ENABLE = '1' then
 				if MMIO_WR = '1' then
@@ -239,7 +282,7 @@ begin
 							when x"8" =>						-- 3038
 								SCBR <= DI;
 							when x"9" =>						-- 3039
-								CLS_INT <= DI(0);
+								CLS <= DI(0);
 							when others => null;
 						end case;
 					end if;
@@ -389,13 +432,13 @@ begin
 		end if;
 	end process; 
 	
-	CLS <= CLS_INT or TURBO;
+	SPEED <= CLS or TURBO;
 	
-	EN <= ENABLE and FLAG_GO and (CLK_CE or CLS);
+	EN <= ENABLE and FLAG_GO and (CLK_CE or SPEED);
 	
 	OP_CYCLES <= "000" when TURBO = '1' else
-					 not (MS0 and not CLS) & "10" when OP.OP = OP_FMULT or OP.OP = OP_LMULT else
-					 "00" & not (MS0 and not CLS) when OP.OP = OP_MULT or OP.OP = OP_UMULT else
+					 not (MS0 and not SPEED) & "10" when OP.OP = OP_FMULT or OP.OP = OP_LMULT else
+					 "00" & not (MS0 and not SPEED) when OP.OP = OP_MULT or OP.OP = OP_UMULT else
 					 "000";
 	
 	process(CLK, RST_N)
@@ -413,9 +456,8 @@ begin
 	end process; 
 	
 	OP_CYCLE_EN <= '1' when OP_CYCLE_CNT = OP_CYCLES else '0';
-	CPU_EN <= EN and (ROM_FETCH_EN or RAM_FETCH_EN or (CACHE_FETCH_EN and OP_CYCLE_EN)) and not RAM_NEED_WAIT and not ROM_NEED_WAIT;-- or RAM_LOAD_EN
+	CPU_EN <= EN and (ROM_FETCH_EN or RAM_FETCH_EN or (CACHE_FETCH_EN and OP_CYCLE_EN)) and not RAM_NEED_WAIT and not ROM_NEED_WAIT;
 	
-		
 	process(CLK, RST_N)
 	begin
 		if RST_N = '0' then
@@ -447,6 +489,7 @@ begin
 			end if;
 		end if;
 	end process; 
+	
 	
 	--CPU Code cache
 	CACHE_POS <= unsigned(R(15)) - unsigned(CBR);
@@ -545,7 +588,7 @@ begin
 			if EN = '1' then
 				if TURBO = '1' then
 					ROM_CYCLES := "011";
-				elsif CLS = '0' then
+				elsif SPEED = '0' then
 					ROM_CYCLES := "010";
 				else 
 					ROM_CYCLES := "100";
@@ -639,7 +682,7 @@ begin
 			if EN = '1' then
 				if TURBO = '1' then
 					RAM_CYCLES := "011";
-				elsif CLS = '0' then
+				elsif SPEED = '0' then
 					RAM_CYCLES := "001";
 				else 
 					RAM_CYCLES := "100";
@@ -742,8 +785,8 @@ begin
 						RAMST <= RAMST_FETCH;
 					elsif IN_CACHE = '1' and VAL_CACHE = '0' and CODE_IN_RAM = '1' then
 						RAMST <= RAMST_CACHE;
-					elsif PIX_CACHE(PC1).VALID /= x"00" then
-						PCF_RW <= PC1_FULL;
+					elsif CPU_EN = '1' and OP.OP = OP_PLOT and PLOT_EXEC = '1' and (PC0_OFFS_HIT = '0' or PC0_FULL = '1') then
+						PCF_RW <= PC0_FULL;
 						RAMST <= RAMST_PCF;
 					elsif CPU_EN = '1' and OP.OP = OP_RPIX and STATE = 0 then
 						if PIX_CACHE(PC0).VALID /= x"00" then
@@ -962,6 +1005,7 @@ begin
 		end if;
 	end process; 
 	
+	
 	--Resisters
 	process(CLK, RST_N)
 		variable COND : std_logic;
@@ -970,10 +1014,6 @@ begin
 			R <= (others => (others => '0'));
 			RAMBR <= (others => '0');
 			ROMBR <= (others => '0');
--- synthesis translate_off
-			R <= (x"33D8",x"0808",x"0006",x"964C",x"7000",x"0001",x"0000",x"0008",
-					x"0040",x"0C00",x"0200",x"FE48",x"0000",x"FE70",x"A8FE",x"8cb0");
--- synthesis translate_on 
 			REG_LSB <= (others => '0');
 		elsif rising_edge(CLK) then
 			if EN = '0' then 
@@ -1074,10 +1114,26 @@ begin
 	PC1 <= 0 when PCN = '1' else 1;
 	PC0_FULL <= '1' when PIX_CACHE(PC0).VALID = x"FF" else '0';
 	PC1_FULL <= '1' when PIX_CACHE(PC1).VALID = x"FF" else '0';
+	PC0_OFFS_HIT <= '1' when PIX_CACHE(PC0).OFFSET = PC_Y & PC_X(7 downto 3) else '0';
+	
+	process(POR_TRANS, SCMR_MD, POR_FH, COLR )
+	begin
+		PLOT_EXEC <= '0';
+		if POR_TRANS = '1' then
+			PLOT_EXEC <= '1';
+		elsif SCMR_MD /= "11" or POR_FH = '1' then
+			if COLR(3 downto 0) /= "0000" then
+				PLOT_EXEC <= '1';
+			end if;
+		else
+			if COLR /= "00000000" then
+				PLOT_EXEC <= '1';
+			end if;
+		end if;
+	end process; 
 			
 	process(CLK, RST_N)
 		variable NEW_COLOR : std_logic_vector(7 downto 0);
-		variable PLOT_EXEC : std_logic;
 		variable COL_DITH : std_logic_vector(7 downto 0);
 	begin
 		if RST_N = '0' then
@@ -1125,30 +1181,17 @@ begin
 						else
 							COL_DITH := COLR;
 						end if;
-							
-						PLOT_EXEC := '0';
-						if POR_TRANS = '1' then
-							PLOT_EXEC := '1';
-						elsif SCMR_MD /= "11" or POR_FH = '1' then
-							if COLR(3 downto 0) /= "0000" then
-								PLOT_EXEC := '1';
-							end if;
-						else
-							if COLR /= "00000000" then
-								PLOT_EXEC := '1';
-							end if;
-						end if;
 						
 						if PLOT_EXEC = '1' then
-							if PIX_CACHE(PC0).OFFSET /= PC_Y & PC_X(7 downto 3) or PIX_CACHE(PC0).VALID = x"FF" then
+							if PC0_OFFS_HIT = '0' or PC0_FULL = '1' then
 								PCN <= not PCN;
 								PIX_CACHE(PC1).DATA(to_integer(not PC_X(2 downto 0))) <= COL_DITH;
 								PIX_CACHE(PC1).OFFSET <= PC_Y & PC_X(7 downto 3);
 								PIX_CACHE(PC1).VALID(to_integer(not PC_X(2 downto 0))) <= '1';
 							else
 								PIX_CACHE(PC0).DATA(to_integer(not PC_X(2 downto 0))) <= COL_DITH;
-								PIX_CACHE(PC0).VALID(to_integer(not PC_X(2 downto 0))) <= '1';
 								PIX_CACHE(PC0).OFFSET <= PC_Y & PC_X(7 downto 3);
+								PIX_CACHE(PC0).VALID(to_integer(not PC_X(2 downto 0))) <= '1';
 							end if;
 						end if;
 					elsif OP.OP = OP_RPIX and STATE = 0 then

@@ -463,6 +463,22 @@ package GSU_PKG is
 	end record;
 	type PixCaches_t is array (0 to 1) of PixCache_r;
 	
+	type ROMState_t is (
+		ROMST_IDLE, 
+		ROMST_FETCH, 
+		ROMST_CACHE, 
+		ROMST_LOAD
+	);
+	type RAMState_t is (
+		RAMST_IDLE, 
+		RAMST_FETCH, 
+		RAMST_CACHE, 
+		RAMST_LOAD, 
+		RAMST_SAVE, 
+		RAMST_PCF, 
+		RAMST_RPIX
+	);
+	
 	function GetLastBPP(md: std_logic_vector(1 downto 0)) return unsigned;
 	function GetCharOffset(offs: unsigned(12 downto 0); ht: std_logic_vector(1 downto 0); md: std_logic_vector(1 downto 0); 
 								  bpp: unsigned(2 downto 0); scbr: std_logic_vector(7 downto 0)) return std_logic_vector;

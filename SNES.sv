@@ -160,12 +160,12 @@ parameter CONF_STR1 = {
 	"-;",
 	"O13,ROM Header,Auto,No Header,LoROM,HiROM,ExHiROM;",
 	"-;",
-	"C,Cheats;",
+	"C,Cheats;"
 };
 
 parameter CONF_STR2 = {
 	"O,Cheats Enabled,Yes,No;",
-	"-;",
+	"-;"
 };
 
 parameter CONF_STR3 = {
@@ -173,15 +173,18 @@ parameter CONF_STR3 = {
 };
 
 parameter CONF_STR4 = {
-	"D,Save Backup RAM;",
-	"ON,Autosave,OFF,ON;",
+	"D,Save Backup RAM;"
 };
 
 parameter CONF_STR5 = {
-	";",
+	"N,Autosave,OFF,ON;"
 };
 
 parameter CONF_STR6 = {
+	";"
+};
+
+parameter CONF_STR7 = {
 	"I,SuperFX speed,Original,Turbo;",
 	"OEF,Video Region,Auto,NTSC,PAL;",
 	"O8,Aspect ratio,4:3,16:9;",
@@ -221,11 +224,19 @@ wire  [7:0] ioctl_index;
 wire [11:0] joy0,joy1,joy2,joy3,joy4;
 wire [24:0] ps2_mouse;
 
-hps_io #(.STRLEN((($size(CONF_STR1)+$size(CONF_STR2)+$size(CONF_STR3)+$size(CONF_STR4)+$size(CONF_STR5)+$size(CONF_STR6))>>3) + 5), .WIDE(1)) hps_io
+hps_io #(.STRLEN((($size(CONF_STR1)+$size(CONF_STR2)+$size(CONF_STR3)+$size(CONF_STR4)+$size(CONF_STR5)+$size(CONF_STR6)+$size(CONF_STR7))>>3) + 6), .WIDE(1)) hps_io
 (
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
-	.conf_str({CONF_STR1,gg_available ? "O" : "+",CONF_STR2,bk_ena ? "R" : "+",CONF_STR3,bk_ena ? "R" : "+",CONF_STR4,bk_ena ? "-" : "+",CONF_STR5,GSU_ACTIVE ? "O" : "+",CONF_STR6}),
+	.conf_str
+	({                          CONF_STR1,
+		gg_available ? "O" : "+",CONF_STR2,
+		bk_ena ?       "R" : "+",CONF_STR3,
+		bk_ena ?       "R" : "+",CONF_STR4,
+		bk_ena ?       "O" : "+",CONF_STR5,
+		bk_ena ?       "-" : "+",CONF_STR6,
+		GSU_ACTIVE ?   "O" : "+",CONF_STR7
+	}),
 
 	.buttons(buttons),
 	.forced_scandoubler(forced_scandoubler),

@@ -154,38 +154,20 @@ wire reset = RESET | buttons[1] | status[0] | cart_download | bk_loading;
 ////////////////////////////  HPS I/O  //////////////////////////////////
 
 `include "build_id.v"
-parameter CONF_STR1 = {
+parameter CONF_STR = {
 	"SNES;;",
 	"FS,SFCSMCBIN;",
 	"-;",
 	"O13,ROM Header,Auto,No Header,LoROM,HiROM,ExHiROM;",
 	"-;",
-	"C,Cheats;"
-};
-
-parameter CONF_STR2 = {
-	"O,Cheats Enabled,Yes,No;",
-	"-;"
-};
-
-parameter CONF_STR3 = {
-	"C,Load Backup RAM;"
-};
-
-parameter CONF_STR4 = {
-	"D,Save Backup RAM;"
-};
-
-parameter CONF_STR5 = {
-	"N,Autosave,OFF,ON;"
-};
-
-parameter CONF_STR6 = {
-	";"
-};
-
-parameter CONF_STR7 = {
-	"I,SuperFX speed,Original,Turbo;",
+	"C,Cheats;",
+	"H2OO,Cheats Enabled,Yes,No;",
+	"-;",
+	"D0RC,Load Backup RAM;",
+	"D0RD,Save Backup RAM;",
+	"D0ON,Autosave,OFF,ON;",
+	"D0-;",
+	"D1OI,SuperFX speed,Original,Turbo;",
 	"OEF,Video Region,Auto,NTSC,PAL;",
 	"O8,Aspect ratio,4:3,16:9;",
 	"O9B,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
@@ -204,6 +186,7 @@ parameter CONF_STR7 = {
 
 wire  [1:0] buttons;
 wire [31:0] status;
+wire [15:0] status_menumask = {~gg_available, ~GSU_ACTIVE, ~bk_ena};
 wire        forced_scandoubler;
 reg  [31:0] sd_lba;
 reg         sd_rd = 0;
@@ -227,19 +210,11 @@ wire [24:0] ps2_mouse;
 
 wire  [7:0] joy0_x,joy0_y,joy1_x,joy1_y;
 
-hps_io #(.STRLEN((($size(CONF_STR1)+$size(CONF_STR2)+$size(CONF_STR3)+$size(CONF_STR4)+$size(CONF_STR5)+$size(CONF_STR6)+$size(CONF_STR7))>>3) + 6), .WIDE(1)) hps_io
+hps_io #(.STRLEN($size(CONF_STR)>>3), .WIDE(1)) hps_io
 (
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
-	.conf_str
-	({                          CONF_STR1,
-		gg_available ? "O" : "+",CONF_STR2,
-		bk_ena ?       "R" : "+",CONF_STR3,
-		bk_ena ?       "R" : "+",CONF_STR4,
-		bk_ena ?       "O" : "+",CONF_STR5,
-		bk_ena ?       "-" : "+",CONF_STR6,
-		GSU_ACTIVE ?   "O" : "+",CONF_STR7
-	}),
+	.conf_str(CONF_STR),
 
 	.buttons(buttons),
 	.forced_scandoubler(forced_scandoubler),
@@ -255,6 +230,7 @@ hps_io #(.STRLEN((($size(CONF_STR1)+$size(CONF_STR2)+$size(CONF_STR3)+$size(CONF
 	.ps2_mouse(ps2_mouse),
 
 	.status(status),
+	.status_menumask(status_menumask),
 
 	.ioctl_addr(ioctl_addr),
 	.ioctl_dout(ioctl_dout),

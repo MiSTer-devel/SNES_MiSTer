@@ -57,6 +57,7 @@ module hps_io #(parameter STRLEN=0, PS2DIV=2000, WIDE=0, VDNUM=1, PS2WE=0)
 	output reg [31:0] status,
 	input      [31:0] status_in,
 	input             status_set,
+	input      [15:0] status_menumask,
 
 	//toggle to force notify of video mode change
 	input             new_vmode,
@@ -458,6 +459,9 @@ always@(posedge clk_sys) begin
 								1: io_dout <= status_req[15:0];
 								2: io_dout <= status_req[31:16];
 							endcase
+					
+					//menu mask
+					'h2E: if(byte_cnt == 1) io_dout <= status_menumask;
 				endcase
 			end
 		end

@@ -177,7 +177,10 @@ parameter CONF_STR = {
 	"O56,Mouse,None,Port1,Port2;",
 	"O7,Swap Joysticks,No,Yes;",
 	"OH,Multitap,Disabled,Port2;",
-	"OPR,Super Scope,Disabled,Joy1,Joy2;",
+	"-;",
+	"OPQ,Super Scope,Disabled,Joy1,Joy2,Mouse;",
+	"OR,Super Scope Btn,Joy,Mouse;",
+	"OS,Cross,Small,Big;",
 	"-;",
 	"R0,Reset;",
 	"J1,A(Scope Fire),B(Scope Cursor),X(Scope TurboSw),Y(Scope Pause),LT,RT,Select,Start;",
@@ -252,11 +255,13 @@ hps_io #(.STRLEN($size(CONF_STR)>>3), .WIDE(1)) hps_io
 	.img_size(img_size)
 );
 
+wire       GUN_BTN = status[27];
+wire [1:0] GUN_MODE = status[26:25];
 wire       GSU_TURBO = status[18];
 wire       BLEND = ~status[16];
 wire       PAL = (!status[15:14]) ? rom_region : status[15];
 wire [1:0] mouse_mode = status[6:5];
-wire       joy_swap = status[7];
+wire       joy_swap = (GUN_MODE[0] == GUN_MODE[1]) ? status[7] : (GUN_MODE == 1);
 wire [2:0] LHRom_type = status[3:1];
 
 wire code_index = &ioctl_index;
@@ -396,13 +401,13 @@ main main
 	.VSYNC(VSYNC),
 
 	.JOY1_DI(JOY1_DO),
-	.JOY2_DI(status[26:25] ? LG_DO : JOY2_DO),
+	.JOY2_DI(GUN_MODE ? LG_DO : JOY2_DO),
 	.JOY_STRB(JOY_STRB),
 	.JOY1_CLK(JOY1_CLK),
 	.JOY2_CLK(JOY2_CLK),
 	.JOY1_P6(JOY1_P6),
 	.JOY2_P6(JOY2_P6),
-	.JOY2_P6_in(LG_P6_out | !status[26:25]),
+	.JOY2_P6_in(LG_P6_out | !GUN_MODE),
 
 	.GG_EN(status[24]),
 	.GG_CODE(gg_code),
@@ -612,9 +617,9 @@ video_mixer #(.LINE_LENGTH(520)) video_mixer
 
 	.HBlank(~HBlank_n),
 	.VBlank(~VBlank_n),
-	.R((LG_TARGET && status[26:25]) ? {8{LG_TARGET[0]}} : R),
-	.G((LG_TARGET && status[26:25]) ? {8{LG_TARGET[1]}} : G),
-	.B((LG_TARGET && status[26:25]) ? {8{LG_TARGET[2]}} : B)
+	.R((LG_TARGET && GUN_MODE) ? {8{LG_TARGET[0]}} : R),
+	.G((LG_TARGET && GUN_MODE) ? {8{LG_TARGET[1]}} : G),
+	.B((LG_TARGET && GUN_MODE) ? {8{LG_TARGET[2]}} : B)
 );
 
 ////////////////////////////  I/O PORTS  ////////////////////////////////
@@ -668,19 +673,25 @@ wire [2:0] LG_TARGET;
 lightgun lightgun
 (
 	.CLK(clk_sys),
+	.RESET(reset),
 
-	.JOY_X(status[25] ? joy0_x : joy1_x),
-	.JOY_Y(status[25] ? joy0_y : joy1_y),
-	.F(status[25] ? joy0[4] : joy1[4]),
-	.C(status[25] ? joy0[5] : joy1[5]),
-	.T(status[25] ? joy0[6] : joy1[6]),
-	.P(status[25] ? joy0[7] : joy1[7]),
+	.MOUSE(ps2_mouse),
+	.MOUSE_XY(&GUN_MODE),
+
+	.JOY_X(GUN_MODE[0] ? joy0_x : joy1_x),
+	.JOY_Y(GUN_MODE[0] ? joy0_y : joy1_y),
+
+	.F(GUN_BTN ? ps2_mouse[0] : ((GUN_MODE[0]&joy0[4]) | (GUN_MODE[1]&joy1[4]))),
+	.C(GUN_BTN ? ps2_mouse[1] : ((GUN_MODE[0]&joy0[5]) | (GUN_MODE[1]&joy1[5]))),
+	.T(                         ((GUN_MODE[0]&joy0[6]) | (GUN_MODE[1]&joy1[6]))), // always from joysticks
+	.P(          ps2_mouse[2] | ((GUN_MODE[0]&joy0[7]) | (GUN_MODE[1]&joy1[7]))), // always from joysticks and mouse
 
 	.HDE(HBlank_n),
 	.VDE(VBlank_n),
 	.CLKPIX(DOTCLK),
 	
 	.TARGET(LG_TARGET),
+	.SIZE(status[28]),
 
 	.PORT_LATCH(JOY_STRB),
 	.PORT_CLK(JOY2_CLK),

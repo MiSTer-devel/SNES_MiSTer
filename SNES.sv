@@ -195,9 +195,10 @@ parameter CONF_STR7 = {
 	"O56,Mouse,None,Port1,Port2;",
 	"O7,Swap Joysticks,No,Yes;",
 	"OH,Multitap,Disabled,Port2;",
+	"OPR,Super Scope,Disabled,Joy1,Joy2;",
 	"-;",
 	"R0,Reset;",
-	"J1,A,B,X,Y,LT,RT,Select,Start;",
+	"J1,A(Scope Fire),B(Scope Cursor),X(Scope TurboSw),Y(Scope Pause),LT,RT,Select,Start;",
 	"V,v",`BUILD_DATE
 };
 
@@ -224,6 +225,8 @@ wire  [7:0] ioctl_index;
 wire [11:0] joy0,joy1,joy2,joy3,joy4;
 wire [24:0] ps2_mouse;
 
+wire  [7:0] joy0_x,joy0_y,joy1_x,joy1_y;
+
 hps_io #(.STRLEN((($size(CONF_STR1)+$size(CONF_STR2)+$size(CONF_STR3)+$size(CONF_STR4)+$size(CONF_STR5)+$size(CONF_STR6)+$size(CONF_STR7))>>3) + 6), .WIDE(1)) hps_io
 (
 	.clk_sys(clk_sys),
@@ -242,6 +245,8 @@ hps_io #(.STRLEN((($size(CONF_STR1)+$size(CONF_STR2)+$size(CONF_STR3)+$size(CONF
 	.forced_scandoubler(forced_scandoubler),
 	.new_vmode(new_vmode),
 
+	.joystick_analog_0({joy0_y, joy0_x}),
+	.joystick_analog_1({joy1_y, joy1_x}),
 	.joystick_0(joy0),
 	.joystick_1(joy1),
 	.joystick_2(joy2),
@@ -415,12 +420,13 @@ main main
 	.VSYNC(VSYNC),
 
 	.JOY1_DI(JOY1_DO),
-	.JOY2_DI(JOY2_DO),
+	.JOY2_DI(status[26:25] ? LG_DO : JOY2_DO),
 	.JOY_STRB(JOY_STRB),
 	.JOY1_CLK(JOY1_CLK),
 	.JOY2_CLK(JOY2_CLK),
 	.JOY1_P6(JOY1_P6),
 	.JOY2_P6(JOY2_P6),
+	.JOY2_P6_in(LG_P6_out | !status[26:25]),
 
 	.GG_EN(status[24]),
 	.GG_CODE(gg_code),
@@ -630,9 +636,9 @@ video_mixer #(.LINE_LENGTH(520)) video_mixer
 
 	.HBlank(~HBlank_n),
 	.VBlank(~VBlank_n),
-	.R(R),
-	.G(G),
-	.B(B)
+	.R((LG_TARGET && status[26:25]) ? {8{LG_TARGET[0]}} : R),
+	.G((LG_TARGET && status[26:25]) ? {8{LG_TARGET[1]}} : G),
+	.B((LG_TARGET && status[26:25]) ? {8{LG_TARGET[2]}} : B)
 );
 
 ////////////////////////////  I/O PORTS  ////////////////////////////////
@@ -680,6 +686,31 @@ ioport port2
 	.MOUSE_EN(mouse_mode[1])
 );
 
+wire       LG_P6_out;
+wire [1:0] LG_DO;
+wire [2:0] LG_TARGET;
+lightgun lightgun
+(
+	.CLK(clk_sys),
+
+	.JOY_X(status[25] ? joy0_x : joy1_x),
+	.JOY_Y(status[25] ? joy0_y : joy1_y),
+	.F(status[25] ? joy0[4] : joy1[4]),
+	.C(status[25] ? joy0[5] : joy1[5]),
+	.T(status[25] ? joy0[6] : joy1[6]),
+	.P(status[25] ? joy0[7] : joy1[7]),
+
+	.HDE(HBlank_n),
+	.VDE(VBlank_n),
+	.CLKPIX(DOTCLK),
+	
+	.TARGET(LG_TARGET),
+
+	.PORT_LATCH(JOY_STRB),
+	.PORT_CLK(JOY2_CLK),
+	.PORT_P6(LG_P6_out),
+	.PORT_DO(LG_DO)
+);
 
 /////////////////////////  STATE SAVE/LOAD  /////////////////////////////
 

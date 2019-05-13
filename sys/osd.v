@@ -107,22 +107,21 @@ end
 
 reg [ 2:0] osd_de;
 reg        osd_pixel;
-reg [21:0] next_v_cnt;
+reg [21:0] v_cnt;
 
 reg v_cnt_below320, v_cnt_below640, v_cnt_below960;
 
-reg [21:0] v_cnt;
 reg [21:0] v_osd_start_320, v_osd_start_640, v_osd_start_960, v_osd_start_other;
 
 // pipeline the comparisons a bit
 always @(posedge clk_video) if(ce_pix) begin
-	v_cnt_below320 <= next_v_cnt < 320;
-	v_cnt_below640 <= next_v_cnt < 640;
-	v_cnt_below960 <= next_v_cnt < 960;
-    v_osd_start_320   <= ((next_v_cnt-hrheight)>>1) + OSD_Y_OFFSET;
-    v_osd_start_640   <= ((next_v_cnt-(hrheight<<1))>>1) + OSD_Y_OFFSET;
-    v_osd_start_960   <= ((next_v_cnt-(hrheight + (hrheight<<1)))>>1) + OSD_Y_OFFSET;
-    v_osd_start_other <= ((next_v_cnt-(hrheight<<2))>>1) + OSD_Y_OFFSET;
+	v_cnt_below320    <= v_cnt < 320;
+	v_cnt_below640    <= v_cnt < 640;
+	v_cnt_below960    <= v_cnt < 960;
+	v_osd_start_320   <= ((v_cnt-hrheight)>>1) + OSD_Y_OFFSET;
+	v_osd_start_640   <= ((v_cnt-(hrheight<<1))>>1) + OSD_Y_OFFSET;
+	v_osd_start_960   <= ((v_cnt-(hrheight + (hrheight<<1)))>>1) + OSD_Y_OFFSET;
+	v_osd_start_other <= ((v_cnt-(hrheight<<2))>>1) + OSD_Y_OFFSET;
 end
 
 always @(posedge clk_video) begin
@@ -157,13 +156,11 @@ always @(posedge clk_video) begin
 		// rising edge of de
 		if(de_in && !deD) begin
 			h_cnt <= 0;
-			v_cnt <= next_v_cnt;
-            next_v_cnt <= next_v_cnt+1'd1; 
+			v_cnt <= v_cnt + 1'd1; 
 			h_osd_start <= info ? infox : (((dsp_width - OSD_WIDTH)>>1) + OSD_X_OFFSET - 2'd2);
 
 			if(h_cnt > {dsp_width, 2'b00}) begin
-				v_cnt <= 0;
-                next_v_cnt <= 'd1;
+				v_cnt <= 1;
 
 				osd_en <= (osd_en << 1) | osd_enable;
 				if(~osd_enable) osd_en <= 0;
@@ -191,7 +188,7 @@ always @(posedge clk_video) begin
 				osd_div <= 0;
 				if(~&osd_vcnt) osd_vcnt <= osd_vcnt + 1'd1;
 			end
-			if(v_osd_start == next_v_cnt) {osd_div, osd_vcnt} <= 0;
+			if(v_osd_start == v_cnt) {osd_div, osd_vcnt} <= 0;
 		end
 
 		osd_byte  <= osd_buffer[{osd_vcnt[6:3], osd_hcnt[7:0]}];
@@ -210,11 +207,11 @@ reg de_dly;
 always @(posedge clk_video) begin
 	normal_rdout <= din;
 	osd_rdout <= {{osd_pixel, osd_pixel, OSD_COLOR[2], din[23:19]},// 23:16
-	                             {osd_pixel, osd_pixel, OSD_COLOR[1], din[15:11]},// 15:8
-	                             {osd_pixel, osd_pixel, OSD_COLOR[0], din[7:3]}}; //  7:0
+	              {osd_pixel, osd_pixel, OSD_COLOR[1], din[15:11]},// 15:8
+	              {osd_pixel, osd_pixel, OSD_COLOR[0], din[7:3]}}; //  7:0
 	osd_mux <= ~osd_de[2];
 	rdout  <= osd_mux ? normal_rdout : osd_rdout;
-    de_dly <= de_in;
+	de_dly <= de_in;
 	de_out <= de_dly;
 end
 

@@ -25,7 +25,7 @@ module lightgun
 parameter CROSS_SZ = 8'd3;
 
 assign PORT_DO = {1'b1, JOY_LATCH0[15]};
-assign TARGET  = {2'b00, ~offscreen & draw};
+assign TARGET  = {{2{~Ttr & ~offscreen & draw}}, Ttr & ~offscreen & draw};
 
 reg Ttr; // 0 - one-shot fire. 1 - continous fire.
 reg Fb = 0, Pb = 0;

@@ -180,12 +180,13 @@ parameter CONF_STR = {
 	"-;",
 	"OPQ,Super Scope,Disabled,Joy1,Joy2,Mouse;",
 	"OR,Super Scope Btn,Joy,Mouse;",
-	"OS,Cross,Small,Big;",
+	"OST,Cross,Small,Big,None;",
 	"-;",
 	"R0,Reset;",
-	"J1,A(Scope Fire),B(Scope Cursor),X(Scope TurboSw),Y(Scope Pause),LT,RT,Select,Start;",
+	"J1,A(SS Fire),B(SS Cursor),X(SS TurboSw),Y(SS Pause),LT(SS Cursor),RT(SS Fire),Select,Start;",
 	"V,v",`BUILD_DATE
 };
+// free bits: 4,L,M,U,V
 
 wire  [1:0] buttons;
 wire [31:0] status;
@@ -617,9 +618,9 @@ video_mixer #(.LINE_LENGTH(520)) video_mixer
 
 	.HBlank(~HBlank_n),
 	.VBlank(~VBlank_n),
-	.R((LG_TARGET && GUN_MODE) ? {8{LG_TARGET[0]}} : R),
-	.G((LG_TARGET && GUN_MODE) ? {8{LG_TARGET[1]}} : G),
-	.B((LG_TARGET && GUN_MODE) ? {8{LG_TARGET[2]}} : B)
+	.R((LG_TARGET && GUN_MODE && (!status[29] | LG_T)) ? {8{LG_TARGET[0]}} : R),
+	.G((LG_TARGET && GUN_MODE && (!status[29] | LG_T)) ? {8{LG_TARGET[1]}} : G),
+	.B((LG_TARGET && GUN_MODE && (!status[29] | LG_T)) ? {8{LG_TARGET[2]}} : B)
 );
 
 ////////////////////////////  I/O PORTS  ////////////////////////////////
@@ -670,6 +671,8 @@ ioport port2
 wire       LG_P6_out;
 wire [1:0] LG_DO;
 wire [2:0] LG_TARGET;
+wire       LG_T = ((GUN_MODE[0]&joy0[6]) | (GUN_MODE[1]&joy1[6])); // always from joysticks
+
 lightgun lightgun
 (
 	.CLK(clk_sys),
@@ -681,10 +684,10 @@ lightgun lightgun
 	.JOY_X(GUN_MODE[0] ? joy0_x : joy1_x),
 	.JOY_Y(GUN_MODE[0] ? joy0_y : joy1_y),
 
-	.F(GUN_BTN ? ps2_mouse[0] : ((GUN_MODE[0]&joy0[4]) | (GUN_MODE[1]&joy1[4]))),
-	.C(GUN_BTN ? ps2_mouse[1] : ((GUN_MODE[0]&joy0[5]) | (GUN_MODE[1]&joy1[5]))),
-	.T(                         ((GUN_MODE[0]&joy0[6]) | (GUN_MODE[1]&joy1[6]))), // always from joysticks
-	.P(          ps2_mouse[2] | ((GUN_MODE[0]&joy0[7]) | (GUN_MODE[1]&joy1[7]))), // always from joysticks and mouse
+	.F(GUN_BTN ? ps2_mouse[0] : ((GUN_MODE[0]&(joy0[4]|joy0[9]) | (GUN_MODE[1]&(joy1[4]|joy1[9]))))),
+	.C(GUN_BTN ? ps2_mouse[1] : ((GUN_MODE[0]&(joy0[5]|joy0[8]) | (GUN_MODE[1]&(joy1[5]|joy0[8]))))),
+	.T(LG_T), // always from joysticks
+	.P(ps2_mouse[2] | ((GUN_MODE[0]&joy0[7]) | (GUN_MODE[1]&joy1[7]))), // always from joysticks and mouse
 
 	.HDE(HBlank_n),
 	.VDE(VBlank_n),

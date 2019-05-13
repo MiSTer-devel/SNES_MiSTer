@@ -261,7 +261,7 @@ wire       GSU_TURBO = status[18];
 wire       BLEND = ~status[16];
 wire       PAL = (!status[15:14]) ? rom_region : status[15];
 wire [1:0] mouse_mode = status[6:5];
-wire       joy_swap = (GUN_MODE[0] == GUN_MODE[1]) ? status[7] : (GUN_MODE == 1);
+wire       joy_swap = status[7];
 wire [2:0] LHRom_type = status[3:1];
 
 wire code_index = &ioctl_index;

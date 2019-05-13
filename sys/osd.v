@@ -84,7 +84,7 @@ always@(posedge clk_sys) begin
 	end
 end
 
-reg ce_pix;
+(* direct_enable *) reg ce_pix;
 always @(negedge clk_video) begin
 	integer cnt = 0;
 	integer pixsz, pixcnt;
@@ -105,8 +105,25 @@ always @(negedge clk_video) begin
 	end
 end
 
-reg [2:0] osd_de;
-reg       osd_pixel;
+reg [ 2:0] osd_de;
+reg        osd_pixel;
+reg [21:0] next_v_cnt;
+
+reg v_cnt_below320, v_cnt_below640, v_cnt_below960;
+
+reg [21:0] v_cnt;
+reg [21:0] v_osd_start_320, v_osd_start_640, v_osd_start_960, v_osd_start_other;
+
+// pipeline the comparisons a bit
+always @(posedge clk_video) if(ce_pix) begin
+	v_cnt_below320 <= next_v_cnt < 320;
+	v_cnt_below640 <= next_v_cnt < 640;
+	v_cnt_below960 <= next_v_cnt < 960;
+    v_osd_start_320   <= ((next_v_cnt-hrheight)>>1) + OSD_Y_OFFSET;
+    v_osd_start_640   <= ((next_v_cnt-(hrheight<<1))>>1) + OSD_Y_OFFSET;
+    v_osd_start_960   <= ((next_v_cnt-(hrheight + (hrheight<<1)))>>1) + OSD_Y_OFFSET;
+    v_osd_start_other <= ((next_v_cnt-(hrheight<<2))>>1) + OSD_Y_OFFSET;
+end
 
 always @(posedge clk_video) begin
 	reg        deD;
@@ -114,7 +131,6 @@ always @(posedge clk_video) begin
 	reg  [1:0] multiscan;
 	reg  [7:0] osd_byte; 
 	reg [23:0] h_cnt;
-	reg [21:0] v_cnt;
 	reg [21:0] dsp_width;
 	reg [21:0] osd_vcnt;
 	reg [21:0] h_osd_start;
@@ -141,30 +157,32 @@ always @(posedge clk_video) begin
 		// rising edge of de
 		if(de_in && !deD) begin
 			h_cnt <= 0;
-			v_cnt <= v_cnt + 1'd1;
+			v_cnt <= next_v_cnt;
+            next_v_cnt <= next_v_cnt+1'd1; 
 			h_osd_start <= info ? infox : (((dsp_width - OSD_WIDTH)>>1) + OSD_X_OFFSET - 2'd2);
 
 			if(h_cnt > {dsp_width, 2'b00}) begin
 				v_cnt <= 0;
+                next_v_cnt <= 'd1;
 
 				osd_en <= (osd_en << 1) | osd_enable;
 				if(~osd_enable) osd_en <= 0;
 
-				if(v_cnt<320) begin
+				if(v_cnt_below320) begin
 					multiscan <= 0;
-					v_osd_start <= info ? infoy : (((v_cnt-hrheight)>>1) + OSD_Y_OFFSET);
+					v_osd_start <= info ? infoy : v_osd_start_320;
 				end
-				else if(v_cnt<640) begin
+				else if(v_cnt_below640) begin
 					multiscan <= 1;
-					v_osd_start <= info ? (infoy<<1) : (((v_cnt-(hrheight<<1))>>1) + OSD_Y_OFFSET);
+					v_osd_start <= info ? (infoy<<1) : v_osd_start_640;
 				end
-				else if(v_cnt<960) begin
+				else if(v_cnt_below960) begin
 					multiscan <= 2;
-					v_osd_start <= info ? (infoy + (infoy << 1)) : (((v_cnt-(hrheight + (hrheight<<1)))>>1) + OSD_Y_OFFSET);
+					v_osd_start <= info ? (infoy + (infoy << 1)) : v_osd_start_960;
 				end
 				else begin
 					multiscan <= 3;
-					v_osd_start <= info ? (infoy<<2) : (((v_cnt-(hrheight<<2))>>1) + OSD_Y_OFFSET);
+					v_osd_start <= info ? (infoy<<2) : v_osd_start_other;
 				end
 			end
 
@@ -173,7 +191,7 @@ always @(posedge clk_video) begin
 				osd_div <= 0;
 				if(~&osd_vcnt) osd_vcnt <= osd_vcnt + 1'd1;
 			end
-			if(v_osd_start == (v_cnt+1'b1)) {osd_div, osd_vcnt} <= 0;
+			if(v_osd_start == next_v_cnt) {osd_div, osd_vcnt} <= 0;
 		end
 
 		osd_byte  <= osd_buffer[{osd_vcnt[6:3], osd_hcnt[7:0]}];
@@ -185,11 +203,19 @@ end
 reg [23:0] rdout;
 assign dout = rdout;
 
+reg [23:0] osd_rdout, normal_rdout;
+reg osd_mux;
+reg de_dly;
+
 always @(posedge clk_video) begin
-	rdout <= ~osd_de[2] ? din : {{osd_pixel, osd_pixel, OSD_COLOR[2], din[23:19]},
-	                             {osd_pixel, osd_pixel, OSD_COLOR[1], din[15:11]},
-	                             {osd_pixel, osd_pixel, OSD_COLOR[0], din[7:3]}};
-	de_out <= de_in;
+	normal_rdout <= din;
+	osd_rdout <= {{osd_pixel, osd_pixel, OSD_COLOR[2], din[23:19]},// 23:16
+	                             {osd_pixel, osd_pixel, OSD_COLOR[1], din[15:11]},// 15:8
+	                             {osd_pixel, osd_pixel, OSD_COLOR[0], din[7:3]}}; //  7:0
+	osd_mux <= ~osd_de[2];
+	rdout  <= osd_mux ? normal_rdout : osd_rdout;
+    de_dly <= de_in;
+	de_out <= de_dly;
 end
 
 endmodule

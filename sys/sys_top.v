@@ -83,6 +83,12 @@ module sys_top
 	output        SDIO_CLK,
 	input         SDIO_CD,
 
+	////////// ADC //////////////
+	output        ADC_SCK,
+	input         ADC_SDO,
+	output        ADC_SDI,
+	output        ADC_CONVST,
+
 	////////// MB KEY ///////////
 	input   [1:0] KEY,
 
@@ -861,7 +867,8 @@ emu emu
 	.AUDIO_R(audio_rs),
 	.AUDIO_S(audio_s),
 	.AUDIO_MIX(audio_mix),
-	.TAPE_IN(0),
+
+	.ADC_BUS({ADC_SCK,ADC_SDO,ADC_SDI,ADC_CONVST}),
 
 	.SD_SCK(SDIO_CLK),
 	.SD_MOSI(SDIO_CMD),

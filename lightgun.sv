@@ -24,13 +24,13 @@ module lightgun
 
 parameter CROSS_SZ = 8'd3;
 
-assign PORT_DO = {1'b1, JOY_LATCH0[15]};
+assign PORT_DO = {1'b1, JOY_LATCH0[7]};
 assign TARGET  = {{2{~Ttr & ~offscreen & draw}}, Ttr & ~offscreen & draw};
 
 reg Ttr; // 0 - one-shot fire. 1 - continous fire.
 reg Fb = 0, Pb = 0;
 
-reg [15:0] JOY_LATCH0;
+reg [7:0] JOY_LATCH0;
 always @(posedge CLK) begin
 	reg old_clk, old_f, old_p, old_t, old_latch;
 	old_clk <= PORT_CLK;
@@ -52,7 +52,7 @@ always @(posedge CLK) begin
 	old_p <= P;
 	if(~old_p & P) Pb <= 1;
 	
-	if(PORT_LATCH) JOY_LATCH0 <= ~{Fb,C,Ttr,Pb,2'b00,offscreen,1'b0,4'b1111,4'b1111};
+	if(PORT_LATCH) JOY_LATCH0 <= ~{Fb,C,Ttr,Pb,2'b00,offscreen,1'b0};
 	else if (~old_clk & PORT_CLK) JOY_LATCH0 <= JOY_LATCH0 << 1;
 end
 

@@ -577,6 +577,7 @@ wire VBlank_n;
 wire HIGH_RES;
 wire DOTCLK;
 
+reg interlace;
 reg ce_pix;
 always @(posedge CLK_VIDEO) begin
 	reg [2:0] pcnt;
@@ -590,6 +591,7 @@ always @(posedge CLK_VIDEO) begin
 	if(~old_vsync & VSync) begin
 		frame_hres <= tmp_hres | ~scandoubler;
 		tmp_hres <= HIGH_RES;
+		interlace <= INTERLACE;
 	end
 
 	pcnt <= pcnt + 1'd1;
@@ -601,12 +603,12 @@ always @(posedge CLK_VIDEO) begin
 	if(pcnt==3) {HSync, VSync} <= {HSYNC, VSYNC};
 end
 
-assign VGA_F1 = INTERLACE & FIELD;
-assign VGA_SL = {~INTERLACE,~INTERLACE}&sl[1:0];
+assign VGA_F1 = interlace & FIELD;
+assign VGA_SL = {~interlace,~interlace}&sl[1:0];
 
 wire [2:0] scale = status[11:9];
 wire [2:0] sl = scale ? scale - 1'd1 : 3'd0;
-wire       scandoubler = ~INTERLACE && (scale || forced_scandoubler);
+wire       scandoubler = ~interlace && (scale || forced_scandoubler);
 
 video_mixer #(.LINE_LENGTH(520)) video_mixer
 (

@@ -77,6 +77,7 @@ module main
    output            JOY2_CLK,
    output            JOY1_P6,
    output            JOY2_P6,
+   input             JOY2_P6_in,
 
    input             GG_EN,
    input     [128:0] GG_CODE,
@@ -163,6 +164,7 @@ SNES SNES
 	.joy2_clk(JOY2_CLK),
 	.joy1_p6(JOY1_P6),
 	.joy2_p6(JOY2_P6),
+	.joy2_p6_in(JOY2_P6_in),
 
 	.blend(BLEND),
 	.pal(PAL),

@@ -83,6 +83,12 @@ module sys_top
 	output        SDIO_CLK,
 	input         SDIO_CD,
 
+	////////// ADC //////////////
+	output        ADC_SCK,
+	input         ADC_SDO,
+	output        ADC_SDI,
+	output        ADC_CONVST,
+
 	////////// MB KEY ///////////
 	input   [1:0] KEY,
 
@@ -195,7 +201,7 @@ reg [15:0] cfg;
 
 reg  cfg_got   = 0;
 reg  cfg_set   = 0;
-//wire [2:0] hdmi_res  = cfg[10:8];
+wire hdmi_limited = cfg[8];
 wire dvi_mode  = cfg[7];
 wire audio_96k = cfg[6];
 wire ypbpr_en  = cfg[5];
@@ -604,7 +610,8 @@ hdmi_config hdmi_config
 	.I2C_SDA(HDMI_I2C_SDA),
 
 	.dvi_mode(dvi_mode),
-	.audio_96k(audio_96k)
+	.audio_96k(audio_96k),
+	.hdmi_limited(hdmi_limited)
 );
 
 wire [23:0] hdmi_data;
@@ -860,7 +867,8 @@ emu emu
 	.AUDIO_R(audio_rs),
 	.AUDIO_S(audio_s),
 	.AUDIO_MIX(audio_mix),
-	.TAPE_IN(0),
+
+	.ADC_BUS({ADC_SCK,ADC_SDO,ADC_SDI,ADC_CONVST}),
 
 	.SD_SCK(SDIO_CLK),
 	.SD_MOSI(SDIO_CMD),

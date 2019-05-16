@@ -78,7 +78,8 @@ entity SNES is
 		JOY2_CLK		: out std_logic;
 		JOY1_P6		: out std_logic;
 		JOY2_P6		: out std_logic;
-		
+		JOY2_P6_in	: in std_logic;
+
 		LRCK			: out std_logic;
 		BCK			: out std_logic;
 		SDAT			: out std_logic;
@@ -320,7 +321,7 @@ begin
 		VRAM_WRA_N	=> VRAM_WRA_N,
 		VRAM_WRB_N	=> VRAM_WRB_N,
 		
-		EXTLATCH		=> JPIO67(7),
+		EXTLATCH		=> JPIO67(7) and JOY2_P6_in,
 		
 		BLEND			=> BLEND,
 		PAL			=> PAL,

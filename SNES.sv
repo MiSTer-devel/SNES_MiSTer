@@ -62,7 +62,9 @@ module emu
 	output [15:0] AUDIO_R,
 	output        AUDIO_S, // 1 - signed audio samples, 0 - unsigned
 	output  [1:0] AUDIO_MIX, // 0 - no mix, 1 - 25%, 2 - 50%, 3 - 100% (mono)
-	input         TAPE_IN,
+
+	//ADC
+	inout   [3:0] ADC_BUS,
 
 	// SD-SPI
 	output        SD_SCK,
@@ -115,6 +117,7 @@ module emu
 	input         OSD_STATUS
 );
 
+assign ADC_BUS  = 'Z;
 assign USER_OUT = '1;
 assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 
@@ -154,35 +157,20 @@ wire reset = RESET | buttons[1] | status[0] | cart_download | bk_loading;
 ////////////////////////////  HPS I/O  //////////////////////////////////
 
 `include "build_id.v"
-parameter CONF_STR1 = {
+parameter CONF_STR = {
 	"SNES;;",
 	"FS,SFCSMCBIN;",
 	"-;",
 	"O13,ROM Header,Auto,No Header,LoROM,HiROM,ExHiROM;",
 	"-;",
 	"C,Cheats;",
-};
-
-parameter CONF_STR2 = {
-	"O,Cheats Enabled,Yes,No;",
+	"H2OO,Cheats Enabled,Yes,No;",
 	"-;",
-};
-
-parameter CONF_STR3 = {
-	"C,Load Backup RAM;"
-};
-
-parameter CONF_STR4 = {
-	"D,Save Backup RAM;",
-	"ON,Autosave,OFF,ON;",
-};
-
-parameter CONF_STR5 = {
-	";",
-};
-
-parameter CONF_STR6 = {
-	"I,SuperFX speed,Original,Turbo;",
+	"D0RC,Load Backup RAM;",
+	"D0RD,Save Backup RAM;",
+	"D0ON,Autosave,OFF,ON;",
+	"D0-;",
+	"D1OI,SuperFX speed,Original,Turbo;",
 	"OEF,Video Region,Auto,NTSC,PAL;",
 	"O8,Aspect ratio,4:3,16:9;",
 	"O9B,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
@@ -193,13 +181,19 @@ parameter CONF_STR6 = {
 	"O7,Swap Joysticks,No,Yes;",
 	"OH,Multitap,Disabled,Port2;",
 	"-;",
+	"OPQ,Super Scope,Disabled,Joy1,Joy2,Mouse;",
+	"OR,Super Scope Btn,Joy,Mouse;",
+	"OST,Cross,Small,Big,None;",
+	"-;",
 	"R0,Reset;",
-	"J1,A,B,X,Y,LT,RT,Select,Start;",
+	"J1,A(SS Fire),B(SS Cursor),X(SS TurboSw),Y(SS Pause),LT(SS Cursor),RT(SS Fire),Select,Start;",
 	"V,v",`BUILD_DATE
 };
+// free bits: 4,L,M,U,V
 
 wire  [1:0] buttons;
 wire [31:0] status;
+wire [15:0] status_menumask = {~gg_available, ~GSU_ACTIVE, ~bk_ena};
 wire        forced_scandoubler;
 reg  [31:0] sd_lba;
 reg         sd_rd = 0;
@@ -221,16 +215,20 @@ wire  [7:0] ioctl_index;
 wire [11:0] joy0,joy1,joy2,joy3,joy4;
 wire [24:0] ps2_mouse;
 
-hps_io #(.STRLEN((($size(CONF_STR1)+$size(CONF_STR2)+$size(CONF_STR3)+$size(CONF_STR4)+$size(CONF_STR5)+$size(CONF_STR6))>>3) + 5), .WIDE(1)) hps_io
+wire  [7:0] joy0_x,joy0_y,joy1_x,joy1_y;
+
+hps_io #(.STRLEN($size(CONF_STR)>>3), .WIDE(1)) hps_io
 (
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
-	.conf_str({CONF_STR1,gg_available ? "O" : "+",CONF_STR2,bk_ena ? "R" : "+",CONF_STR3,bk_ena ? "R" : "+",CONF_STR4,bk_ena ? "-" : "+",CONF_STR5,GSU_ACTIVE ? "O" : "+",CONF_STR6}),
+	.conf_str(CONF_STR),
 
 	.buttons(buttons),
 	.forced_scandoubler(forced_scandoubler),
 	.new_vmode(new_vmode),
 
+	.joystick_analog_0({joy0_y, joy0_x}),
+	.joystick_analog_1({joy1_y, joy1_x}),
 	.joystick_0(joy0),
 	.joystick_1(joy1),
 	.joystick_2(joy2),
@@ -239,6 +237,7 @@ hps_io #(.STRLEN((($size(CONF_STR1)+$size(CONF_STR2)+$size(CONF_STR3)+$size(CONF
 	.ps2_mouse(ps2_mouse),
 
 	.status(status),
+	.status_menumask(status_menumask),
 
 	.ioctl_addr(ioctl_addr),
 	.ioctl_dout(ioctl_dout),
@@ -260,6 +259,8 @@ hps_io #(.STRLEN((($size(CONF_STR1)+$size(CONF_STR2)+$size(CONF_STR3)+$size(CONF
 	.img_size(img_size)
 );
 
+wire       GUN_BTN = status[27];
+wire [1:0] GUN_MODE = status[26:25];
 wire       GSU_TURBO = status[18];
 wire       BLEND = ~status[16];
 wire       PAL = (!status[15:14]) ? rom_region : status[15];
@@ -404,12 +405,13 @@ main main
 	.VSYNC(VSYNC),
 
 	.JOY1_DI(JOY1_DO),
-	.JOY2_DI(JOY2_DO),
+	.JOY2_DI(GUN_MODE ? LG_DO : JOY2_DO),
 	.JOY_STRB(JOY_STRB),
 	.JOY1_CLK(JOY1_CLK),
 	.JOY2_CLK(JOY2_CLK),
 	.JOY1_P6(JOY1_P6),
 	.JOY2_P6(JOY2_P6),
+	.JOY2_P6_in(LG_P6_out | !GUN_MODE),
 
 	.GG_EN(status[24]),
 	.GG_CODE(gg_code),
@@ -575,6 +577,7 @@ wire VBlank_n;
 wire HIGH_RES;
 wire DOTCLK;
 
+reg interlace;
 reg ce_pix;
 always @(posedge CLK_VIDEO) begin
 	reg [2:0] pcnt;
@@ -588,6 +591,7 @@ always @(posedge CLK_VIDEO) begin
 	if(~old_vsync & VSync) begin
 		frame_hres <= tmp_hres | ~scandoubler;
 		tmp_hres <= HIGH_RES;
+		interlace <= INTERLACE;
 	end
 
 	pcnt <= pcnt + 1'd1;
@@ -599,12 +603,12 @@ always @(posedge CLK_VIDEO) begin
 	if(pcnt==3) {HSync, VSync} <= {HSYNC, VSYNC};
 end
 
-assign VGA_F1 = INTERLACE & FIELD;
-assign VGA_SL = {~INTERLACE,~INTERLACE}&sl[1:0];
+assign VGA_F1 = interlace & FIELD;
+assign VGA_SL = {~interlace,~interlace}&sl[1:0];
 
 wire [2:0] scale = status[11:9];
 wire [2:0] sl = scale ? scale - 1'd1 : 3'd0;
-wire       scandoubler = ~INTERLACE && (scale || forced_scandoubler);
+wire       scandoubler = ~interlace && (scale || forced_scandoubler);
 
 video_mixer #(.LINE_LENGTH(520)) video_mixer
 (
@@ -619,9 +623,9 @@ video_mixer #(.LINE_LENGTH(520)) video_mixer
 
 	.HBlank(~HBlank_n),
 	.VBlank(~VBlank_n),
-	.R(R),
-	.G(G),
-	.B(B)
+	.R((LG_TARGET && GUN_MODE && (!status[29] | LG_T)) ? {8{LG_TARGET[0]}} : R),
+	.G((LG_TARGET && GUN_MODE && (!status[29] | LG_T)) ? {8{LG_TARGET[1]}} : G),
+	.B((LG_TARGET && GUN_MODE && (!status[29] | LG_T)) ? {8{LG_TARGET[2]}} : B)
 );
 
 ////////////////////////////  I/O PORTS  ////////////////////////////////
@@ -669,6 +673,39 @@ ioport port2
 	.MOUSE_EN(mouse_mode[1])
 );
 
+wire       LG_P6_out;
+wire [1:0] LG_DO;
+wire [2:0] LG_TARGET;
+wire       LG_T = ((GUN_MODE[0]&joy0[6]) | (GUN_MODE[1]&joy1[6])); // always from joysticks
+
+lightgun lightgun
+(
+	.CLK(clk_sys),
+	.RESET(reset),
+
+	.MOUSE(ps2_mouse),
+	.MOUSE_XY(&GUN_MODE),
+
+	.JOY_X(GUN_MODE[0] ? joy0_x : joy1_x),
+	.JOY_Y(GUN_MODE[0] ? joy0_y : joy1_y),
+
+	.F(GUN_BTN ? ps2_mouse[0] : ((GUN_MODE[0]&(joy0[4]|joy0[9]) | (GUN_MODE[1]&(joy1[4]|joy1[9]))))),
+	.C(GUN_BTN ? ps2_mouse[1] : ((GUN_MODE[0]&(joy0[5]|joy0[8]) | (GUN_MODE[1]&(joy1[5]|joy0[8]))))),
+	.T(LG_T), // always from joysticks
+	.P(ps2_mouse[2] | ((GUN_MODE[0]&joy0[7]) | (GUN_MODE[1]&joy1[7]))), // always from joysticks and mouse
+
+	.HDE(HBlank_n),
+	.VDE(VBlank_n),
+	.CLKPIX(DOTCLK),
+	
+	.TARGET(LG_TARGET),
+	.SIZE(status[28]),
+
+	.PORT_LATCH(JOY_STRB),
+	.PORT_CLK(JOY2_CLK),
+	.PORT_P6(LG_P6_out),
+	.PORT_DO(LG_DO)
+);
 
 /////////////////////////  STATE SAVE/LOAD  /////////////////////////////
 

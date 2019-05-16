@@ -28,7 +28,7 @@ module emu
 	input         RESET,
 
 	//Must be passed to hps_io module
-	inout  [44:0] HPS_BUS,
+	inout  [45:0] HPS_BUS,
 
 	//Base video clock. Usually equals to CLK_SYS.
 	output        CLK_VIDEO,
@@ -433,14 +433,11 @@ wire gg_available;
 // Integer values are in BIG endian byte order, so it up to the loader
 // or generator of the code to re-arrange them correctly.
 
-// SNES files come in with 512 extra words of data at the start
-wire [24:0] code_addr = ioctl_addr - 10'd512;
-
 always_ff @(posedge clk_sys) begin
-	gg_code[128] <= 1'b0;
+	gg_code[128] <= 0;
 
 	if (code_download & ioctl_wr) begin
-		case (code_addr[3:0])
+		case (ioctl_addr[3:0])
 			0:  gg_code[111:96]  <= ioctl_dout; // Flags Bottom Word
 			2:  gg_code[127:112] <= ioctl_dout; // Flags Top Word
 			4:  gg_code[79:64]   <= ioctl_dout; // Address Bottom Word
@@ -449,8 +446,8 @@ always_ff @(posedge clk_sys) begin
 			10: gg_code[63:48]   <= ioctl_dout; // Compare top Word
 			12: gg_code[15:0]    <= ioctl_dout; // Replace Bottom Word
 			14: begin
-				gg_code[31:16]   <= ioctl_dout; // Replace Top Word
-				gg_code[128]     <=  1'b1;      // Clock it in
+				gg_code[31:16]    <= ioctl_dout; // Replace Top Word
+				gg_code[128]      <= 1;          // Clock it in
 			end
 		endcase
 	end

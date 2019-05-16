@@ -182,18 +182,20 @@ parameter CONF_STR = {
 	"OH,Multitap,Disabled,Port2;",
 	"-;",
 	"OPQ,Super Scope,Disabled,Joy1,Joy2,Mouse;",
-	"OR,Super Scope Btn,Joy,Mouse;",
-	"OST,Cross,Small,Big,None;",
+	"D4OR,Super Scope Btn,Joy,Mouse;",
+	"D4OST,Cross,Small,Big,None;",
+	"-;",
+	"D3O4,Turbo,Disable,Enable;",
 	"-;",
 	"R0,Reset;",
 	"J1,A(SS Fire),B(SS Cursor),X(SS TurboSw),Y(SS Pause),LT(SS Cursor),RT(SS Fire),Select,Start;",
 	"V,v",`BUILD_DATE
 };
-// free bits: 4,L,M,U,V
+// free bits: L,M,U,V
 
 wire  [1:0] buttons;
 wire [31:0] status;
-wire [15:0] status_menumask = {~gg_available, ~GSU_ACTIVE, ~bk_ena};
+wire [15:0] status_menumask = {!GUN_MODE, ~turbo_allow, ~gg_available, ~GSU_ACTIVE, ~bk_ena};
 wire        forced_scandoubler;
 reg  [31:0] sd_lba;
 reg         sd_rd = 0;
@@ -339,6 +341,7 @@ end
 ////////////////////////////  SYSTEM  ///////////////////////////////////
 
 wire GSU_ACTIVE;
+wire turbo_allow;
 
 main main
 (
@@ -417,6 +420,9 @@ main main
 	.GG_CODE(gg_code),
 	.GG_RESET((code_download && ioctl_wr && !ioctl_addr) || cart_download),
 	.GG_AVAILABLE(gg_available),
+	
+	.TURBO(status[4] & turbo_allow),
+	.TURBO_ALLOW(turbo_allow),
 
 	.AUDIO_L(AUDIO_L),
 	.AUDIO_R(AUDIO_R)

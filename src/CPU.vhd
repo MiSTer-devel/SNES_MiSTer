@@ -40,7 +40,9 @@ entity SCPU is
 		JOY_STRB			: out std_logic;
 		JOY1_CLK			: out std_logic;
 		JOY2_CLK			: out std_logic;
-		
+
+		TURBO				: in std_logic;
+
 		DBG_CPU_BRK 	: out std_logic;
 		DBG_REG			: in std_logic_vector(7 downto 0);
 		DBG_DAT			: out std_logic_vector(7 downto 0);
@@ -58,7 +60,10 @@ architecture rtl of SCPU is
 	signal INT_CLKR_CE, INT_CLKF_CE, DOT_CLK_CE : std_logic;
 	signal P65_CLK_CNT : unsigned(3 downto 0);
 	signal DMA_CLK_CNT : unsigned(2 downto 0);
+	signal DMA_LAST_CLOCK : unsigned(2 downto 0);
+	signal DMA_MID_CLOCK : unsigned(2 downto 0);
 	signal CPU_LAST_CLOCK : unsigned(3 downto 0);
+	signal CPU_MID_CLOCK : unsigned(3 downto 0);
 	signal CPU_ACTIVEr, DMA_ACTIVEr : std_logic;
 	signal H_CNT : unsigned(8 downto 0);
 	signal V_CNT : unsigned(8 downto 0);
@@ -228,9 +233,17 @@ begin
 
 	DMA_ACTIVE <= DMA_RUN or HDMA_RUN;
 
-	process( SPEED, MEMSEL, REFRESHED, CPU_ACTIVEr )
+	process( SPEED, MEMSEL, REFRESHED, CPU_ACTIVEr, TURBO )
 	begin
-		if REFRESHED = '1' and CPU_ACTIVEr = '1' then
+		CPU_MID_CLOCK <= x"2";
+		DMA_MID_CLOCK <= "011";
+		DMA_LAST_CLOCK <= "111";
+		if TURBO = '1' then
+			CPU_LAST_CLOCK <= x"3";
+			CPU_MID_CLOCK <= x"1";
+			DMA_LAST_CLOCK <= "011";
+			DMA_MID_CLOCK <= "001";
+		elsif REFRESHED = '1' and CPU_ACTIVEr = '1' then
 			CPU_LAST_CLOCK <= x"7";
 		elsif SPEED = FAST or (SPEED = SLOWFAST and MEMSEL = '1') then
 			CPU_LAST_CLOCK <= x"5";
@@ -251,12 +264,16 @@ begin
 			DMA_ACTIVEr <= '0';
 		elsif rising_edge(CLK) then
 			DMA_CLK_CNT <= DMA_CLK_CNT + 1;
+			if DMA_CLK_CNT = DMA_LAST_CLOCK  then
+				DMA_CLK_CNT <= (others => '0');
+			end if;
+			
 			P65_CLK_CNT <= P65_CLK_CNT + 1;
 			if P65_CLK_CNT = CPU_LAST_CLOCK  then
 				P65_CLK_CNT <= (others => '0');
 			end if;
-			
-			if DMA_ACTIVEr = '0' and DMA_ACTIVE = '1' and DMA_CLK_CNT = 7 and REFRESHED = '0' then
+
+			if DMA_ACTIVEr = '0' and DMA_ACTIVE = '1' and DMA_CLK_CNT = DMA_LAST_CLOCK and REFRESHED = '0' then
 				DMA_ACTIVEr <= '1';
 			elsif DMA_ACTIVEr = '1' and DMA_ACTIVE = '0' and REFRESHED = '0' then
 				DMA_ACTIVEr <= '0';
@@ -269,13 +286,13 @@ begin
 			end if;
 
 			if DMA_ACTIVEr = '1' or ENABLE = '0' then
-				if DMA_CLK_CNT = 4-1 then
+				if DMA_CLK_CNT = DMA_MID_CLOCK then
 					INT_CLK <= '1';
-				elsif DMA_CLK_CNT = 8-1 then
+				elsif DMA_CLK_CNT = DMA_LAST_CLOCK then
 					INT_CLK <= '0';
 				end if;
 			elsif CPU_ACTIVEr = '1' then
-				if P65_CLK_CNT = 3-1 then
+				if P65_CLK_CNT = CPU_MID_CLOCK then
 					INT_CLK <= '1';
 				elsif P65_CLK_CNT = CPU_LAST_CLOCK then
 					INT_CLK <= '0';
@@ -295,17 +312,17 @@ begin
 			if DMA_CLK_CNT(1 downto 0) = 4-1 then
 				DOT_CLK_CE <= '1';
 			end if;
-				
+
 			INT_CLKF_CE <= '0';
 			INT_CLKR_CE <= '0';
 			if DMA_ACTIVEr = '1' or ENABLE = '0' then
-				if DMA_CLK_CNT = 4-1 then
+				if DMA_CLK_CNT = DMA_MID_CLOCK then
 					INT_CLKR_CE <= '1';
-				elsif DMA_CLK_CNT = 8-1 then
+				elsif DMA_CLK_CNT = DMA_LAST_CLOCK then
 					INT_CLKF_CE <= '1';
 				end if;
 			elsif CPU_ACTIVEr = '1' then
-				if P65_CLK_CNT = 3-1 then
+				if P65_CLK_CNT = CPU_MID_CLOCK then
 					INT_CLKR_CE <= '1';
 				elsif P65_CLK_CNT = CPU_LAST_CLOCK  then
 					INT_CLKF_CE <= '1';

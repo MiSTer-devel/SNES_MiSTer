@@ -128,8 +128,8 @@ assign LED_USER  = cart_download | (status[23] & bk_pending);
 assign LED_DISK  = 0;
 assign LED_POWER = 0;
 
-assign VIDEO_ARX = status[8] ? 8'd16 : 8'd4;
-assign VIDEO_ARY = status[8] ? 8'd9  : 8'd3;
+assign VIDEO_ARX = status[31:30] == 2 ? 8'd16 : (status[30] ? 8'd8 : 8'd64);
+assign VIDEO_ARY = status[31:30] == 2 ? 8'd9  : (status[30] ? 8'd7 : 8'd49);
 
 assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = 0;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
@@ -172,7 +172,7 @@ parameter CONF_STR = {
 	"D0-;",
 	"D1OI,SuperFX speed,Original,Turbo;",
 	"OEF,Video Region,Auto,NTSC,PAL;",
-	"O8,Aspect ratio,4:3,16:9;",
+	"OUV,Aspect ratio,4:3,8:7,16:9;",
 	"O9B,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
 	"OG,Pseudo-transparency,Blend,Stripes;",
 	"OJK,Stereo mix,none,25%,50%,100%;", 

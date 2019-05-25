@@ -78,6 +78,7 @@ architecture rtl of SCPU is
 	signal P65_EN : std_logic;
 	signal P65_VPA, P65_VDA : std_logic;
 	signal P65_BRK : std_logic;
+	signal P65_BANK: std_logic_vector(7 downto 0);
 
 	type speed_t is (
 		XSLOW,
@@ -232,13 +233,15 @@ architecture rtl of SCPU is
 begin
 
 	DMA_ACTIVE <= DMA_RUN or HDMA_RUN;
+	P65_BANK <= P65_A(23 downto 16);
 
 	process( SPEED, MEMSEL, REFRESHED, CPU_ACTIVEr, TURBO )
 	begin
 		CPU_MID_CLOCK <= x"2";
 		DMA_MID_CLOCK <= "011";
 		DMA_LAST_CLOCK <= "111";
-		if TURBO = '1' then
+		-- No turbo while accessing APU ports $2140-$2143 in banks $00-$3F and their mirrors at $80-$BF
+		if TURBO = '1' and not (P65_A(15 downto 4) = x"214" and (P65_BANK < x"40" or (P65_BANK > x"7F" and P65_BANK < x"C0"))) then
 			CPU_LAST_CLOCK <= x"3";
 			CPU_MID_CLOCK <= x"1";
 			DMA_LAST_CLOCK <= "011";

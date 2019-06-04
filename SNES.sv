@@ -28,7 +28,7 @@ module emu
 	input         RESET,
 
 	//Must be passed to hps_io module
-	inout  [44:0] HPS_BUS,
+	inout  [45:0] HPS_BUS,
 
 	//Base video clock. Usually equals to CLK_SYS.
 	output        CLK_VIDEO,
@@ -128,8 +128,8 @@ assign LED_USER  = cart_download | (status[23] & bk_pending);
 assign LED_DISK  = 0;
 assign LED_POWER = 0;
 
-assign VIDEO_ARX = status[8] ? 8'd16 : 8'd4;
-assign VIDEO_ARY = status[8] ? 8'd9  : 8'd3;
+assign VIDEO_ARX = status[31:30] == 2 ? 8'd16 : (status[30] ? 8'd8 : 8'd64);
+assign VIDEO_ARY = status[31:30] == 2 ? 8'd9  : (status[30] ? 8'd7 : 8'd49);
 
 assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = 0;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
@@ -172,7 +172,7 @@ parameter CONF_STR = {
 	"D0-;",
 	"D1OI,SuperFX speed,Original,Turbo;",
 	"OEF,Video Region,Auto,NTSC,PAL;",
-	"O8,Aspect ratio,4:3,16:9;",
+	"OUV,Aspect ratio,4:3,8:7,16:9;",
 	"O9B,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
 	"OG,Pseudo-transparency,Blend,Stripes;",
 	"OJK,Stereo mix,none,25%,50%,100%;", 
@@ -182,18 +182,20 @@ parameter CONF_STR = {
 	"OH,Multitap,Disabled,Port2;",
 	"-;",
 	"OPQ,Super Scope,Disabled,Joy1,Joy2,Mouse;",
-	"OR,Super Scope Btn,Joy,Mouse;",
-	"OST,Cross,Small,Big,None;",
+	"D4OR,Super Scope Btn,Joy,Mouse;",
+	"D4OST,Cross,Small,Big,None;",
+	"-;",
+	"D3O4,Turbo,Disable,Enable;",
 	"-;",
 	"R0,Reset;",
 	"J1,A(SS Fire),B(SS Cursor),X(SS TurboSw),Y(SS Pause),LT(SS Cursor),RT(SS Fire),Select,Start;",
 	"V,v",`BUILD_DATE
 };
-// free bits: 4,L,M,U,V
+// free bits: L,M,U,V
 
 wire  [1:0] buttons;
 wire [31:0] status;
-wire [15:0] status_menumask = {~gg_available, ~GSU_ACTIVE, ~bk_ena};
+wire [15:0] status_menumask = {!GUN_MODE, ~turbo_allow, ~gg_available, ~GSU_ACTIVE, ~bk_ena};
 wire        forced_scandoubler;
 reg  [31:0] sd_lba;
 reg         sd_rd = 0;
@@ -339,6 +341,7 @@ end
 ////////////////////////////  SYSTEM  ///////////////////////////////////
 
 wire GSU_ACTIVE;
+wire turbo_allow;
 
 main main
 (
@@ -417,6 +420,9 @@ main main
 	.GG_CODE(gg_code),
 	.GG_RESET((code_download && ioctl_wr && !ioctl_addr) || cart_download),
 	.GG_AVAILABLE(gg_available),
+	
+	.TURBO(status[4] & turbo_allow),
+	.TURBO_ALLOW(turbo_allow),
 
 	.AUDIO_L(AUDIO_L),
 	.AUDIO_R(AUDIO_R)
@@ -433,14 +439,11 @@ wire gg_available;
 // Integer values are in BIG endian byte order, so it up to the loader
 // or generator of the code to re-arrange them correctly.
 
-// SNES files come in with 512 extra words of data at the start
-wire [24:0] code_addr = ioctl_addr - 10'd512;
-
 always_ff @(posedge clk_sys) begin
-	gg_code[128] <= 1'b0;
+	gg_code[128] <= 0;
 
 	if (code_download & ioctl_wr) begin
-		case (code_addr[3:0])
+		case (ioctl_addr[3:0])
 			0:  gg_code[111:96]  <= ioctl_dout; // Flags Bottom Word
 			2:  gg_code[127:112] <= ioctl_dout; // Flags Top Word
 			4:  gg_code[79:64]   <= ioctl_dout; // Address Bottom Word
@@ -449,8 +452,8 @@ always_ff @(posedge clk_sys) begin
 			10: gg_code[63:48]   <= ioctl_dout; // Compare top Word
 			12: gg_code[15:0]    <= ioctl_dout; // Replace Bottom Word
 			14: begin
-				gg_code[31:16]   <= ioctl_dout; // Replace Top Word
-				gg_code[128]     <=  1'b1;      // Clock it in
+				gg_code[31:16]    <= ioctl_dout; // Replace Top Word
+				gg_code[128]      <= 1;          // Clock it in
 			end
 		endcase
 	end

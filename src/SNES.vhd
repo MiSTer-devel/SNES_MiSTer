@@ -95,6 +95,8 @@ entity SNES is
 		GG_CODE		: in std_logic_vector(128 downto 0);
 		GG_RESET		: in std_logic;
 		GG_AVAILABLE: out std_logic;
+		
+		TURBO			: in std_logic;
 
 		AUDIO_L		: out std_logic_vector(15 downto 0);
 		AUDIO_R		: out std_logic_vector(15 downto 0)
@@ -230,7 +232,9 @@ begin
 		JOY_STRB		=> JOY_STRB,
 		JOY1_CLK		=> JOY1_CLK,
 		JOY2_CLK		=> JOY2_CLK,
-		
+
+		TURBO			=> TURBO,
+
 		DBG_CPU_BRK => CPU_BRK,
 		DBG_REG     => DBG_REG,
 		DBG_DAT     => DBG_SCPU_DAT,

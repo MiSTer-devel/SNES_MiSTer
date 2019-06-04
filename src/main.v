@@ -84,6 +84,9 @@ module main
    input             GG_RESET,
    output            GG_AVAILABLE,
 
+   input             TURBO,
+   output            TURBO_ALLOW,
+
    output     [15:0] AUDIO_L,
    output     [15:0] AUDIO_R
 );
@@ -183,6 +186,8 @@ SNES SNES
 	.gg_code(GG_CODE),
 	.gg_reset(GG_RESET),
 	.gg_available(GG_AVAILABLE),
+	
+	.turbo(TURBO),
 
 	.audio_l(AUDIO_L),
 	.audio_r(AUDIO_R)
@@ -486,6 +491,8 @@ SA1Map SA1Map
 `else
 assign MAP_ACTIVE[3] = 0;
 `endif
+
+assign TURBO_ALLOW = ~(MAP_ACTIVE[3] | MAP_ACTIVE[1]);
 
 always @(*) begin
 	case (MAP_ACTIVE)

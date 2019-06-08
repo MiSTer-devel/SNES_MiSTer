@@ -589,7 +589,7 @@ begin
 	
 	A_OUT <= ADDR_BUS;
 
-	process(MC, IR, LAST_CYCLE, IRQ_ACTIVE, NMI_ACTIVE)
+	process(MC, IR, LAST_CYCLE, STATE, IRQ_ACTIVE, NMI_ACTIVE)
 		variable rmw : std_logic;
 		variable twoCls : std_logic;
 	begin
@@ -617,7 +617,7 @@ begin
 			MLB <= '1';
 		end if;
 		
-		if LAST_CYCLE = '1' and MC.STATE_CTRL = "010" and MC.VA = "00" then
+		if LAST_CYCLE = '1' and STATE = 1 and MC.VA = "00" then
 			twoCls := '1';
 		else
 			twoCls := '0';

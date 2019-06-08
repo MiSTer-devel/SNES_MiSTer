@@ -8,7 +8,7 @@ package DSP_PKG is
 	constant MCLK_NTSC_FREQ : integer := 2147727;
 	constant MCLK_PAL_FREQ  : integer := 2128137;
 	constant ACLK_FREQ      : integer :=  410000; --(originally 409600)
-
+	
 	constant V0VOLL: std_logic_vector(7 downto 0) := x"00"; 
 	constant V1VOLL: std_logic_vector(7 downto 0) := x"10"; 
 	constant V2VOLL: std_logic_vector(7 downto 0) := x"20"; 
@@ -128,31 +128,31 @@ package DSP_PKG is
 	type RegsAccessTbl_t is array(0 to 31, 0 to 3) of std_logic_vector(7 downto 0);
 	constant  RA_TBL: RegsAccessTbl_t := (
 	(V0VOLR, V1PITCHL, V1ADSR1, x"7E"),
-	(V0ENVX, V1PITCHH, V1ADSR2, x"7E"),
+	(x"7E",  V1PITCHH, V1ADSR2, x"7E"),
 	(V0OUTX, V1VOLL,   V3SRCN,  x"7E"),
 	(V1VOLR, V2PITCHL, V2ADSR1, x"7E"),
-	(V1ENVX, V2PITCHH, V2ADSR2, x"7E"),
+	(V0ENVX, V2PITCHH, V2ADSR2, x"7E"),
 	(V1OUTX, V2VOLL,   V4SRCN,  x"7E"),
 	(V2VOLR, V3PITCHL, V3ADSR1, x"7E"),
-	(V2ENVX, V3PITCHH, V3ADSR2, x"7E"),
+	(V1ENVX, V3PITCHH, V3ADSR2, x"7E"),
 	(V2OUTX, V3VOLL,   V5SRCN,  x"7E"),
 	(V3VOLR, V4PITCHL, V4ADSR1, x"7E"),
-	(V3ENVX, V4PITCHH, V4ADSR2, x"7E"),
+	(V2ENVX, V4PITCHH, V4ADSR2, x"7E"),
 	(V3OUTX, V4VOLL,   V6SRCN,  x"7E"),
 	(V4VOLR, V5PITCHL, V5ADSR1, x"7E"),
-	(V4ENVX, V5PITCHH, V5ADSR2, x"7E"),
+	(V3ENVX, V5PITCHH, V5ADSR2, x"7E"),
 	(V4OUTX, V5VOLL,   V7SRCN,  x"7E"),
 	(V5VOLR, V6PITCHL, V6ADSR1, x"7E"),
-	(V5ENVX, V6PITCHH, V6ADSR2, x"7E"),
+	(V4ENVX, V6PITCHH, V6ADSR2, x"7E"),--
 	(V5OUTX, V6VOLL,   V0SRCN,  x"7E"),
 	(V6VOLR, V7PITCHL, V7ADSR1, x"7E"),
-	(V6ENVX, V7PITCHH, V7ADSR2, x"7E"),
+	(V5ENVX, V7PITCHH, V7ADSR2, x"7E"),
 	(V6OUTX, V7VOLL,   V1SRCN,  x"7E"),
 	(V7VOLR, V0PITCHL, V0ADSR1, x"7E"),
-	(V7ENVX, V0PITCHH, FIR0, 	 x"7E"),
+	(V6ENVX, V0PITCHH, FIR0, 	 x"7E"),
 	(V7OUTX, FIR1,     FIR2,    x"7E"),
 	(FIR3,   FIR4,     FIR5,    x"7E"),
-	(FIR6,   FIR7,     x"7E",   x"7E"),
+	(V7ENVX, FIR6,     FIR7,    x"7E"),
 	(MVOLL,  EVOLL, 	 EFB,     x"7E"),
 	(MVOLR,  EVOLR, 	 PMON,    x"7E"),
 	(NON,    EON,      DIR,     x"7E"),
@@ -205,31 +205,31 @@ package DSP_PKG is
 	type VoiceStepTbl_t is array(0 to 31, 0 to 3) of VoiceStep_r;
 	constant VS_TBL: VoiceStepTbl_t := (
 	((VS_VOLR,0),  (VS_PITCHL,1), (VS_ADSR1,1), (VS_IDLE,0)),
-	((VS_ENVX,0),  (VS_PITCHH,1), (VS_ADSR2,1), (VS_IDLE,0)),
+	((VS_IDLE,0),  (VS_PITCHH,1), (VS_ADSR2,1), (VS_IDLE,0)),
 	((VS_OUTX,0),  (VS_VOLL,1),   (VS_SRCN,3),  (VS_IDLE,0)),
 	((VS_VOLR,1),  (VS_PITCHL,2), (VS_ADSR1,2), (VS_IDLE,0)),
-	((VS_ENVX,1),  (VS_PITCHH,2), (VS_ADSR2,2), (VS_IDLE,0)),
+	((VS_ENVX,0),  (VS_PITCHH,2), (VS_ADSR2,2), (VS_IDLE,0)),
 	((VS_OUTX,1),  (VS_VOLL,2),   (VS_SRCN,4),  (VS_IDLE,0)),
 	((VS_VOLR,2),  (VS_PITCHL,3), (VS_ADSR1,3), (VS_IDLE,0)),
-	((VS_ENVX,2),  (VS_PITCHH,3), (VS_ADSR2,3), (VS_IDLE,0)),
+	((VS_ENVX,1),  (VS_PITCHH,3), (VS_ADSR2,3), (VS_IDLE,0)),
 	((VS_OUTX,2),  (VS_VOLL,3),   (VS_SRCN,5),  (VS_IDLE,0)),
 	((VS_VOLR,3),  (VS_PITCHL,4), (VS_ADSR1,4), (VS_IDLE,0)),
-	((VS_ENVX,3),  (VS_PITCHH,4), (VS_ADSR2,4), (VS_IDLE,0)),
+	((VS_ENVX,2),  (VS_PITCHH,4), (VS_ADSR2,4), (VS_IDLE,0)),
 	((VS_OUTX,3),  (VS_VOLL,4),   (VS_SRCN,6),  (VS_IDLE,0)),
 	((VS_VOLR,4),  (VS_PITCHL,5), (VS_ADSR1,5), (VS_IDLE,0)),
-	((VS_ENVX,4),  (VS_PITCHH,5), (VS_ADSR2,5), (VS_IDLE,0)),
+	((VS_ENVX,3),  (VS_PITCHH,5), (VS_ADSR2,5), (VS_IDLE,0)),
 	((VS_OUTX,4),  (VS_VOLL,5),   (VS_SRCN,7),  (VS_IDLE,0)),
 	((VS_VOLR,5),  (VS_PITCHL,6), (VS_ADSR1,6), (VS_IDLE,0)),
-	((VS_ENVX,5),  (VS_PITCHH,6), (VS_ADSR2,6), (VS_IDLE,0)),
+	((VS_ENVX,4),  (VS_PITCHH,6), (VS_ADSR2,6), (VS_IDLE,0)),--
 	((VS_OUTX,5),  (VS_VOLL,6),   (VS_SRCN,0),  (VS_IDLE,0)),
 	((VS_VOLR,6),  (VS_PITCHL,7), (VS_ADSR1,7), (VS_IDLE,0)),
-	((VS_ENVX,6),  (VS_PITCHH,7), (VS_ADSR2,7), (VS_IDLE,0)),
+	((VS_ENVX,5),  (VS_PITCHH,7), (VS_ADSR2,7), (VS_IDLE,0)),
 	((VS_OUTX,6),  (VS_VOLL,7),   (VS_SRCN,1),  (VS_IDLE,0)),
 	((VS_VOLR,7),  (VS_PITCHL,0), (VS_ADSR1,0), (VS_IDLE,0)),
-	((VS_ENVX,7),  (VS_PITCHH,0), (VS_FIR0,0),  (VS_IDLE,0)),
+	((VS_ENVX,6),  (VS_PITCHH,0), (VS_FIR0,0),  (VS_IDLE,0)),
 	((VS_OUTX,7),  (VS_FIR1,1),   (VS_FIR2,2),  (VS_IDLE,0)),
 	((VS_FIR3,3),  (VS_FIR4,4),   (VS_FIR5,5),  (VS_IDLE,0)),
-	((VS_FIR6,6),  (VS_FIR7,7),   (VS_IDLE,0),  (VS_IDLE,0)),
+	((VS_ENVX,7),  (VS_FIR6,6),   (VS_FIR7,7),  (VS_IDLE,0)),
 	((VS_MVOLL,0), (VS_EVOLL,0),  (VS_EFB,0),   (VS_IDLE,0)),
 	((VS_MVOLR,0), (VS_EVOLR,0),  (VS_PMON,0),  (VS_IDLE,0)),
 	((VS_NON,0),   (VS_EON,0),    (VS_DIR,0),   (VS_IDLE,0)),
@@ -436,7 +436,7 @@ package DSP_PKG is
 	x"11E", x"122", x"125", x"129", x"12C", x"130", x"133", x"137",
 	x"13A", x"13E", x"141", x"145", x"148", x"14C", x"150", x"153",
 	x"157", x"15B", x"15F", x"162", x"166", x"16A", x"16E", x"172",
-	x"176", x"17A", x"17D", x"181", x"185", x"189", x"18D", x"191",
+	x"176", x"17A", x"17D", x"181", x"185", x"189", x"18D", x"191",--
 	x"195", x"19A", x"19E", x"1A2", x"1A6", x"1AA", x"1AE", x"1B2",
 	x"1B7", x"1BB", x"1BF", x"1C3", x"1C8", x"1CC", x"1D0", x"1D5",
 	x"1D9", x"1DD", x"1E2", x"1E6", x"1EB", x"1EF", x"1F3", x"1F8",
@@ -479,12 +479,13 @@ package DSP_PKG is
 	type EchoBuf_t is array (0 to 7) of std_logic_vector(14 downto 0);
 	type ChEchoBuf_t is array (0 to 1) of EchoBuf_t;
 	type EchoFir_t is array (0 to 1) of signed(15 downto 0);
+	type EchoFir17_t is array (0 to 1) of signed(15 downto 0);
 	type EchoFFC_t is array (0 to 7) of signed(7 downto 0);
 	type ChEnvMode_t is array (0 to 7) of EnvMode_t;
 	type Env_t is array (0 to 7) of signed(11 downto 0);
+	type EnvxBuf_t is array (0 to 7) of std_logic_vector(7 downto 0);
 	type InterpPos_t is array (0 to 7) of unsigned(15 downto 0);
 	type RegRam_t is array (0 to 127) of std_logic_vector(7 downto 0);
-	
 	
 	function CLAMP16(a: signed(16 downto 0)) return signed; 
 	

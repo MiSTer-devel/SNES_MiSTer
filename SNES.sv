@@ -179,7 +179,7 @@ parameter CONF_STR = {
 	"O56,Mouse,None,Port1,Port2;",
 	"O7,Swap Joysticks,No,Yes;",
 	"OH,Multitap,Disabled,Port2;",
-	"O8,Raw Serial,OFF,ON;",
+	"O8,Serial,OFF,Raw;",
 	"-;",
 	"OPQ,Super Scope,Disabled,Joy1,Joy2,Mouse;",
 	"D4OR,Super Scope Btn,Joy,Mouse;",
@@ -647,7 +647,7 @@ ioport port1
 	.PORT_P6(JOY1_P6),
 	.PORT_DO(JOY1_DO),
 
-	.JOYSTICK1(joy_swap ? joy1 : joy0),
+	.JOYSTICK1((joy_swap ^ raw_serial) ? joy1 : joy0),
 
 	.MOUSE(ps2_mouse),
 	.MOUSE_EN(mouse_mode[0])

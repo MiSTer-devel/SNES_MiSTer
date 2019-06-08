@@ -118,7 +118,6 @@ module emu
 );
 
 assign ADC_BUS  = 'Z;
-//assign USER_OUT = '1;
 assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 
 assign AUDIO_S   = 1;
@@ -711,15 +710,6 @@ lightgun lightgun
 	.PORT_DO(LG_DO)
 );
 
-// .JOY1_DI(JOY1_DO),
-// .JOY2_DI(GUN_MODE ? LG_DO : JOY2_DO),
-// .JOY_STRB(JOY_STRB),
-// .JOY1_CLK(JOY1_CLK),
-// .JOY2_CLK(JOY2_CLK),
-// .JOY1_P6(JOY1_P6),
-// .JOY2_P6(JOY2_P6),
-// .JOY2_P6_in(LG_P6_out | !GUN_MODE),
-
 // Indexes:
 // 0 = D+    = Latch
 // 1 = D-    = CLK
@@ -744,9 +734,9 @@ always_comb begin
 		USER_OUT[0] = JOY_STRB;
 		USER_OUT[1] = joy_swap ? ~JOY2_CLK : ~JOY1_CLK;
 		USER_OUT[4] = joy_swap ? JOY2_P6 : JOY1_P6;
-		JOY1_DI = joy_swap ? JOY1_DO : {~USER_IN[2], ~USER_IN[5]};
-		JOY2_DI = joy_swap ? {~USER_IN[2], ~USER_IN[5]} : JOY2_DO;
-		JOY2_P6_DI = joy_swap ? (LG_P6_out | !GUN_MODE) : USER_IN[4];
+		JOY1_DI = joy_swap ? JOY1_DO : {USER_IN[2], USER_IN[5]};
+		JOY2_DI = joy_swap ? {USER_IN[2], USER_IN[5]} : JOY2_DO;
+		JOY2_P6_DI = joy_swap ? USER_IN[4] : (LG_P6_out | !GUN_MODE);
 	end else begin
 		USER_OUT[0] = 1'b1;
 		USER_OUT[1] = 1'b1;

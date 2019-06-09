@@ -158,38 +158,37 @@ wire reset = RESET | buttons[1] | status[0] | cart_download | bk_loading;
 
 `include "build_id.v"
 parameter CONF_STR = {
-	"SNES;;",
-	"FS,SFCSMCBIN;",
-	"-;",
-	"O13,ROM Header,Auto,No Header,LoROM,HiROM,ExHiROM;",
-	"-;",
-	"C,Cheats;",
-	"H2OO,Cheats Enabled,Yes,No;",
-	"-;",
-	"D0RC,Load Backup RAM;",
-	"D0RD,Save Backup RAM;",
-	"D0ON,Autosave,OFF,ON;",
-	"D0-;",
-	"D1OI,SuperFX speed,Original,Turbo;",
-	"OEF,Video Region,Auto,NTSC,PAL;",
-	"OUV,Aspect ratio,4:3,8:7,16:9;",
-	"O9B,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
-	"OG,Pseudo-transparency,Blend,Stripes;",
-	"OJK,Stereo mix,none,25%,50%,100%;", 
-	"-;",
-	"O56,Mouse,None,Port1,Port2;",
-	"O7,Swap Joysticks,No,Yes;",
-	"OH,Multitap,Disabled,Port2;",
-	"-;",
-	"OPQ,Super Scope,Disabled,Joy1,Joy2,Mouse;",
-	"D4OR,Super Scope Btn,Joy,Mouse;",
-	"D4OST,Cross,Small,Big,None;",
-	"-;",
-	"D3O4,Turbo,Disable,Enable;",
-	"-;",
-	"R0,Reset;",
-	"J1,A(SS Fire),B(SS Cursor),X(SS TurboSw),Y(SS Pause),LT(SS Cursor),RT(SS Fire),Select,Start;",
-	"V,v",`BUILD_DATE
+    "SNES;;",
+    "FS,SFCSMCBIN;",
+    "OEF,Video Region,Auto,NTSC,PAL;",
+    "O13,ROM Header,Auto,No Header,LoROM,HiROM,ExHiROM;",
+    "-;",
+    "C,Cheats;",
+    "H2OO,Cheats Enabled,Yes,No;",
+    "-;",
+    "D0RC,Load Backup RAM;",
+    "D0RD,Save Backup RAM;",
+    "D0ON,Autosave,OFF,ON;",
+    "D0-;",
+    "OUV,Aspect Ratio,4:3,8:7,16:9;",
+    "O9B,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
+    "OG,Pseudo Transparency,Off,Blend;",
+    "OJK,Stereo Mix,None,25%,50%,100%;", 
+    "-;",
+    "O56,Mouse,None,Port1,Port2;",
+    "O7,Swap Joysticks,No,Yes;",
+    "OH,Multitap,Disabled,Port2;",
+    "-;",
+    "OPQ,Super Scope,Disabled,Joy1,Joy2,Mouse;",
+    "D4OR,Super Scope Btn,Joy,Mouse;",
+    "D4OST,Cross,Small,Big,None;",
+    "-;",
+    "D1OI,SuperFX Speed,Normal,Turbo;",
+    "D3O4,CPU Speed,Normal,Turbo;",
+    "-;",
+    "R0,Reset;",
+    "J1,A(SS Fire),B(SS Cursor),X(SS TurboSw),Y(SS Pause),LT(SS Cursor),RT(SS Fire),Select,Start;",
+    "V,v",`BUILD_DATE
 };
 // free bits: L,M,U,V
 
@@ -264,7 +263,7 @@ hps_io #(.STRLEN($size(CONF_STR)>>3), .WIDE(1)) hps_io
 wire       GUN_BTN = status[27];
 wire [1:0] GUN_MODE = status[26:25];
 wire       GSU_TURBO = status[18];
-wire       BLEND = ~status[16];
+wire       BLEND = status[16];
 wire       PAL = (!status[15:14]) ? rom_region : status[15];
 wire [1:0] mouse_mode = status[6:5];
 wire       joy_swap = status[7];

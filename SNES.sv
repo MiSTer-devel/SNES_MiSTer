@@ -160,6 +160,7 @@ wire reset = RESET | buttons[1] | status[0] | cart_download | bk_loading;
 parameter CONF_STR = {
     "SNES;;",
     "FS,SFCSMCBIN;",
+    "-;",
     "OEF,Video Region,Auto,NTSC,PAL;",
     "O13,ROM Header,Auto,No Header,LoROM,HiROM,ExHiROM;",
     "-;",

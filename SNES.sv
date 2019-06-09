@@ -191,7 +191,7 @@ parameter CONF_STR = {
     "J1,A(SS Fire),B(SS Cursor),X(SS TurboSw),Y(SS Pause),LT(SS Cursor),RT(SS Fire),Select,Start;",
     "V,v",`BUILD_DATE
 };
-// free bits: L,M,U,V
+// free bits: 4,L,M
 
 wire  [1:0] buttons;
 wire [31:0] status;

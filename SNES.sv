@@ -173,7 +173,7 @@ parameter CONF_STR = {
     "D0-;",
     "OUV,Aspect Ratio,4:3,8:7,16:9;",
     "O9B,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
-    "OG,Pseudo Transparency,Off,Blend;",
+    "OG,Pseudo Transparency,Blend,Off;",
     "OJK,Stereo Mix,None,25%,50%,100%;", 
     "-;",
     "O56,Mouse,None,Port1,Port2;",
@@ -264,7 +264,7 @@ hps_io #(.STRLEN($size(CONF_STR)>>3), .WIDE(1)) hps_io
 wire       GUN_BTN = status[27];
 wire [1:0] GUN_MODE = status[26:25];
 wire       GSU_TURBO = status[18];
-wire       BLEND = status[16];
+wire       BLEND = ~status[16];
 wire       PAL = (!status[15:14]) ? rom_region : status[15];
 wire [1:0] mouse_mode = status[6:5];
 wire       joy_swap = status[7];

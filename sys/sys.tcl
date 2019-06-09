@@ -25,7 +25,6 @@ set_location_assignment PIN_U13 -to ARDUINO_IO[5]
 set_location_assignment PIN_AG8 -to ARDUINO_IO[6]
 set_location_assignment PIN_AH8 -to ARDUINO_IO[7]
 set_location_assignment PIN_AF17 -to ARDUINO_IO[8]
-set_location_assignment PIN_AE15 -to ARDUINO_IO[9]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ARDUINO_IO[*]
 set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to ARDUINO_IO[*]
 set_instance_assignment -name CURRENT_STRENGTH_NEW "MAXIMUM CURRENT" -to ARDUINO_IO[*]
@@ -90,6 +89,9 @@ set_location_assignment PIN_AG24 -to VGA_VS
 
 set_location_assignment PIN_AH27 -to VGA_EN
 set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to VGA_EN
+
+set_location_assignment PIN_AE15 -to VGA_SOG
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to VGA_SOG
 
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to VGA_*
 set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_*

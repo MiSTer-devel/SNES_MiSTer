@@ -157,16 +157,21 @@ always @(posedge FPGA_CLK2_50) btn_reset <= BTN_RESET;
 wire [31:0] gp_in = {1'b0, btn_user, btn_osd, 9'd0, io_ver, io_ack, io_wide, io_dout};
 wire [31:0] gp_out;
 
-wire  [1:0] io_ver    = 1; // 0 - standard MiST I/O (for quick porting of complex MiST cores). 1 - optimized HPS I/O. 2,3 - reserved for future.
+wire  [1:0] io_ver = 1; // 0 - standard MiST I/O (for quick porting of complex MiST cores). 1 - optimized HPS I/O. 2,3 - reserved for future.
 wire        io_wait;
 wire        io_wide;
 wire [15:0] io_dout;                  
-wire [15:0] io_din    = gp_outr[15:0];
-wire        io_clk    = gp_outr[17];
-wire        io_fpga   = gp_outr[18];
-wire        io_osd    = gp_outr[19];
-wire        io_uio    = gp_outr[20];
+wire [15:0] io_din = gp_outr[15:0];
+wire        io_clk = gp_outr[17];
+wire        io_ss0 = gp_outr[18];
+wire        io_ss1 = gp_outr[19];
+wire        io_ss2 = gp_outr[20];
 //wire        io_sdd    = gp_outr[21]; // used only in ST core
+
+wire io_osd_hdmi = io_ss1 & ~io_ss0;
+wire io_osd_vga  = io_ss1 & ~io_ss2;
+wire io_fpga     = ~io_ss1 & io_ss0;
+wire io_uio      = ~io_ss1 & io_ss2;
 
 reg  io_ack;
 reg  rack;
@@ -739,7 +744,7 @@ osd hdmi_osd
 (
 	.clk_sys(clk_sys),
 
-	.io_osd(io_osd),
+	.io_osd(io_osd_hdmi),
 	.io_strobe(io_strobe),
 	.io_din(io_din),
 
@@ -771,7 +776,7 @@ osd vga_osd
 (
 	.clk_sys(clk_sys),
 
-	.io_osd(io_osd),
+	.io_osd(io_osd_vga),
 	.io_strobe(io_strobe),
 	.io_din(io_din),
 

@@ -102,8 +102,8 @@ begin
 		BSRAM_SEL <= '0';
 		if ROM_MASK(23) = '0' then
 			case MAP_CTRL(2 downto 0) is
-				when "000" =>							-- LoROM
-					CART_ADDR <= "00" & CA(22 downto 16) & CA(14 downto 0);
+				when "000" =>							-- LoROM/ExLoROM
+					CART_ADDR <= '0' & not CA(23) & CA(22 downto 16) & CA(14 downto 0);
 					BRAM_ADDR <= CA(20 downto 16) & CA(14 downto 0);
 					if MAP_CTRL(3) = '0' then
 						if CA(22 downto 20) = "111" and ROMSEL_N = '0' and BSRAM_MASK(10) = '1' then

@@ -169,7 +169,7 @@ parameter CONF_STR = {
     "-;",
     "D0RC,Load Backup RAM;",
     "D0RD,Save Backup RAM;",
-    "D0ON,Autosave,OFF,ON;",
+    "D0ON,Autosave,Off,On;",
     "D0-;",
     "OUV,Aspect Ratio,4:3,8:7,16:9;",
     "O9B,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",

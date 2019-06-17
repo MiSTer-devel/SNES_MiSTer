@@ -8,6 +8,7 @@ module hdmi_config
 	input       dvi_mode,
 	input       audio_96k,
 	input       hdmi_limited,
+	output reg  done,
 
 	//	I2C Side
 	output		I2C_SCL,
@@ -42,6 +43,7 @@ always@(posedge iCLK or negedge iRST_N) begin
 		LUT_INDEX	<=	0;
 		mSetup_ST	<=	0;
 		mI2C_GO		<=	0;
+		done        <= 0;
 	end else begin
 		if(init_data[LUT_INDEX] != 16'hFFFF) begin
 			case(mSetup_ST)
@@ -59,6 +61,7 @@ always@(posedge iCLK or negedge iRST_N) begin
 				end
 			endcase
 		end
+		else done <= 1;
 	end
 end
 

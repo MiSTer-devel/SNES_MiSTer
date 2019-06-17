@@ -30,7 +30,7 @@
 
 // WIDE=1 for 16 bit file I/O
 // VDNUM 1-4
-module hps_io #(parameter STRLEN=0, PS2DIV=2000, WIDE=0, VDNUM=1, PS2WE=0)
+module hps_io #(parameter STRLEN=0, PS2DIV=0, WIDE=0, VDNUM=1, PS2WE=0)
 (
 	input             clk_sys,
 	inout      [45:0] HPS_BUS,
@@ -122,7 +122,8 @@ module hps_io #(parameter STRLEN=0, PS2DIV=2000, WIDE=0, VDNUM=1, PS2WE=0)
 	output reg [10:0] ps2_key = 0,
 
 	// [24] - toggles with every event
-	output reg [24:0] ps2_mouse = 0
+	output reg [24:0] ps2_mouse = 0,
+	output reg [15:0] ps2_mouse_ext = 0 // 15:8 - reserved(additional buttons), 7:0 - wheel movements
 );
 
 localparam DW = (WIDE) ? 15 : 7;
@@ -299,7 +300,7 @@ always@(posedge clk_sys) begin
 	if(b_wr[2] && (~&sd_buff_addr)) sd_buff_addr <= sd_buff_addr + 1'b1;
 	b_wr <= (b_wr<<1);
 
-	{kbd_rd,kbd_we,mouse_rd,mouse_we} <= 0;
+	if(PS2DIV) {kbd_rd,kbd_we,mouse_rd,mouse_we} <= 0;
 
 	if(~io_enable) begin
 		if(cmd == 4 && !ps2skip) ps2_mouse[24] <= ~ps2_mouse[24];
@@ -332,6 +333,7 @@ always@(posedge clk_sys) begin
 					'h18: sd_ack <= 1;
 					'h29: io_dout <= {4'hA, stflg};
 					'h2B: io_dout <= 1;
+					'h2F: io_dout <= 1;
 				endcase
 
 				sd_buff_addr <= 0;
@@ -351,14 +353,21 @@ always@(posedge clk_sys) begin
 
 					// store incoming ps2 mouse bytes
 					'h04: begin
-							mouse_data <= io_din[7:0];
-							mouse_we   <= 1;
+							if(PS2DIV) begin
+								mouse_data <= io_din[7:0];
+								mouse_we   <= 1;
+							end
 							if(&io_din[15:8]) ps2skip <= 1;
 							if(~&io_din[15:8] & ~ps2skip) begin
 								case(byte_cnt)
 									1: ps2_mouse[7:0]   <= io_din[7:0];
 									2: ps2_mouse[15:8]  <= io_din[7:0];
 									3: ps2_mouse[23:16] <= io_din[7:0];
+								endcase
+								case(byte_cnt)
+									1: ps2_mouse_ext[7:0]  <= {io_din[14], io_din[14:8]};
+									2: ps2_mouse_ext[11:8] <= io_din[11:8];
+									3: ps2_mouse_ext[15:12]<= io_din[11:8];
 								endcase
 							end
 						end
@@ -367,8 +376,10 @@ always@(posedge clk_sys) begin
 					'h05: begin
 							if(&io_din[15:8]) ps2skip <= 1;
 							if(~&io_din[15:8] & ~ps2skip) ps2_key_raw[31:0] <= {ps2_key_raw[23:0], io_din[7:0]};
-							kbd_data <= io_din[7:0];
-							kbd_we <= 1;
+							if(PS2DIV) begin
+								kbd_data <= io_din[7:0];
+								kbd_we <= 1;
+							end
 						end
 
 					// reading config string, returning a byte from string
@@ -429,15 +440,18 @@ always@(posedge clk_sys) begin
 					'h1f: io_dout <= {|PS2WE, 2'b01, ps2_kbd_led_status[2], ps2_kbd_led_use[2], ps2_kbd_led_status[1], ps2_kbd_led_use[1], ps2_kbd_led_status[0], ps2_kbd_led_use[0]};
 
 					// reading ps2 keyboard/mouse control
-					'h21: if(byte_cnt == 1) begin
-								io_dout <= kbd_data_host;
-								kbd_rd <= 1;
+					'h21: if(PS2DIV) begin
+								if(byte_cnt == 1) begin
+									io_dout <= kbd_data_host;
+									kbd_rd <= 1;
+								end
+								else
+								if(byte_cnt == 2) begin
+									io_dout <= mouse_data_host;
+									mouse_rd <= 1;
+								end
 							end
-							else
-							if(byte_cnt == 2) begin
-								io_dout <= mouse_data_host;
-								mouse_rd <= 1;
-							end
+
 					//RTC
 					'h22: RTC[(byte_cnt-6'd1)<<4 +:16] <= io_din;
 
@@ -480,62 +494,71 @@ end
 
 
 ///////////////////////////////   PS2   ///////////////////////////////
-reg clk_ps2;
-always @(negedge clk_sys) begin
-	integer cnt;
-	cnt <= cnt + 1'd1;
-	if(cnt == PS2DIV) begin
-		clk_ps2 <= ~clk_ps2;
-		cnt <= 0;
+generate
+	if(PS2DIV) begin
+		reg clk_ps2;
+		always @(negedge clk_sys) begin
+			integer cnt;
+			cnt <= cnt + 1'd1;
+			if(cnt == PS2DIV) begin
+				clk_ps2 <= ~clk_ps2;
+				cnt <= 0;
+			end
+		end
+
+		reg  [7:0] kbd_data;
+		reg        kbd_we;
+		wire [8:0] kbd_data_host;
+		reg        kbd_rd;
+
+		ps2_device keyboard
+		(
+			.clk_sys(clk_sys),
+
+			.wdata(kbd_data),
+			.we(kbd_we),
+
+			.ps2_clk(clk_ps2),
+			.ps2_clk_out(ps2_kbd_clk_out),
+			.ps2_dat_out(ps2_kbd_data_out),
+
+			.ps2_clk_in(ps2_kbd_clk_in  || !PS2WE),
+			.ps2_dat_in(ps2_kbd_data_in || !PS2WE),
+
+			.rdata(kbd_data_host),
+			.rd(kbd_rd)
+		);
+
+		reg  [7:0] mouse_data;
+		reg        mouse_we;
+		wire [8:0] mouse_data_host;
+		reg        mouse_rd;
+
+		ps2_device mouse
+		(
+			.clk_sys(clk_sys),
+
+			.wdata(mouse_data),
+			.we(mouse_we),
+
+			.ps2_clk(clk_ps2),
+			.ps2_clk_out(ps2_mouse_clk_out),
+			.ps2_dat_out(ps2_mouse_data_out),
+
+			.ps2_clk_in(ps2_mouse_clk_in  || !PS2WE),
+			.ps2_dat_in(ps2_mouse_data_in || !PS2WE),
+
+			.rdata(mouse_data_host),
+			.rd(mouse_rd)
+		);
 	end
-end
-
-reg  [7:0] kbd_data;
-reg        kbd_we;
-wire [8:0] kbd_data_host;
-reg        kbd_rd;
-
-ps2_device keyboard
-(
-	.clk_sys(clk_sys),
-
-	.wdata(kbd_data),
-	.we(kbd_we),
-
-	.ps2_clk(clk_ps2),
-	.ps2_clk_out(ps2_kbd_clk_out),
-	.ps2_dat_out(ps2_kbd_data_out),
-
-	.ps2_clk_in(ps2_kbd_clk_in  || !PS2WE),
-	.ps2_dat_in(ps2_kbd_data_in || !PS2WE),
-
-	.rdata(kbd_data_host),
-	.rd(kbd_rd)
-);
-
-reg  [7:0] mouse_data;
-reg        mouse_we;
-wire [8:0] mouse_data_host;
-reg        mouse_rd;
-
-ps2_device mouse
-(
-	.clk_sys(clk_sys),
-
-	.wdata(mouse_data),
-	.we(mouse_we),
-
-	.ps2_clk(clk_ps2),
-	.ps2_clk_out(ps2_mouse_clk_out),
-	.ps2_dat_out(ps2_mouse_data_out),
-
-	.ps2_clk_in(ps2_mouse_clk_in  || !PS2WE),
-	.ps2_dat_in(ps2_mouse_data_in || !PS2WE),
-
-	.rdata(mouse_data_host),
-	.rd(mouse_rd)
-);
-
+	else begin
+		assign ps2_kbd_clk_out = 0;
+		assign ps2_kbd_data_out = 0;
+		assign ps2_mouse_clk_out = 0;
+		assign ps2_mouse_data_out = 0;
+	end
+endgenerate
 
 ///////////////////////////////   DOWNLOADING   ///////////////////////////////
 

@@ -887,7 +887,7 @@ begin
 			if H_CNT = 19-1  then HDE <= '1'; end if;
 			if H_CNT = 275-1 then HDE <= '0'; end if;
 
-			if H_CNT = 297-1 then HSYNC <= '1'; end if;
+			if H_CNT = 298-1 then HSYNC <= '1'; end if;
 			if H_CNT = 320-1 then HSYNC <= '0'; end if;
 
 			if V_CNT = 1               then VDE <= '1'; end if;

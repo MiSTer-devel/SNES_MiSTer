@@ -1171,16 +1171,9 @@ begin
 				
 	MPY <= resize(signed(M7A) * signed(M7B(15 downto 8)), MPY'length);
 	
-	M7_VRAM_X := (resize(signed(M7X), M7_VRAM_X'length) sll 8) + 
-					 (resize(signed(M7A) * signed(ORG_X), M7_VRAM_X'length) and x"FFFFC0") + 
-					 (resize(signed(M7B) * signed(ORG_Y), M7_VRAM_X'length) and x"FFFFC0") + 
-					 (resize(signed(M7B) * M7_SCREEN_Y, M7_VRAM_X'length) and x"FFFFC0") + 
-					 resize(signed(M7A) * M7_SCREEN_X, M7_VRAM_X'length);
-	M7_VRAM_Y := (resize(signed(M7Y), M7_VRAM_Y'length) sll 8) + 
-					 (resize(signed(M7C) * signed(ORG_X), M7_VRAM_Y'length) and x"FFFFC0") + 
-					 (resize(signed(M7D) * signed(ORG_Y), M7_VRAM_Y'length) and x"FFFFC0") + 
-					 (resize(signed(M7D) * M7_SCREEN_Y, M7_VRAM_Y'length) and x"FFFFC0") + 
-					 resize(signed(M7C) * M7_SCREEN_X, M7_VRAM_Y'length);
+	M7_VRAM_X := M7_TEMP_X + resize(signed(M7A) * M7_SCREEN_X, M7_VRAM_X'length);
+	M7_VRAM_Y := M7_TEMP_Y + resize(signed(M7C) * M7_SCREEN_X, M7_VRAM_Y'length);
+
 					 
 	if M7_VRAM_X(23 downto 18) = "000000" and M7_VRAM_Y(23 downto 18) = "000000" then
 		M7_IS_OUTSIDE := '0';
@@ -1215,7 +1208,18 @@ begin
 		M7_TILE_COL <= (others => '0');
 		M7_TILE_OUTSIDE <= '0';
 	elsif rising_edge(CLK) then 
-		if DOT_CLKR_CE = '1' then
+		if ENABLE = '1' and DOT_CLKR_CE = '1' then
+			if H_CNT = LAST_DOT then
+				M7_TEMP_X <= (resize(signed(M7X), M7_TEMP_X'length) sll 8) + 
+								 (resize(signed(M7A) * signed(ORG_X), M7_TEMP_X'length) and x"FFFFC0") + 
+								 (resize(signed(M7B) * signed(ORG_Y), M7_TEMP_X'length) and x"FFFFC0") + 
+								 (resize(signed(M7B) * M7_SCREEN_Y, M7_TEMP_X'length) and x"FFFFC0");
+				M7_TEMP_Y <= (resize(signed(M7Y), M7_TEMP_Y'length) sll 8) + 
+								 (resize(signed(M7C) * signed(ORG_X), M7_TEMP_Y'length) and x"FFFFC0") + 
+								 (resize(signed(M7D) * signed(ORG_Y), M7_TEMP_Y'length) and x"FFFFC0") + 
+								 (resize(signed(M7D) * M7_SCREEN_Y, M7_TEMP_Y'length) and x"FFFFC0");
+			end if;
+
 			M7_TILE_N <= M7_TILE;
 			M7_TILE_COL <= unsigned(M7_VRAM_X(10 downto 8));
 			M7_TILE_ROW <= unsigned(M7_VRAM_Y(10 downto 8));

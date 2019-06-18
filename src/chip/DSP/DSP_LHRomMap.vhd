@@ -145,7 +145,7 @@ begin
 					DSP_A0 <= CA(12);
 				when "101"|"010" =>					-- ExHiROM
 					CART_ADDR <= "0" & (not CA(23)) & CA(21 downto 0);
-					BRAM_ADDR <= CA(19 downto 0);
+					BRAM_ADDR <= "0" & CA(21 downto 16) & CA(12 downto 0);
 					if CA(22 downto 21) = "01" and CA(15 downto 13) = "011" and BSRAM_MASK(10) = '1' then
 						BSRAM_SEL <= '1';
 					end if;

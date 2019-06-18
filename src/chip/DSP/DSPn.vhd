@@ -427,7 +427,7 @@ begin
                     std_logic_vector(unsigned(PC) + ("1"&x"254")) when VER="011" else
                     std_logic_vector(unsigned(PC) + ("1"&x"954"));
 
-	PROG_ROM : entity work.spram_sz generic map(13, 24, 7018, "src/chip/dsp/dsp1b23410_p.mif")
+	PROG_ROM : entity work.spram_sz generic map(13, 24, 7018, "src/chip/DSP/dsp1b23410_p.mif")
 	port map(
 		clock		=> CLK,
 		address	=> PROG_ROM_ADDR,
@@ -435,7 +435,7 @@ begin
 	);
 
 	DATA_ROM_ADDR <= VER(2 downto 1) & (VER(0) or (RP(10) and VER(2))) & RP(9 downto 0);
-	DATA_ROM : entity work.spram_sz generic map(13, 16, 6144, "src/chip/dsp/dsp1b23410_d.mif")
+	DATA_ROM : entity work.spram_sz generic map(13, 16, 6144, "src/chip/DSP/dsp1b23410_d.mif")
 	port map(
 		clock		=> CLK,
 		address	=> DATA_ROM_ADDR,

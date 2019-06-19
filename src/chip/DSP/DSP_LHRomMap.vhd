@@ -123,11 +123,11 @@ begin
 							OBC1_SEL <= MAP_CTRL(7) and MAP_CTRL(6);
 						end if;
 					else
-						BSRAM_SEL <= '0';
 						if CA(22 downto 19) = "1101" and ROMSEL_N = '0' then 								--68-6F/E8-EF:0000-0FFF
-							DP_SEL <= '1';
+							DP_SEL <= not CA(11);
+							BSRAM_SEL <= CA(11);
 						end if;
-						
+
 						if CA(22 downto 19) = "1100" then														--60-67/E0-E7:0000-0001
 							DSP_SEL <= MAP_CTRL(7) and not MAP_CTRL(6);
 						end if;

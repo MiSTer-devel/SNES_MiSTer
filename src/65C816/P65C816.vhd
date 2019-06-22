@@ -498,11 +498,11 @@ begin
 		elsif rising_edge(CLK) then
 			if RDY_IN = '1' and CE = '1' then
 				NMI_ACTIVE <= NMI_SYNC;
-				IRQ_ACTIVE <= not IRQ_N and not P(2);
+				IRQ_ACTIVE <= not IRQ_N;
 				
 				if LAST_CYCLE = '1' and EN = '1' then
 					if GotInterrupt = '0' then
-						GotInterrupt <= IRQ_ACTIVE or NMI_ACTIVE;
+						GotInterrupt <= (IRQ_ACTIVE and not P(2)) or NMI_ACTIVE;
 						NMI_ACTIVE <= '0';
 					else
 						GotInterrupt <= '0';
@@ -510,7 +510,7 @@ begin
 					
 					IsResetInterrupt <= '0';
 					IsNMIInterrupt <= NMI_ACTIVE;
-					IsIRQInterrupt <= IRQ_ACTIVE;
+					IsIRQInterrupt <= IRQ_ACTIVE and not P(2);
 				end if;
 			end if;
 		end if;

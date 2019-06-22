@@ -1482,7 +1482,7 @@ begin
 				OBJ_RANGE_DONE <= '0';
 			end if;
 			
-			if H_CNT = LAST_DOT and V_CNT = LAST_LINE and FORCE_BLANK = '0' then
+			if H_CNT = LAST_DOT and V_CNT = LAST_LINE then
 				OBJ_RANGE_OFL <= '0';
 				OBJ_TIME_OFL <= '0';
 			end if;

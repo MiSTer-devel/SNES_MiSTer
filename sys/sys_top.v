@@ -666,7 +666,7 @@ reg         adj_write;
 reg   [5:0] adj_address;
 reg  [31:0] adj_data;
 
-pll_hdmi_cfg pll_hdmi_cfg
+pll_cfg pll_cfg
 (
 	.mgmt_clk(FPGA_CLK1_50),
 	.mgmt_reset(reset_req),

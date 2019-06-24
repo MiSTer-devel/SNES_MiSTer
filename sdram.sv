@@ -127,12 +127,12 @@ localparam MODE_PRE    = 2'b11;
 
 // initialization 
 reg [1:0] mode;
-reg [4:0] reset=5'h1f;
+reg [4:0] reset = '1;
 always @(posedge clk) begin
 	reg init_old=0;
 	init_old <= init;
 
-	if(init_old & ~init) reset <= 5'h1f;
+	if(init_old & ~init) reset <= '1;
 	else if(state == STATE_LAST) begin
 		if(reset != 0) begin
 			reset <= reset - 5'd1;

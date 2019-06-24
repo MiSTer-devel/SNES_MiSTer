@@ -148,11 +148,65 @@ pll pll
 	.outclk_1(SDRAM_CLK),
 	.outclk_2(CLK_VIDEO),
 	.outclk_3(clk_sys),
+	.reconfig_to_pll(reconfig_to_pll),
+	.reconfig_from_pll(reconfig_from_pll),
 	.locked(clock_locked)
 );
 
-wire reset = RESET | buttons[1] | status[0] | cart_download | bk_loading;
+wire [63:0] reconfig_to_pll;
+wire [63:0] reconfig_from_pll;
+wire        cfg_waitrequest;
+reg         cfg_write;
+reg   [5:0] cfg_address;
+reg  [31:0] cfg_data;
 
+pll_cfg pll_cfg
+(
+	.mgmt_clk(CLK_50M),
+	.mgmt_reset(0),
+	.mgmt_waitrequest(cfg_waitrequest),
+	.mgmt_read(0),
+	.mgmt_readdata(),
+	.mgmt_write(cfg_write),
+	.mgmt_address(cfg_address),
+	.mgmt_writedata(cfg_data),
+	.reconfig_to_pll(reconfig_to_pll),
+	.reconfig_from_pll(reconfig_from_pll)
+);
+
+always @(posedge CLK_50M) begin
+	reg pald = 0, pald2 = 0;
+	reg [2:0] state = 0;
+
+	pald  <= PAL;
+	pald2 <= pald;
+
+	cfg_write <= 0;
+	if(pald2 != pald) state <= 1;
+
+	if(!cfg_waitrequest) begin
+		if(state) state<=state+1'd1;
+		case(state)
+			1: begin
+					cfg_address <= 0;
+					cfg_data <= 0;
+					cfg_write <= 1;
+				end
+			3: begin
+					cfg_address <= 7;
+					cfg_data <= pald2 ? 2201376898 : 2537930535;
+					cfg_write <= 1;
+				end
+			5: begin
+					cfg_address <= 2;
+					cfg_data <= 0;
+					cfg_write <= 1;
+				end
+		endcase
+	end
+end
+
+wire reset = RESET | buttons[1] | status[0] | cart_download | bk_loading;
 
 ////////////////////////////  HPS I/O  //////////////////////////////////
 
@@ -267,7 +321,6 @@ wire       GUN_BTN = status[27];
 wire [1:0] GUN_MODE = status[26:25];
 wire       GSU_TURBO = status[18];
 wire       BLEND = ~status[16];
-wire       PAL = (!status[15:14]) ? rom_region : status[15];
 wire [1:0] mouse_mode = status[6:5];
 wire       joy_swap = status[7];
 wire [2:0] LHRom_type = status[3:1];
@@ -294,12 +347,13 @@ end
 
 //////////////////////////  ROM DETECT  /////////////////////////////////
 
-reg        rom_region = 0;
+reg        PAL;
 reg  [7:0] rom_type;
 reg [23:0] rom_mask, ram_mask;
 always @(posedge clk_sys) begin
 	reg [3:0] rom_size;
 	reg [3:0] ram_size;
+	reg       rom_region = 0;
 
 	if (cart_download) begin
 		if(ioctl_wr) begin
@@ -337,6 +391,9 @@ always @(posedge clk_sys) begin
 			rom_mask <= (24'd1024 << rom_size) - 1'd1;
 			ram_mask <= ram_size ? (24'd1024 << ram_size) - 1'd1 : 24'd0;
 		end
+	end
+	else begin
+		PAL <= (!status[15:14]) ? rom_region : status[15];
 	end
 end
 
@@ -472,7 +529,7 @@ wire[15:0] ROM_Q;
 sdram sdram
 (
 	.*,
-	.init(~clock_locked),
+	.init(0), //~clock_locked),
 	.clk(clk_mem),
 	
 	.addr(cart_download ? ioctl_addr-10'd512 : ROM_ADDR),

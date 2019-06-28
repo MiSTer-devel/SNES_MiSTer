@@ -262,6 +262,7 @@ signal CGRAM_ADDR_INC	: std_logic;
 
 -- COLOR MATH
 signal SUB_COLOR 			: std_logic_vector(14 downto 0);
+signal PREV_MAIN_COLOR		: std_logic_vector(14 downto 0);
 signal SUB_BD 				: std_logic;
 signal MAIN_R				: unsigned(4 downto 0);
 signal MAIN_G				: unsigned(4 downto 0);
@@ -2178,12 +2179,17 @@ begin
 		MAIN_B <= (others => '0');
 		SUB_BD <= '0';
 		SUB_COLOR <= (others => '0');
+		PREV_MAIN_COLOR <= (others => '0');
 	elsif rising_edge(CLK) then 
 		if ENABLE = '1' then
 			if BG_GET_PIXEL = '1' and DOT_CLKR_CE = '1' then
 				WINDOW_X <= GET_PIXEL_X;
 			end if;
-			
+
+			if H_CNT = LAST_DOT and DOT_CLKR_CE = '1' then
+				PREV_MAIN_COLOR <= (others => '0');
+			end if;
+
 			if BG_MATH = '1' then
 				if DOT_CLKF_CE = '1' then
 					if DCM = '1' then
@@ -2198,7 +2204,8 @@ begin
 					else
 						MAIN_COLOR := CGRAM_Q;
 					end if;
-				
+					PREV_MAIN_COLOR <= MAIN_COLOR;
+
 					HALF := CGADSUB(6) and MAIN_EN and not (SUB_BD and CGWSEL(1));
 					SUB_MATH_EN := CGWSEL(1) and not SUB_BD;
 
@@ -2242,9 +2249,9 @@ begin
 						SUB_B <= MATH_B;
 					elsif MATH = '1' and SUB_EN = '1' then
 						if SUB_MATH_EN = '1' then
-							SUB_R <= AddSub(unsigned(SUB_COLOR(4 downto 0) and COLOR_MASK), unsigned(MAIN_COLOR(4 downto 0)), not CGADSUB(7), HALF);
-							SUB_G <= AddSub(unsigned(SUB_COLOR(9 downto 5) and COLOR_MASK), unsigned(MAIN_COLOR(9 downto 5)), not CGADSUB(7), HALF);
-							SUB_B <= AddSub(unsigned(SUB_COLOR(14 downto 10) and COLOR_MASK), unsigned(MAIN_COLOR(14 downto 10)), not CGADSUB(7), HALF);
+							SUB_R <= AddSub(unsigned(SUB_COLOR(4 downto 0) and COLOR_MASK), unsigned(PREV_MAIN_COLOR(4 downto 0)), not CGADSUB(7), HALF);
+							SUB_G <= AddSub(unsigned(SUB_COLOR(9 downto 5) and COLOR_MASK), unsigned(PREV_MAIN_COLOR(9 downto 5)), not CGADSUB(7), HALF);
+							SUB_B <= AddSub(unsigned(SUB_COLOR(14 downto 10) and COLOR_MASK), unsigned(PREV_MAIN_COLOR(14 downto 10)), not CGADSUB(7), HALF);
 						else
 							SUB_R <= AddSub(unsigned(SUB_COLOR(4 downto 0) and COLOR_MASK), unsigned(SUBCOLBD(4 downto 0)), not CGADSUB(7), HALF);
 							SUB_G <= AddSub(unsigned(SUB_COLOR(9 downto 5) and COLOR_MASK), unsigned(SUBCOLBD(9 downto 5)), not CGADSUB(7), HALF);

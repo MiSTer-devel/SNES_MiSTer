@@ -261,8 +261,7 @@ signal CGRAM_ADDR 		: std_logic_vector(7 downto 0);
 signal CGRAM_ADDR_INC	: std_logic;
 
 -- COLOR MATH
-signal SUB_COLOR 			: std_logic_vector(14 downto 0);
-signal PREV_MAIN_COLOR		: std_logic_vector(14 downto 0);
+signal PREV_COLOR			: std_logic_vector(14 downto 0);
 signal SUB_BD 				: std_logic;
 signal MAIN_R				: unsigned(4 downto 0);
 signal MAIN_G				: unsigned(4 downto 0);
@@ -270,6 +269,9 @@ signal MAIN_B				: unsigned(4 downto 0);
 signal SUB_R				: unsigned(4 downto 0);
 signal SUB_G				: unsigned(4 downto 0);
 signal SUB_B				: unsigned(4 downto 0);
+signal SUB_MATH_R			: unsigned(4 downto 0);
+signal SUB_MATH_G			: unsigned(4 downto 0);
+signal SUB_MATH_B			: unsigned(4 downto 0);
 signal HIRES 				: std_logic;
 
 --debug
@@ -1791,9 +1793,9 @@ variable OBJPR0EN,OBJPR1EN,OBJPR2EN,OBJPR3EN : std_logic;
 variable OBJ_PRIO : std_logic_vector(1 downto 0);
 variable win1, win2, win1en, win2en, bglog0, bglog1, winres : std_logic_vector(5 downto 0);
 variable main_dis, sub_dis : std_logic_vector(4 downto 0);
-variable MAIN_EN, SUB_EN, SUB_MATH_EN : std_logic;
+variable MAIN_EN, SUB_EN, SUB_MATH_EN, MATH_EN : std_logic;
 variable DCM, BD, MATH : std_logic;
-variable MAIN_COLOR	: std_logic_vector(14 downto 0);
+variable COLOR	: std_logic_vector(14 downto 0);
 variable COLOR_MASK : std_logic_vector(4 downto 0);
 variable MATH_R, MATH_G, MATH_B	: unsigned(4 downto 0);
 variable HALF : std_logic;
@@ -2178,8 +2180,10 @@ begin
 		MAIN_G <= (others => '0');
 		MAIN_B <= (others => '0');
 		SUB_BD <= '0';
-		SUB_COLOR <= (others => '0');
-		PREV_MAIN_COLOR <= (others => '0');
+		PREV_COLOR <= (others => '0');
+		SUB_MATH_R <= (others => '0');
+		SUB_MATH_G <= (others => '0');
+		SUB_MATH_B <= (others => '0');
 	elsif rising_edge(CLK) then 
 		if ENABLE = '1' then
 			if BG_GET_PIXEL = '1' and DOT_CLKR_CE = '1' then
@@ -2187,25 +2191,16 @@ begin
 			end if;
 
 			if H_CNT = LAST_DOT and DOT_CLKR_CE = '1' then
-				PREV_MAIN_COLOR <= (others => '0');
+				PREV_COLOR <= (others => '0');
 			end if;
 
 			if BG_MATH = '1' then
 				if DOT_CLKF_CE = '1' then
-					if DCM = '1' then
-						SUB_COLOR <= GetDCM(BG1_PIX_DATA(10 downto 0));
-					else
-						SUB_COLOR <= CGRAM_Q;
-					end if;
 					SUB_BD <= BD;
-				elsif DOT_CLKR_CE = '1' then
-					if DCM = '1' then
-						MAIN_COLOR := GetDCM(BG1_PIX_DATA(10 downto 0));
-					else
-						MAIN_COLOR := CGRAM_Q;
-					end if;
-					PREV_MAIN_COLOR <= MAIN_COLOR;
+				end if;
 
+				if DOT_CLKR_CE = '1' then
+					MATH_EN := MATH;
 					HALF := CGADSUB(6) and MAIN_EN and not (SUB_BD and CGWSEL(1));
 					SUB_MATH_EN := CGWSEL(1) and not SUB_BD;
 
@@ -2214,58 +2209,62 @@ begin
 					else
 						COLOR_MASK := "11111";
 					end if;
-				
+				end if;
+
+				if DOT_CLKF_CE = '1' or DOT_CLKR_CE = '1' then
+
+					if DCM = '1' then
+						COLOR := GetDCM(BG1_PIX_DATA(10 downto 0));
+					else
+						COLOR := CGRAM_Q;
+					end if;
+					PREV_COLOR <= COLOR;
+
 					if FORCE_BLANK = '1' then
 						MATH_R := (others => '0');
 						MATH_G := (others => '0');
 						MATH_B := (others => '0');
 					elsif PSEUDOHIRES = '1' and BLEND = '1' then
-						MATH_R := AddSub(unsigned(MAIN_COLOR(4 downto 0) and COLOR_MASK), unsigned(SUB_COLOR(4 downto 0) and COLOR_MASK),  '1', '1');
-						MATH_G := AddSub(unsigned(MAIN_COLOR(9 downto 5) and COLOR_MASK), unsigned(SUB_COLOR(9 downto 5) and COLOR_MASK), '1', '1');
-						MATH_B := AddSub(unsigned(MAIN_COLOR(14 downto 10) and COLOR_MASK), unsigned(SUB_COLOR(14 downto 10) and COLOR_MASK), '1', '1');
-					elsif MATH = '1' and SUB_EN = '1' then
+						MATH_R := AddSub(unsigned(COLOR(4 downto 0) and COLOR_MASK), unsigned(PREV_COLOR(4 downto 0) and COLOR_MASK),  '1', '1');
+						MATH_G := AddSub(unsigned(COLOR(9 downto 5) and COLOR_MASK), unsigned(PREV_COLOR(9 downto 5) and COLOR_MASK), '1', '1');
+						MATH_B := AddSub(unsigned(COLOR(14 downto 10) and COLOR_MASK), unsigned(PREV_COLOR(14 downto 10) and COLOR_MASK), '1', '1');
+					elsif MATH_EN = '1' and SUB_EN = '1' then
 						if SUB_MATH_EN = '1' then
-							MATH_R := AddSub(unsigned(MAIN_COLOR(4 downto 0) and COLOR_MASK), unsigned(SUB_COLOR(4 downto 0)), not CGADSUB(7), HALF);
-							MATH_G := AddSub(unsigned(MAIN_COLOR(9 downto 5) and COLOR_MASK), unsigned(SUB_COLOR(9 downto 5)), not CGADSUB(7), HALF);
-							MATH_B := AddSub(unsigned(MAIN_COLOR(14 downto 10) and COLOR_MASK), unsigned(SUB_COLOR(14 downto 10)), not CGADSUB(7), HALF);
+							MATH_R := AddSub(unsigned(COLOR(4 downto 0) and COLOR_MASK), unsigned(PREV_COLOR(4 downto 0)), not CGADSUB(7), HALF);
+							MATH_G := AddSub(unsigned(COLOR(9 downto 5) and COLOR_MASK), unsigned(PREV_COLOR(9 downto 5)), not CGADSUB(7), HALF);
+							MATH_B := AddSub(unsigned(COLOR(14 downto 10) and COLOR_MASK), unsigned(PREV_COLOR(14 downto 10)), not CGADSUB(7), HALF);
 						else
-							MATH_R := AddSub(unsigned(MAIN_COLOR(4 downto 0) and COLOR_MASK), unsigned(SUBCOLBD(4 downto 0)), not CGADSUB(7), HALF);
-							MATH_G := AddSub(unsigned(MAIN_COLOR(9 downto 5) and COLOR_MASK), unsigned(SUBCOLBD(9 downto 5)), not CGADSUB(7), HALF);
-							MATH_B := AddSub(unsigned(MAIN_COLOR(14 downto 10) and COLOR_MASK), unsigned(SUBCOLBD(14 downto 10)), not CGADSUB(7), HALF);
+							MATH_R := AddSub(unsigned(COLOR(4 downto 0) and COLOR_MASK), unsigned(SUBCOLBD(4 downto 0)), not CGADSUB(7), HALF);
+							MATH_G := AddSub(unsigned(COLOR(9 downto 5) and COLOR_MASK), unsigned(SUBCOLBD(9 downto 5)), not CGADSUB(7), HALF);
+							MATH_B := AddSub(unsigned(COLOR(14 downto 10) and COLOR_MASK), unsigned(SUBCOLBD(14 downto 10)), not CGADSUB(7), HALF);
 						end if;
 					else
-						MATH_R := unsigned(MAIN_COLOR(4 downto 0) and COLOR_MASK);
-						MATH_G := unsigned(MAIN_COLOR(9 downto 5) and COLOR_MASK);
-						MATH_B := unsigned(MAIN_COLOR(14 downto 10) and COLOR_MASK);
+						MATH_R := unsigned(COLOR(4 downto 0) and COLOR_MASK);
+						MATH_G := unsigned(COLOR(9 downto 5) and COLOR_MASK);
+						MATH_B := unsigned(COLOR(14 downto 10) and COLOR_MASK);
 					end if;
-	
-					if FORCE_BLANK = '1' then
-						SUB_R <= (others => '0');
-						SUB_G <= (others => '0');
-						SUB_B <= (others => '0');
-					elsif HIRES = '0' and (PSEUDOHIRES = '0' or BLEND = '1') then
-						SUB_R <= MATH_R;
-						SUB_G <= MATH_G;
-						SUB_B <= MATH_B;
-					elsif MATH = '1' and SUB_EN = '1' then
-						if SUB_MATH_EN = '1' then
-							SUB_R <= AddSub(unsigned(SUB_COLOR(4 downto 0) and COLOR_MASK), unsigned(PREV_MAIN_COLOR(4 downto 0)), not CGADSUB(7), HALF);
-							SUB_G <= AddSub(unsigned(SUB_COLOR(9 downto 5) and COLOR_MASK), unsigned(PREV_MAIN_COLOR(9 downto 5)), not CGADSUB(7), HALF);
-							SUB_B <= AddSub(unsigned(SUB_COLOR(14 downto 10) and COLOR_MASK), unsigned(PREV_MAIN_COLOR(14 downto 10)), not CGADSUB(7), HALF);
-						else
-							SUB_R <= AddSub(unsigned(SUB_COLOR(4 downto 0) and COLOR_MASK), unsigned(SUBCOLBD(4 downto 0)), not CGADSUB(7), HALF);
-							SUB_G <= AddSub(unsigned(SUB_COLOR(9 downto 5) and COLOR_MASK), unsigned(SUBCOLBD(9 downto 5)), not CGADSUB(7), HALF);
-							SUB_B <= AddSub(unsigned(SUB_COLOR(14 downto 10) and COLOR_MASK), unsigned(SUBCOLBD(14 downto 10)), not CGADSUB(7), HALF);
+
+					if DOT_CLKF_CE = '1' then
+						SUB_MATH_R <= MATH_R;
+						SUB_MATH_G <= MATH_G;
+						SUB_MATH_B <= MATH_B;
+					end if;
+
+					if DOT_CLKR_CE = '1' then
+						MAIN_R <= MATH_R;
+						MAIN_G <= MATH_G;
+						MAIN_B <= MATH_B;
+
+						if HIRES = '1' or (PSEUDOHIRES = '1' and BLEND = '0') then
+							SUB_R <= SUB_MATH_R;
+							SUB_G <= SUB_MATH_G;
+							SUB_B <= SUB_MATH_B;
+						else 
+							SUB_R <= MATH_R;
+							SUB_G <= MATH_G;
+							SUB_B <= MATH_B;
 						end if;
-					else
-						SUB_R <= unsigned(SUB_COLOR(4 downto 0) and COLOR_MASK);
-						SUB_G <= unsigned(SUB_COLOR(9 downto 5) and COLOR_MASK);
-						SUB_B <= unsigned(SUB_COLOR(14 downto 10) and COLOR_MASK);
-					end if;
-	
-					MAIN_R <= MATH_R;
-					MAIN_G <= MATH_G;
-					MAIN_B <= MATH_B;
+					end if; 
 				end if;
 			end if;
 		end if;

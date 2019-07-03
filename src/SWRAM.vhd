@@ -39,7 +39,6 @@ end SWRAM;
 architecture rtl of SWRAM is
 
 	signal WMADD : std_logic_vector(23 downto 0);
-	signal WE_N : std_logic;
 	
 	--debug
 	signal DBG_ADDR	: std_logic_vector(23 downto 0);
@@ -56,7 +55,9 @@ begin
 				if PAWR_N = '0' then
 					case PA is
 						when x"80" =>
-							WMADD <= std_logic_vector(unsigned(WMADD) + 1);
+							if RAMSEL_N = '1'  then		--check if DMA use WRAM in ABUS
+								WMADD <= std_logic_vector(unsigned(WMADD) + 1);
+							end if;
 						when x"81" =>
 							WMADD(7 downto 0) <= DI;
 						when x"82" =>
@@ -68,7 +69,9 @@ begin
 				elsif PARD_N = '0' then
 					case PA is
 						when x"80" =>
-							WMADD <= std_logic_vector(unsigned(WMADD) + 1);
+							if RAMSEL_N = '1' then		--check if DMA use WRAM in ABUS
+								WMADD <= std_logic_vector(unsigned(WMADD) + 1);
+							end if;
 						when others => null;
 					end case;
 				end if;
@@ -77,26 +80,27 @@ begin
 	end process;
 	
 	DO <= RAM_Q;
-	RAM_D <= DI;
+	RAM_D <= x"FF" when PA = x"80" and RAMSEL_N = '0' else DI;
 
 	RAM_A 	<= DBG_ADDR(16 downto 0) when ENABLE = '0' else 
-					WMADD(16 downto 0) when PA = x"80" else 
-					CA(16 downto 0);
+					CA(16 downto 0) when RAMSEL_N = '0' else
+					WMADD(16 downto 0);
 					
 	RAM_CE_N <= '0' when ENABLE = '0' else 
+					'0' when RAMSEL_N = '0' else
 					'0' when PA = x"80" else 
-					RAMSEL_N;
+					'1';
 					
 	RAM_OE_N <= '0' when ENABLE = '0' else 
-					PARD_N when PA = x"80" else 
-					CPURD_N;
+					'0' when RAMSEL_N = '0' and CPURD_N = '0' else
+					'0' when PA = x"80" and PARD_N = '0' and RAMSEL_N = '1' else 
+					'1';
 				
-	WE_N	   <= '1' when ENABLE = '0' else
-					PAWR_N when PA = x"80" else 
-					CPUWR_N;
+	RAM_WE_N <= '1' when ENABLE = '0' else
+					'0' when RAMSEL_N = '0' and CPUWR_N = '0' else
+					'0' when PA = x"80" and PAWR_N = '0' and RAMSEL_N = '1' else 
+					'1';
 					
-	RAM_WE_N <= WE_N;
-
 	--debug
 	process( CLK, RST_N, WMADD, RAM_Q, DBG_REG )
 	begin

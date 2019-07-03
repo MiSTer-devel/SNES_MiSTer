@@ -418,7 +418,8 @@ begin
 	RAM_LOAD_EN  <= '1' when RAMST = RAMST_LOAD and RAM_ACCESS_CNT = 0 and RAM_BYTES = RAM_WORD and RAN = '1' else '0';
 	
 	ROM_NEED_WAIT <= '1' when (R14_CHANGE = '1' or MC.ROMWAIT = '1') and (ROMST = ROMST_LOAD or ROMST = ROMST_CACHE or (ROMST = ROMST_FETCH and ROM_ACCESS_CNT /= 0) or RON = '0') else '0';
-	RAM_NEED_WAIT <= '1' when (MC.RAMWAIT = '1' and (RAMST = RAMST_SAVE or RAMST = RAMST_PCF)) or (MC.RAMWAIT = '1' and RAN = '0') or (RAMST = RAMST_LOAD or RAMST = RAMST_RPIX) else '0';
+	RAM_NEED_WAIT <= '1' when (MC.RAMWAIT = '1' and (RAMST = RAMST_SAVE or RAMST = RAMST_PCF or RAN = '0')) or
+									  RAMST = RAMST_LOAD or RAMST = RAMST_CACHE or (RAMST = RAMST_FETCH and RAM_ACCESS_CNT /= 0) or RAMST = RAMST_RPIX else '0';
 	
 	process(CLK, RST_N)
 	begin
@@ -626,7 +627,7 @@ begin
 						ROMST <= ROMST_LOAD;
 					elsif IN_CACHE = '0' and CODE_IN_ROM = '1' and (ROMST = ROMST_IDLE or ROMST = ROMST_LOAD) then
 						ROMST <= ROMST_FETCH;
-					elsif IN_CACHE = '1' and VAL_CACHE = '0' and CODE_IN_ROM = '1' then
+					elsif IN_CACHE = '1' and VAL_CACHE = '0' and CODE_IN_ROM = '1' and ROMST = ROMST_IDLE then
 						ROMST <= ROMST_CACHE;
 					end if;
 				end if;
@@ -782,7 +783,7 @@ begin
 						end if;
 					elsif IN_CACHE = '0' and CODE_IN_RAM = '1' and RAMST = RAMST_IDLE then
 						RAMST <= RAMST_FETCH;
-					elsif IN_CACHE = '1' and VAL_CACHE = '0' and CODE_IN_RAM = '1' then
+					elsif IN_CACHE = '1' and VAL_CACHE = '0' and CODE_IN_RAM = '1' and RAMST = RAMST_IDLE then
 						RAMST <= RAMST_CACHE;
 					elsif CPU_EN = '1' and OP.OP = OP_PLOT and PLOT_EXEC = '1' and (PC0_OFFS_HIT = '0' or PC0_FULL = '1') then
 						PCF_RW <= PC0_FULL;
@@ -1337,6 +1338,7 @@ begin
 		end if;
 		
 	end process;
+	
 
 	
 end rtl;

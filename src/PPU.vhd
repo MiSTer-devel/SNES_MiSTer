@@ -713,7 +713,7 @@ begin
 		MDR1 <= (others => '1');
 		MDR2 <= (others => '1');
 	elsif rising_edge(CLK) then
-		if PARD_N = '0' then
+		if PARD_N = '0' and SYSCLK_CE = '1' then
 			if PA = x"34" or PA = x"35" or PA = x"36" or PA = x"38" or PA = x"39" or PA = x"3A" or PA = x"3E" then
 				MDR1 <= D_OUT;
 			end if;
@@ -724,59 +724,62 @@ begin
 	end if;
 end process;
 
-process( PA, MPY, OAM_ADDR, OAMIO_Q, HOAM_Q, VRAMDATA_Prefetch, OBJ_TIME_OFL, OBJ_RANGE_OFL, 
-			CGADD, CGRAM_Q, OPHCT_latch, OPHCT, OPVCT_latch, OPVCT, FIELD, F_LATCH, EXTLATCH, PAL, MDR1, MDR2, DI)
+process( RST_N, CLK)
 begin 
-	case PA is
-		when x"04" | x"05" | x"06" | x"08" | x"09" | x"0A" | 
-			  x"14" | x"15" | x"16" | x"18" | x"19" | x"1A" | 
-			  x"24" | x"25" | x"26" | x"28" | x"29" =>	
-			D_OUT <= MDR1;
-		when x"34" =>						--MPYL
-			D_OUT <= std_logic_vector(MPY(7 downto 0));
-		when x"35" =>						--MPYM
-			D_OUT <= std_logic_vector(MPY(15 downto 8));
-		when x"36" =>						--MPYH
-			D_OUT <= std_logic_vector(MPY(23 downto 16));
-		when x"38" =>						--RDOAM
-			if OAM_ADDR(9) = '0' then
-				if OAM_ADDR(0) = '0' then
-					D_OUT <= OAMIO_Q(7 downto 0);
+	if RST_N = '0' then
+		D_OUT <= (others => '0');
+	elsif rising_edge(CLK) then
+		case PA is
+			when x"04" | x"05" | x"06" | x"08" | x"09" | x"0A" | 
+				  x"14" | x"15" | x"16" | x"18" | x"19" | x"1A" | 
+				  x"24" | x"25" | x"26" | x"28" | x"29" =>	
+				D_OUT <= MDR1;
+			when x"34" =>						--MPYL
+				D_OUT <= std_logic_vector(MPY(7 downto 0));
+			when x"35" =>						--MPYM
+				D_OUT <= std_logic_vector(MPY(15 downto 8));
+			when x"36" =>						--MPYH
+				D_OUT <= std_logic_vector(MPY(23 downto 16));
+			when x"38" =>						--RDOAM
+				if OAM_ADDR(9) = '0' then
+					if OAM_ADDR(0) = '0' then
+						D_OUT <= OAMIO_Q(7 downto 0);
+					else
+						D_OUT <= OAMIO_Q(15 downto 8);
+					end if;
 				else
-					D_OUT <= OAMIO_Q(15 downto 8);
+					D_OUT <= HOAM_Q;
 				end if;
-			else
-				D_OUT <= HOAM_Q;
-			end if;
-		when x"39" =>						--RDVRAML
-			D_OUT <= VRAMDATA_Prefetch(7 downto 0);
-		when x"3A" =>						--RDVRAMH
-			D_OUT <= VRAMDATA_Prefetch(15 downto 8);
-		when x"3E" =>						--STAT77
-			D_OUT <= OBJ_TIME_OFL & OBJ_RANGE_OFL & "0" & MDR1(4) & x"1";
-		when x"3B" =>						--RDCGRAM
-			if CGADD(0) = '0' then
-				D_OUT <= CGRAM_Q(7 downto 0);
-			else
-				D_OUT <= MDR2(7) & CGRAM_Q(14 downto 8);
-			end if;
-		when x"3C" =>						--OPHCT
-			if OPHCT_latch = '0' then
-				D_OUT <= OPHCT(7 downto 0);
-			else
-				D_OUT <= MDR2(7 downto 1) & OPHCT(8);
-			end if;
-		when x"3D" =>						--OPVCT
-			if OPVCT_latch = '0' then
-				D_OUT <= OPVCT(7 downto 0);
-			else
-				D_OUT <= MDR2(7 downto 1) & OPVCT(8);
-			end if;
-		when x"3F" =>						--STAT78
-			D_OUT <= FIELD & ((not EXTLATCH) or F_LATCH) & MDR2(5) & PAL & x"3";
-		when others =>
-			D_OUT <= DI;
-	end case;
+			when x"39" =>						--RDVRAML
+				D_OUT <= VRAMDATA_Prefetch(7 downto 0);
+			when x"3A" =>						--RDVRAMH
+				D_OUT <= VRAMDATA_Prefetch(15 downto 8);
+			when x"3E" =>						--STAT77
+				D_OUT <= OBJ_TIME_OFL & OBJ_RANGE_OFL & "0" & MDR1(4) & x"1";
+			when x"3B" =>						--RDCGRAM
+				if CGADD(0) = '0' then
+					D_OUT <= CGRAM_Q(7 downto 0);
+				else
+					D_OUT <= MDR2(7) & CGRAM_Q(14 downto 8);
+				end if;
+			when x"3C" =>						--OPHCT
+				if OPHCT_latch = '0' then
+					D_OUT <= OPHCT(7 downto 0);
+				else
+					D_OUT <= MDR2(7 downto 1) & OPHCT(8);
+				end if;
+			when x"3D" =>						--OPVCT
+				if OPVCT_latch = '0' then
+					D_OUT <= OPVCT(7 downto 0);
+				else
+					D_OUT <= MDR2(7 downto 1) & OPVCT(8);
+				end if;
+			when x"3F" =>						--STAT78
+				D_OUT <= FIELD & ((not EXTLATCH) or F_LATCH) & MDR2(5) & PAL & x"3";
+			when others =>
+				D_OUT <= DI;
+		end case;
+	end if;
 end process;
 
 DO <= D_OUT;

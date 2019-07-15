@@ -4,17 +4,17 @@ This is a speedup hack to help reduce or eliminate the notorious slowdown often 
 
 ## WARNING
 
-Use of the CPU Turbo function is outside the normal operation of SNES hardware. <b>Undesirable issues will occur if you use this feature in many games.</b> The following list of games is simply a reference of titles that are known to have slowdown in the SNES library, and how they react with this feature enabled.
+Use of the CPU Turbo function is outside the normal operation of SNES hardware. **Undesirable issues will occur if you use this feature in many games.** The following list of games is simply a reference of titles that are known to have slowdown in the SNES library, and how they react with this feature enabled.
 
 ## Ranking
 
 All games are ranked by how well this feature can remove slowdown, along with whether any bugs are observed, and the severity of any bugs encountered. 
 
-- <b>A</b> - Slowdown either completely removed or greatly reduced, with no apparent negative side effects
-- <b>B</b> - Good speed improvements, but minor issues occur which keep the experience from being perfect
-- <b>C</b> - Slight speed improvements at least. Games may have moderate issues that are not game breaking
-- <b>D</b> - Improves performance but has severe issues and should not be used
-- <b>E</b> - No improvement / Game-breaking issues
+- **A** - Slowdown either completely removed or greatly reduced, with no apparent negative side effects
+- **B** - Good speed improvements, but minor issues occur which keep the experience from being perfect
+- **C** - Slight speed improvements at least. Games may have moderate issues that are not game breaking
+- **D** - Improves performance but has severe issues and should not be used
+- **E** - No improvement / Game-breaking issues
 
 ### Honorary Mentions
 

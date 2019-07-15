@@ -10,3 +10,5 @@ copy *.rbf to root of SD card. Put some ROMs (*.SCF, *.SMC, *.BIN) into SNES fol
 * Cheat engine.
 * Save/Load Backup RAM.
 * Supports mouse.
+* Light gun support via Wiimote, mouse or analog stick.
+* [SuperFX Turbo and CPU Turbo.](https://github.com/MiSTer-devel/SNES_MiSTer/blob/master/SNES_Turbo.md)

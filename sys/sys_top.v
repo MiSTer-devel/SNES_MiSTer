@@ -257,6 +257,7 @@ reg  cfg_set   = 0;
 wire hdmi_limited = cfg[8];
 wire dvi_mode  = cfg[7];
 wire audio_96k = cfg[6];
+wire direct_video = cfg[10];
 `ifndef DUAL_SDRAM
 	wire sog       = cfg[9];
 	wire ypbpr_en  = cfg[5];
@@ -431,7 +432,7 @@ always @(posedge FPGA_CLK2_50) begin
 end
 
 wire clk_100m;
-wire clk_hdmi  = ~HDMI_TX_CLK;  // Internal HDMI clock, inverted in relation to external clock
+wire clk_hdmi;
 wire clk_audio = FPGA_CLK3_50;
 wire clk_pal   = FPGA_CLK3_50;
 
@@ -496,6 +497,7 @@ wire [127:0] vbuf_writedata;
 wire  [15:0] vbuf_byteenable;
 wire         vbuf_write;
 
+wire         hdmi_vs, hdmi_hs;
 ascal 
 #(
 	.RAMBASE(32'h20000000),
@@ -528,8 +530,8 @@ ascal
 	.o_r      (hdmi_data[23:16]),
 	.o_g      (hdmi_data[15:8]),
 	.o_b      (hdmi_data[7:0]),
-	.o_hs     (HDMI_TX_HS),
-	.o_vs     (HDMI_TX_VS),
+	.o_hs     (hdmi_hs),
+	.o_vs     (hdmi_vs),
 	.o_de     (hdmi_de),
 	.o_lltune (lltune),
 	.htotal   (WIDTH + HFP + HBP + HS),
@@ -693,7 +695,7 @@ pll_hdmi pll_hdmi
 	.rst(reset_req),
 	.reconfig_to_pll(reconfig_to_pll),
 	.reconfig_from_pll(reconfig_from_pll),
-	.outclk_0(HDMI_TX_CLK)
+	.outclk_0(clk_hdmi)
 );
 
 //1920x1080@60 PCLK=148.5MHz CEA
@@ -790,6 +792,8 @@ scanlines #(1) HDMI_scanlines
 	.vs(HDMI_TX_VS)
 );
 
+wire [23:0] hdmi_tx_d;
+wire        hdmi_tx_de;
 osd hdmi_osd
 (
 	.clk_sys(clk_sys),
@@ -800,57 +804,106 @@ osd hdmi_osd
 
 	.clk_video(clk_hdmi),
 	.din(hdmi_data_sl),
-	.dout(HDMI_TX_D),
+	.dout(hdmi_tx_d),
 	.de_in(hdmi_de),
-	.de_out(HDMI_TX_DE),
+	.de_out(hdmi_tx_de),
 
 	.osd_status(osd_status)
 );
 
+assign HDMI_TX_CLK = direct_video ? ~clk_vid : ~clk_hdmi ;
+assign HDMI_TX_HS  = direct_video ? dv_hs    : hdmi_hs   ;
+assign HDMI_TX_VS  = direct_video ? dv_vs    : hdmi_vs   ;
+assign HDMI_TX_D   = direct_video ? dv_d     : hdmi_tx_d ;
+assign HDMI_TX_DE  = direct_video ? dv_de    : hdmi_tx_de;
+
+reg [23:0] dv_d;
+reg        dv_hs, dv_vs, dv_de;
+
+always @(posedge clk_vid) begin
+	reg [23:0] dv_d1, dv_d2;
+	reg        dv_de1, dv_de2, dv_hs1, dv_hs2, dv_vs1, dv_vs2;
+	reg [12:0] vsz, vcnt;
+	reg        old_hs, old_vs;
+	reg        vde;
+	reg  [3:0] hss;
+
+	if(ce_pix) begin
+		hss <= (hss << 1) | hs;
+
+		old_hs <= hs;
+		if(~old_hs && hs) begin
+			old_vs <= vs;
+			if(~&vcnt) vcnt <= vcnt + 1'd1;
+			if(~old_vs & vs) vsz <= vcnt;
+			if(old_vs & ~vs) vcnt <= 0;
+			
+			if(vcnt == 1) vde <= 1;
+			if(vcnt == vsz - 3) vde <= 0;
+		end
+
+		dv_de1 <= !{hss,hs} && vde;
+		dv_hs1 <= csync ? (vs ^ hs) : hs;
+		dv_vs1 <= vs;
+	end
+
+	dv_d1  <= vga_o;
+	dv_d2  <= dv_d1;
+	dv_de2 <= dv_de1;
+	dv_hs2 <= dv_hs1;
+	dv_vs2 <= dv_vs1;
+
+	dv_d   <= dv_d2;
+	dv_de  <= dv_de2;
+	dv_hs  <= dv_hs2;
+	dv_vs  <= dv_vs2;
+end
+
+
 /////////////////////////  VGA output  //////////////////////////////////
 
+wire [23:0] vga_data_sl;
+
+scanlines #(0) VGA_scanlines
+(
+	.clk(clk_vid),
+
+	.scanlines(scanlines),
+	.din(de ? {r_out, g_out, b_out} : 24'd0),
+	.dout(vga_data_sl),
+	.hs(hs1),
+	.vs(vs1)
+);
+
+osd vga_osd
+(
+	.clk_sys(clk_sys),
+
+	.io_osd(io_osd_vga),
+	.io_strobe(io_strobe),
+	.io_din(io_din),
+
+	.clk_video(clk_vid),
+	.din(vga_data_sl),
+	.dout(vga_q),
+	.de_in(de)
+);
+
+wire [23:0] vga_q;
+wire [23:0] vga_o;
+
+vga_out vga_out
+(
+	.ypbpr_full(~direct_video),
+	.ypbpr_en(ypbpr_en),
+	.dout(vga_o),
+	.din((vga_scaler & ~direct_video) ? {24{hdmi_tx_de}} & hdmi_tx_d : vga_q)
+);
+
+wire vs1 = (vga_scaler & ~direct_video) ? hdmi_vs : vs;
+wire hs1 = (vga_scaler & ~direct_video) ? hdmi_hs : hs;
+
 `ifndef DUAL_SDRAM
-	wire [23:0] vga_data_sl;
-
-	scanlines #(0) VGA_scanlines
-	(
-		.clk(clk_vid),
-
-		.scanlines(scanlines),
-		.din(de ? {r_out, g_out, b_out} : 24'd0),
-		.dout(vga_data_sl),
-		.hs(hs1),
-		.vs(vs1)
-	);
-
-	osd vga_osd
-	(
-		.clk_sys(clk_sys),
-
-		.io_osd(io_osd_vga),
-		.io_strobe(io_strobe),
-		.io_din(io_din),
-
-		.clk_video(clk_vid),
-		.din(vga_data_sl),
-		.dout(vga_q),
-		.de_in(de)
-	);
-
-	wire [23:0] vga_q;
-	wire [23:0] vga_o;
-
-	vga_out vga_out
-	(
-		.ypbpr_full(1),
-		.ypbpr_en(ypbpr_en),
-		.dout(vga_o),
-		.din(vga_scaler ? {24{HDMI_TX_DE}} & HDMI_TX_D : vga_q)
-	);
-
-	wire vs1 = vga_scaler ? HDMI_TX_VS : vs;
-	wire hs1 = vga_scaler ? HDMI_TX_HS : hs;
-
 	assign VGA_VS = (VGA_EN | SW[3]) ? 1'bZ      : csync ?     1'b1     : ~vs1;
 	assign VGA_HS = (VGA_EN | SW[3]) ? 1'bZ      : csync ? ~(vs1 ^ hs1) : ~hs1;
 	assign VGA_R  = (VGA_EN | SW[3]) ? 6'bZZZZZZ : vga_o[23:18];

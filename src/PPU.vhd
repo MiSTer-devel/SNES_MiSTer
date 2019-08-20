@@ -860,7 +860,7 @@ begin
 			if BGINTERLACE = '1' and FIELD = '0' then
 				VSYNC_HSTART := VSYNC_I_HSTART;
 			else
-				VSYNC_HSTART := (others => '0');
+				VSYNC_HSTART := to_unsigned(298-1,9);
 			end if;
 
 			if OVERSCAN = '1' then

@@ -860,7 +860,7 @@ begin
 			if BGINTERLACE = '1' and FIELD = '0' then
 				VSYNC_HSTART := VSYNC_I_HSTART;
 			else
-				VSYNC_HSTART := to_unsigned(298-1,9);
+				VSYNC_HSTART := HSYNC_START;
 			end if;
 
 			if OVERSCAN = '1' then
@@ -893,8 +893,8 @@ begin
 			if H_CNT = 19-1  then HDE <= '1'; end if;
 			if H_CNT = 275-1 then HDE <= '0'; end if;
 
-			if H_CNT = 298-1 then HSYNC <= '1'; end if;
-			if H_CNT = 320-1 then HSYNC <= '0'; end if;
+			if H_CNT = HSYNC_START then HSYNC <= '1'; end if;
+			if H_CNT = HSYNC_START+24 then HSYNC <= '0'; end if;
 
 			if V_CNT = 1               then VDE <= '1'; end if;
 			if V_CNT = LAST_VIS_LINE+1 then VDE <= '0'; end if;

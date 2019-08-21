@@ -9,10 +9,11 @@ package PPU_PKG is
 	constant LINE_NUM_NTSC: unsigned(8 downto 0) := "100000110"; --262 
 	constant LINE_NUM_PAL: unsigned(8 downto 0) := "100111000"; --312 
 
-	constant LINE_VSYNC_NTSC: unsigned(8 downto 0) := "011101101"; --237 
-	constant LINE_VSYNC_PAL: unsigned(8 downto 0)  := "100000101"; --261 
-	
-	constant VSYNC_I_HSTART: unsigned(8 downto 0) := "010101010"; --170 
+	constant LINE_VSYNC_NTSC: unsigned(8 downto 0) := "011101100"; --236 
+	constant LINE_VSYNC_PAL: unsigned(8 downto 0)  := "100000100"; --260 
+
+	constant HSYNC_START: unsigned(8 downto 0) := "100101000"; --296 
+	constant VSYNC_I_HSTART: unsigned(8 downto 0) := "001111110"; --126 
 
 	constant BG1: integer range 0 to 3 := 0; 
 	constant BG2: integer range 0 to 3 := 1; 

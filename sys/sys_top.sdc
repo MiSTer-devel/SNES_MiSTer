@@ -8,7 +8,7 @@ create_clock -period 10.0 [get_pins -compatibility_mode spi|sclk_out] -name spi_
 derive_pll_clocks
 
 create_generated_clock -source [get_pins -compatibility_mode {pll_hdmi|pll_hdmi_inst|altera_pll_i|*[0].*|divclk}] \
-                       -name HDMI_CLK [get_ports HDMI_TX_CLK] -invert
+                       -name HDMI_CLK [get_ports HDMI_TX_CLK]
 
 
 derive_clock_uncertainty

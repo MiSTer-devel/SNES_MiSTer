@@ -835,7 +835,7 @@ always @(posedge clk_vid) begin
 		if(~old_hs && hs) begin
 			old_vs <= vs;
 			if(~&vcnt) vcnt <= vcnt + 1'd1;
-			if(~old_vs & vs) vsz <= vcnt;
+			if(~old_vs & vs & ~f1) vsz <= vcnt;
 			if(old_vs & ~vs) vcnt <= 0;
 			
 			if(vcnt == 1) vde <= 1;

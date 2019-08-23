@@ -432,7 +432,7 @@ always @(posedge FPGA_CLK2_50) begin
 end
 
 wire clk_100m;
-wire clk_hdmi;
+wire clk_hdmi  = ~HDMI_TX_CLK;  // Internal HDMI clock, inverted in relation to external clock
 wire clk_audio = FPGA_CLK3_50;
 wire clk_pal   = FPGA_CLK3_50;
 
@@ -506,7 +506,7 @@ ascal
 )
 ascal
 (
-	.reset_na (~reset_req),
+	.reset_na (~reset_req & ~direct_video),
 	.run      (1),
 	.freeze   (0),
 
@@ -689,13 +689,14 @@ fbpal fbpal
 
 /////////////////////////  HDMI output  /////////////////////////////////
 
+wire hdmi_tx_clk;
 pll_hdmi pll_hdmi
 (
 	.refclk(FPGA_CLK1_50),
 	.rst(reset_req),
 	.reconfig_to_pll(reconfig_to_pll),
 	.reconfig_from_pll(reconfig_from_pll),
-	.outclk_0(clk_hdmi)
+	.outclk_0(hdmi_tx_clk)
 );
 
 //1920x1080@60 PCLK=148.5MHz CEA
@@ -811,16 +812,9 @@ osd hdmi_osd
 	.osd_status(osd_status)
 );
 
-assign HDMI_TX_CLK = direct_video ? ~clk_vid : ~clk_hdmi ;
-assign HDMI_TX_HS  = direct_video ? dv_hs    : hdmi_hs   ;
-assign HDMI_TX_VS  = direct_video ? dv_vs    : hdmi_vs   ;
-assign HDMI_TX_D   = direct_video ? dv_d     : hdmi_tx_d ;
-assign HDMI_TX_DE  = direct_video ? dv_de    : hdmi_tx_de;
-
 reg [23:0] dv_d;
 reg        dv_hs, dv_vs, dv_de;
-
-always @(posedge clk_vid) begin
+always @(negedge clk_vid) begin
 	reg [23:0] dv_d1, dv_d2;
 	reg        dv_de1, dv_de2, dv_hs1, dv_hs2, dv_vs1, dv_vs2;
 	reg [12:0] vsz, vcnt;
@@ -859,6 +853,11 @@ always @(posedge clk_vid) begin
 	dv_vs  <= dv_vs2;
 end
 
+assign HDMI_TX_CLK = direct_video ? clk_vid : hdmi_tx_clk ;
+assign HDMI_TX_HS  = direct_video ? dv_hs   : hdmi_hs     ;
+assign HDMI_TX_VS  = direct_video ? dv_vs   : hdmi_vs     ;
+assign HDMI_TX_D   = direct_video ? dv_d    : hdmi_tx_d   ;
+assign HDMI_TX_DE  = direct_video ? dv_de   : hdmi_tx_de  ;
 
 /////////////////////////  VGA output  //////////////////////////////////
 

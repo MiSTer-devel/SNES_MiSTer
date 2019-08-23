@@ -857,7 +857,7 @@ begin
 				VSYNC_LINE := LINE_VSYNC_PAL;
 			end if;
 			
-			if BGINTERLACE = '1' and FIELD = '0' then
+			if BGINTERLACE = '1' and FIELD = '1' then
 				VSYNC_HSTART := VSYNC_I_HSTART;
 			else
 				VSYNC_HSTART := HSYNC_START;

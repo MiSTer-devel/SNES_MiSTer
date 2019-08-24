@@ -2,12 +2,14 @@
 module hdmi_config
 (
 	//	Host Side
-	input			iCLK,
-	input			iRST_N,
+	input       iCLK,
+	input       iRST_N,
 	
 	input       dvi_mode,
 	input       audio_96k,
-	input       hdmi_limited,
+	input       limited,
+	input       ypbpr,
+
 	output reg  done,
 
 	//	I2C Side
@@ -105,34 +107,32 @@ wire [15:0] init_data[82] =
 
 	{8'h17, 8'b01100010},   // Aspect ratio 16:9 [1]=1, 4:3 [1]=0
 
-	{8'h18, hdmi_limited,   // CSC enable [7]. 0 - Off. 1 - On.
-	        7'h0D},         // CSC Scaling Factors and Coefficients for RGB Full->Limited.
-	{8'h19, 8'hBC},         // Taken from table in ADV7513 Programming Guide.
-	{8'h1A, 8'h00},         // CSC Channel A.
-	{8'h1B, 8'h00},
-	{8'h1C, 8'h00},
-	{8'h1D, 8'h00},
-	{8'h1E, 8'h01},
+	{8'h18, ypbpr ? 8'h88 : limited ? 8'h8D : 8'h00},         // CSC Scaling Factors and Coefficients for RGB Full->Limited.
+	{8'h19, ypbpr ? 8'h2E : 8'hBC},         // Taken from table in ADV7513 Programming Guide.
+	{8'h1A, ypbpr ? 8'h18 : 8'h00},         // CSC Channel A.
+	{8'h1B, ypbpr ? 8'h93 : 8'h00},
+	{8'h1C, ypbpr ? 8'h1F : 8'h00},
+	{8'h1D, ypbpr ? 8'h3F : 8'h00},
+	{8'h1E, ypbpr ? 8'h08 : 8'h01},
 	{8'h1F, 8'h00},
-	
-	{8'h20, 8'h00},         // CSC Channel B.
-	{8'h21, 8'h00},
-	{8'h22, 8'h0D},
-	{8'h23, 8'hBC},
-	{8'h24, 8'h00},
-	{8'h25, 8'h00},
-	{8'h26, 8'h01},
+
+	{8'h20, ypbpr ? 8'h03 : 8'h00},         // CSC Channel B.
+	{8'h21, ypbpr ? 8'h67 : 8'h00},
+	{8'h22, ypbpr ? 8'h0B : 8'h0D},
+	{8'h23, ypbpr ? 8'h71 : 8'hBC},
+	{8'h24, ypbpr ? 8'h01 : 8'h00},
+	{8'h25, ypbpr ? 8'h28 : 8'h00},
+	{8'h26, ypbpr ? 8'h00 : 8'h01},
 	{8'h27, 8'h00},
-	
-	{8'h28, 8'h00},         // CSC Channel C.
-	{8'h29, 8'h00},
-	{8'h2A, 8'h00},
-	{8'h2B, 8'h00},
-	{8'h2C, 8'h0D},
-	{8'h2D, 8'hBC},
-	{8'h2E, 8'h01},
+
+	{8'h28, ypbpr ? 8'h1E : 8'h00},         // CSC Channel C.
+	{8'h29, ypbpr ? 8'h21 : 8'h00},
+	{8'h2A, ypbpr ? 8'h19 : 8'h00},
+	{8'h2B, ypbpr ? 8'hB2 : 8'h00},
+	{8'h2C, ypbpr ? 8'h08 : 8'h0D},
+	{8'h2D, ypbpr ? 8'h2D : 8'hBC},
+	{8'h2E, ypbpr ? 8'h08 : 8'h01},
 	{8'h2F, 8'h00},
-	
 
 	{8'h3B, 8'b0000_0000},	// Pixel repetition [6:5] b00 AUTO. [4:3] b00 x1 mult of input clock. [2:1] b00 x1 pixel rep to send to HDMI Rx.
 
@@ -152,7 +152,7 @@ wire [15:0] init_data[82] =
 
 	{8'h57, 1'b0,           // [7] IT Content. 0 - No. 1 - Yes (type set in register h59).
 	3'b000,                 // [6:4] Color space (ignored for RGB)
-	hdmi_limited ? 2'b01 : 2'b10, // [3:2] RGB Quantization range
+	(ypbpr | limited) ? 2'b01 : 2'b10, // [3:2] RGB Quantization range
 	2'b00},                 // [1:0] Non-Uniform Scaled: 00 - None. 01 - Horiz. 10 - Vert. 11 - Both.
 
 	16'h7301,

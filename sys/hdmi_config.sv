@@ -7,7 +7,7 @@ module hdmi_config
 	
 	input       dvi_mode,
 	input       audio_96k,
-	input       limited,
+	input [1:0] limited,
 	input       ypbpr,
 
 	output reg  done,
@@ -107,8 +107,8 @@ wire [15:0] init_data[82] =
 
 	{8'h17, 8'b01100010},   // Aspect ratio 16:9 [1]=1, 4:3 [1]=0
 
-	{8'h18, ypbpr ? 8'h88 : limited ? 8'h8D : 8'h00},         // CSC Scaling Factors and Coefficients for RGB Full->Limited.
-	{8'h19, ypbpr ? 8'h2E : 8'hBC},         // Taken from table in ADV7513 Programming Guide.
+	{8'h18, ypbpr ? 8'h88 : limited[0] ? 8'h8D : limited[1] ? 8'h8E : 8'h00},  // CSC Scaling Factors and Coefficients for RGB Full->Limited.
+	{8'h19, ypbpr ? 8'h2E : limited[0] ? 8'hBC : 8'hFE},                     // Taken from table in ADV7513 Programming Guide.
 	{8'h1A, ypbpr ? 8'h18 : 8'h00},         // CSC Channel A.
 	{8'h1B, ypbpr ? 8'h93 : 8'h00},
 	{8'h1C, ypbpr ? 8'h1F : 8'h00},
@@ -118,8 +118,8 @@ wire [15:0] init_data[82] =
 
 	{8'h20, ypbpr ? 8'h03 : 8'h00},         // CSC Channel B.
 	{8'h21, ypbpr ? 8'h67 : 8'h00},
-	{8'h22, ypbpr ? 8'h0B : 8'h0D},
-	{8'h23, ypbpr ? 8'h71 : 8'hBC},
+	{8'h22, ypbpr ? 8'h0B : limited[0] ? 8'h0D : 8'h0E},
+	{8'h23, ypbpr ? 8'h71 : limited[0] ? 8'hBC : 8'hFE},
 	{8'h24, ypbpr ? 8'h01 : 8'h00},
 	{8'h25, ypbpr ? 8'h28 : 8'h00},
 	{8'h26, ypbpr ? 8'h00 : 8'h01},
@@ -129,8 +129,8 @@ wire [15:0] init_data[82] =
 	{8'h29, ypbpr ? 8'h21 : 8'h00},
 	{8'h2A, ypbpr ? 8'h19 : 8'h00},
 	{8'h2B, ypbpr ? 8'hB2 : 8'h00},
-	{8'h2C, ypbpr ? 8'h08 : 8'h0D},
-	{8'h2D, ypbpr ? 8'h2D : 8'hBC},
+	{8'h2C, ypbpr ? 8'h08 : limited[0] ? 8'h0D : 8'h0E},
+	{8'h2D, ypbpr ? 8'h2D : limited[0] ? 8'hBC : 8'hFE},
 	{8'h2E, ypbpr ? 8'h08 : 8'h01},
 	{8'h2F, 8'h00},
 

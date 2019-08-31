@@ -90,7 +90,6 @@ architecture rtl of GSU is
 	signal OPCODE 				: std_logic_vector(7 downto 0);
 	signal OPDATA 				: std_logic_vector(7 downto 0);
 	signal OP_N 				: unsigned(3 downto 0);
-	signal LAST_CYCLE 		: std_logic;
 	signal STATE 				: integer range 0 to 4;
 	signal OP_CYCLES 			: unsigned(2 downto 0);
 	signal OP_CYCLE_CNT 		: unsigned(2 downto 0);
@@ -419,7 +418,8 @@ begin
 	RAM_LOAD_EN  <= '1' when RAMST = RAMST_LOAD and RAM_ACCESS_CNT = 0 and RAM_BYTES = RAM_WORD and RAN = '1' else '0';
 	
 	ROM_NEED_WAIT <= '1' when (R14_CHANGE = '1' or MC.ROMWAIT = '1') and (ROMST = ROMST_LOAD or ROMST = ROMST_CACHE or (ROMST = ROMST_FETCH and ROM_ACCESS_CNT /= 0) or RON = '0') else '0';
-	RAM_NEED_WAIT <= '1' when (MC.RAMWAIT = '1' and (RAMST = RAMST_SAVE or RAMST = RAMST_PCF)) or (MC.RAMWAIT = '1' and RAN = '0') or (RAMST = RAMST_LOAD or RAMST = RAMST_RPIX) else '0';
+	RAM_NEED_WAIT <= '1' when (MC.RAMWAIT = '1' and (RAMST = RAMST_SAVE or RAMST = RAMST_PCF or RAN = '0')) or
+									  RAMST = RAMST_LOAD or RAMST = RAMST_CACHE or (RAMST = RAMST_FETCH and RAM_ACCESS_CNT /= 0) or RAMST = RAMST_RPIX else '0';
 	
 	process(CLK, RST_N)
 	begin
@@ -468,19 +468,19 @@ begin
 				if OP.OP = OP_STOP then
 					OPCODE <= x"01";
 				elsif IN_CACHE = '1' then
-					if LAST_CYCLE = '1' then
+					if MC.LAST_CYCLE = '1' then
 						OPCODE <= BRAM_CACHE_Q_A;
 					else
 						OPDATA <= BRAM_CACHE_Q_A;
 					end if;
 				elsif ROM_FETCH_EN = '1' then
-					if LAST_CYCLE = '1' then
+					if MC.LAST_CYCLE = '1' then
 						OPCODE <= ROM_DI;
 					else
 						OPDATA <= ROM_DI;
 					end if;
 				elsif RAM_FETCH_EN = '1' then
-					if LAST_CYCLE = '1' then
+					if MC.LAST_CYCLE = '1' then
 						OPCODE <= RAM_DI;
 					else
 						OPDATA <= RAM_DI;
@@ -627,7 +627,7 @@ begin
 						ROMST <= ROMST_LOAD;
 					elsif IN_CACHE = '0' and CODE_IN_ROM = '1' and (ROMST = ROMST_IDLE or ROMST = ROMST_LOAD) then
 						ROMST <= ROMST_FETCH;
-					elsif IN_CACHE = '1' and VAL_CACHE = '0' and CODE_IN_ROM = '1' then
+					elsif IN_CACHE = '1' and VAL_CACHE = '0' and CODE_IN_ROM = '1' and ROMST = ROMST_IDLE then
 						ROMST <= ROMST_CACHE;
 					end if;
 				end if;
@@ -783,7 +783,7 @@ begin
 						end if;
 					elsif IN_CACHE = '0' and CODE_IN_RAM = '1' and RAMST = RAMST_IDLE then
 						RAMST <= RAMST_FETCH;
-					elsif IN_CACHE = '1' and VAL_CACHE = '0' and CODE_IN_RAM = '1' then
+					elsif IN_CACHE = '1' and VAL_CACHE = '0' and CODE_IN_RAM = '1' and RAMST = RAMST_IDLE then
 						RAMST <= RAMST_CACHE;
 					elsif CPU_EN = '1' and OP.OP = OP_PLOT and PLOT_EXEC = '1' and (PC0_OFFS_HIT = '0' or PC0_FULL = '1') then
 						PCF_RW <= PC0_FULL;
@@ -796,6 +796,7 @@ begin
 							RAMST <= RAMST_RPIX;
 						end if;
 					end if;
+
 				end if;
 
 				if RAMST /= RAMST_IDLE and RAN = '1' then
@@ -820,16 +821,14 @@ begin
 			OPS.OP;
 			
 	MC <= MC_TBL(OP.MC, STATE);
-	
-	LAST_CYCLE <= MC.STATE(1);
-	
+		
 	process(CLK, RST_N)
 	begin
 		if RST_N = '0' then
 			STATE <= 0;
 		elsif rising_edge(CLK) then
 			if CPU_EN = '1' then
-				if LAST_CYCLE = '0' then
+				if MC.LAST_CYCLE = '0' then
 					STATE <= STATE + 1;
 				else
 					STATE <= 0;
@@ -866,7 +865,7 @@ begin
 				elsif OP.OP = OP_ALT3 then
 					FLAG_ALT1 <= '1';
 					FLAG_ALT2 <= '1';
-				elsif OP.OP /= OP_BRA and LAST_CYCLE = '1' then
+				elsif OP.OP /= OP_BRA and MC.LAST_CYCLE = '1' then
 					FLAG_B <= '0';
 					FLAG_ALT1 <= '0';
 					FLAG_ALT2 <= '0';
@@ -1195,9 +1194,7 @@ begin
 							end if;
 						end if;
 					elsif OP.OP = OP_RPIX and STATE = 0 then
-						if PIX_CACHE(PC1).VALID = x"00" then
-							PCN <= not PCN;
-						end if;
+						PCN <= not PCN;
 					end if;
 				end if;
 				
@@ -1209,9 +1206,6 @@ begin
 						if BPP_CNT = GetLastBPP(SCMR_MD) then
 							BPP_CNT <= (others => '0');
 							PIX_CACHE(PC1).VALID <= (others => '0');
-							if OP.OP = OP_RPIX then
-								PCN <= not PCN;
-							end if;
 						end if;
 					end if;
 				elsif RAMST = RAMST_RPIX and RAM_ACCESS_CNT = 0 and RAN = '1' then
@@ -1344,6 +1338,7 @@ begin
 		end if;
 		
 	end process;
+	
 
 	
 end rtl;

@@ -163,7 +163,7 @@ architecture rtl of SCPU is
 	);
 	signal HDS	: hds_t; 
 
-	signal HDMA_INIT_STEP: unsigned(1 downto 0);
+	signal HDMA_INIT_STEP: std_logic;
 	signal DMA_TRMODE_STEP, HDMA_TRMODE_STEP: unsigned(1 downto 0);
 	signal HDMA_FIRST_INIT : std_logic;
 	type DmaTransMode is array (0 to 7, 0 to 3) of unsigned(1 downto 0);
@@ -228,14 +228,13 @@ architecture rtl of SCPU is
 	--debug
 	signal FRAME_CNT: unsigned(15 downto 0);
 	signal P65_RDY: std_logic;
-	signal DBG_HDMA_CNT: unsigned(7 downto 0);
 
 begin
 
 	DMA_ACTIVE <= DMA_RUN or HDMA_RUN;
 	P65_BANK <= P65_A(23 downto 16);
 
-	process( SPEED, MEMSEL, REFRESHED, CPU_ACTIVEr, TURBO )
+	process( SPEED, MEMSEL, REFRESHED, CPU_ACTIVEr, TURBO, P65_A, P65_BANK )
 	begin
 		CPU_MID_CLOCK <= x"2";
 		DMA_MID_CLOCK <= "011";
@@ -880,7 +879,7 @@ begin
 			HDMA_CH_WORK <= (others => '0');
 			DMA_TRMODE_STEP <= (others => '0');
 			HDMA_TRMODE_STEP <= (others => '0');
-			HDMA_INIT_STEP <= (others => '0');
+			HDMA_INIT_STEP <= '0';
 			HDMA_FIRST_INIT <= '0';
 			DS <= DS_IDLE;
 			HDS <= HDS_IDLE;
@@ -950,12 +949,15 @@ begin
 							end if;
 							
 						when DS_TRANSFER =>
-							case DMAP(DCH)(4 downto 3) is
-								when "00" => A1T(DCH) <= std_logic_vector(unsigned(A1T(DCH)) + 1);
-								when "10" => A1T(DCH) <= std_logic_vector(unsigned(A1T(DCH)) - 1);
-								when others => null;
-							end case;
-							if DAS(DCH) /= x"0000" then
+							if MDMAEN(DCH) = '1' then
+								case DMAP(DCH)(4 downto 3) is
+									when "00" => A1T(DCH) <= std_logic_vector(unsigned(A1T(DCH)) + 1);
+									when "10" => A1T(DCH) <= std_logic_vector(unsigned(A1T(DCH)) - 1);
+									when others => null;
+								end case;
+							end if;
+							
+							if DAS(DCH) /= x"0000" and MDMAEN(DCH) = '1' then
 								DAS(DCH) <= std_logic_vector(unsigned(DAS(DCH)) - 1);
 								DMA_TRMODE_STEP <= DMA_TRMODE_STEP + 1;
 							else
@@ -986,7 +988,6 @@ begin
 							if (HDMA_CH_RUN and HDMAEN) /= x"00" then
 								HDMA_RUN <= '1';
 								HDS <= HDS_PRE_TRANSFER;
-								DBG_HDMA_CNT <= (others => '0'); 
 							end if;
 							HDMA_RUN_EXEC <= '1';
 						elsif H_CNT < 276 and VBLANK = '0' and HDMA_RUN_EXEC = '1' then
@@ -1024,7 +1025,7 @@ begin
 									HDS <= HDS_IDLE;
 								end if;
 							else
-								HDMA_INIT_STEP <= (others => '0');
+								HDMA_INIT_STEP <= '0';
 								HDS <= HDS_INIT_IND;
 							end if;
 							A2A(HCH) <= std_logic_vector(unsigned(A2A(HCH)) + 1);
@@ -1038,13 +1039,15 @@ begin
 								HDS <= HDS_IDLE;
 							end if;
 						end if;	
-						DBG_HDMA_CNT <= DBG_HDMA_CNT + 1; 
 				
 					when HDS_INIT_IND =>
 						DAS(HCH) <= DI & DAS(HCH)(15 downto 8);
-						HDMA_INIT_STEP <= HDMA_INIT_STEP + 1;
+						
 						A2A(HCH) <= std_logic_vector(unsigned(A2A(HCH)) + 1);
-						if HDMA_INIT_STEP(0) = '1' then
+						if HDMA_INIT_STEP = '0' and IsLastHDMACh(HDMA_CH_WORK, HCH) = '1' and HDMA_CH_RUN(HCH) = '0' then
+							HDMA_RUN <= '0';
+							HDS <= HDS_IDLE;
+						elsif HDMA_INIT_STEP = '1' then
 							HDMA_CH_WORK(HCH) <= '0';
 							if IsLastHDMACh(HDMA_CH_WORK, HCH) = '1' then
 								HDMA_RUN <= '0';
@@ -1053,7 +1056,7 @@ begin
 								HDS <= HDS_INIT;
 							end if;
 						end if;
-						DBG_HDMA_CNT <= DBG_HDMA_CNT + 1; 
+						HDMA_INIT_STEP <= not HDMA_INIT_STEP;
 						
 					when HDS_PRE_TRANSFER =>
 						for i in 0 to 7 loop
@@ -1072,7 +1075,6 @@ begin
 							HDMA_CH_WORK <= HDMA_CH_RUN and HDMAEN;
 							HDS <= HDS_INIT;
 						end if;
-						DBG_HDMA_CNT <= DBG_HDMA_CNT + 1; 
 						
 					when HDS_TRANSFER =>
 						HDMA_TRMODE_STEP <= HDMA_TRMODE_STEP + 1;
@@ -1087,11 +1089,10 @@ begin
 							HDMA_CH_WORK(HCH) <= '0';
 							if IsLastHDMACh(HDMA_CH_WORK, HCH) = '1' then
 								HDMA_CH_WORK <= HDMA_CH_RUN and HDMAEN;
-								HDMA_INIT_STEP <= (others => '0');
+								HDMA_INIT_STEP <= '0';
 								HDS <= HDS_INIT;
 							end if;
 						end if;
-						DBG_HDMA_CNT <= DBG_HDMA_CNT + 1; 
 						
 					when others => null;
 				end case;
@@ -1287,7 +1288,6 @@ begin
 					when x"1F" => DBG_DAT <= std_logic_vector(FRAME_CNT(7 downto 0));
 					when x"20" => DBG_DAT <= std_logic_vector(FRAME_CNT(15 downto 8));
 					when x"21" => DBG_DAT <= ENABLE & CPU_ACTIVEr & DMA_ACTIVEr & P65_RDY & REFRESHED & DMA_RUN & HDMA_RUN & P65_EN;
-					when x"22" => DBG_DAT <= std_logic_vector(DBG_HDMA_CNT);
 					when others => DBG_DAT <= x"00";
 				end case;
 			else

@@ -102,12 +102,17 @@ begin
 		BSRAM_SEL <= '0';
 		if ROM_MASK(23) = '0' then
 			case MAP_CTRL(2 downto 0) is
-				when "000" =>							-- LoROM
-					CART_ADDR <= "00" & CA(22 downto 16) & CA(14 downto 0);
+				when "000" =>							-- LoROM/ExLoROM
+					CART_ADDR <= '0' & not CA(23) & CA(22 downto 16) & CA(14 downto 0);
 					BRAM_ADDR <= CA(20 downto 16) & CA(14 downto 0);
 					if MAP_CTRL(3) = '0' then
-						if CA(22 downto 20) = "111" and CA(15) = '0' and ROMSEL_N = '0' and BSRAM_MASK(10) = '1' then
-							BSRAM_SEL <= '1';
+						if CA(22 downto 20) = "111" and ROMSEL_N = '0' and BSRAM_MASK(10) = '1' then
+							if ROM_MASK(20) = '1' or BSRAM_MASK(15) = '1' or MAP_CTRL(7) = '1' then
+								BSRAM_SEL <= not CA(15);
+							else
+								BRAM_ADDR <= CA(19 downto 0);
+								BSRAM_SEL <= '1';
+							end if;
 						end if;
 						if (CA(22 downto 21) = "01" and CA(15) = '1' and ROM_MASK(20) = '0') or		--20-3F/A0-BF:8000-FFFF
 							(CA(22 downto 20) = "110" and CA(15) = '0' and ROM_MASK(20) = '1') then	--60-6F/E0-EF:0000-7FFF
@@ -118,11 +123,11 @@ begin
 							OBC1_SEL <= MAP_CTRL(7) and MAP_CTRL(6);
 						end if;
 					else
-						BSRAM_SEL <= '0';
 						if CA(22 downto 19) = "1101" and ROMSEL_N = '0' then 								--68-6F/E8-EF:0000-0FFF
-							DP_SEL <= '1';
+							DP_SEL <= not CA(11);
+							BSRAM_SEL <= CA(11);
 						end if;
-						
+
 						if CA(22 downto 19) = "1100" then														--60-67/E0-E7:0000-0001
 							DSP_SEL <= MAP_CTRL(7) and not MAP_CTRL(6);
 						end if;
@@ -140,7 +145,7 @@ begin
 					DSP_A0 <= CA(12);
 				when "101"|"010" =>					-- ExHiROM
 					CART_ADDR <= "0" & (not CA(23)) & CA(21 downto 0);
-					BRAM_ADDR <= CA(19 downto 0);
+					BRAM_ADDR <= "0" & CA(21 downto 16) & CA(12 downto 0);
 					if CA(22 downto 21) = "01" and CA(15 downto 13) = "011" and BSRAM_MASK(10) = '1' then
 						BSRAM_SEL <= '1';
 					end if;

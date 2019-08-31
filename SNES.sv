@@ -232,7 +232,7 @@ parameter CONF_STR = {
     "O56,Mouse,None,Port1,Port2;",
     "O7,Swap Joysticks,No,Yes;",
     "OH,Multitap,Disabled,Port2;",
-    "O8,Serial,OFF,SNAC",
+    "O8,Serial,OFF,SNAC;",
     "-;",
     "OPQ,Super Scope,Disabled,Joy1,Joy2,Mouse;",
     "D4OR,Super Scope Btn,Joy,Mouse;",

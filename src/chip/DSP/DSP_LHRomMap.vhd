@@ -7,6 +7,9 @@ use IEEE.STD_LOGIC_UNSIGNED.ALL;
 use IEEE.STD_LOGIC_TEXTIO.all;
 
 entity DSP_LHRomMap is
+	generic (
+		USE_DSPn	: in std_logic := '1'
+	);
 	port(
 		MCLK			: in std_logic;
 		RST_N			: in std_logic;
@@ -188,7 +191,8 @@ begin
 	
 
 	DSP_CS_N <= not DSP_SEL;
-	
+
+	DSPn_BLOCK: if USE_DSPn = '1' generate
 	DSPn : entity work.DSPn
 	port map(
 		CLK			=> MCLK,
@@ -213,7 +217,8 @@ begin
 		DBG_DAT_OUT	=> DBG_DAT_OUT,
 		DBG_DAT_WR	=> DBG_DAT_WR
 	);
-	
+	end generate;
+
 	OBC1 : entity work.OBC1
 	port map(
 		CLK			=> MCLK,

@@ -402,8 +402,8 @@ package DSP_PKG is
 		EM_SUSTAIN
 	);
 	
-	type GaussTbl_t is array(0 to 511) of signed(11 downto 0);
-	constant  GTBL: GaussTbl_t := (
+	type GaussTbl_t is array(0 to 255) of signed(11 downto 0);
+	constant  GTBL_L: GaussTbl_t := (
 	x"000", x"000", x"000", x"000", x"000", x"000", x"000", x"000",
 	x"000", x"000", x"000", x"000", x"000", x"000", x"000", x"000",
 	x"001", x"001", x"001", x"001", x"001", x"001", x"001", x"001",
@@ -435,7 +435,9 @@ package DSP_PKG is
 	x"104", x"107", x"10B", x"10E", x"111", x"114", x"118", x"11B",
 	x"11E", x"122", x"125", x"129", x"12C", x"130", x"133", x"137",
 	x"13A", x"13E", x"141", x"145", x"148", x"14C", x"150", x"153",
-	x"157", x"15B", x"15F", x"162", x"166", x"16A", x"16E", x"172",
+	x"157", x"15B", x"15F", x"162", x"166", x"16A", x"16E", x"172"
+	);
+	constant  GTBL_H: GaussTbl_t := (
 	x"176", x"17A", x"17D", x"181", x"185", x"189", x"18D", x"191",--
 	x"195", x"19A", x"19E", x"1A2", x"1A6", x"1AA", x"1AE", x"1B2",
 	x"1B7", x"1BB", x"1BF", x"1C3", x"1C8", x"1CC", x"1D0", x"1D5",

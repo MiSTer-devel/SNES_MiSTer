@@ -189,13 +189,22 @@ architecture rtl of DSP is
 	signal RAM_OE 			: std_logic;
 	signal RAM_CE 			: std_logic;
 	
+	signal GTBL_L_S			: GaussTbl_t := GTBL_L;
+	signal GTBL_H_S			: GaussTbl_t := GTBL_H;
+	signal GTBL_POS_A		: unsigned(7 downto 0);
+	signal GTBL_POS_B		: unsigned(7 downto 0);
+	signal GTBL_L_Q_A       : signed(11 downto 0);
+	signal GTBL_L_Q_B       : signed(11 downto 0);
+	signal GTBL_H_Q_A       : signed(11 downto 0);
+	signal GTBL_H_Q_B       : signed(11 downto 0);
+
 	--debug
 	signal DBG_ADDR		: std_logic_vector(15 downto 0);
 	signal DBG_DAT_WRr	: std_logic;
 	signal DBG_VMUTE 		: std_logic_vector(7 downto 0) := (others => '0');
 
 begin
-	
+
 	MCLK_FREQ <= MCLK_PAL_FREQ when PAL = '1' else MCLK_NTSC_FREQ;
 	
 	CEGen : entity work.CEGen
@@ -243,13 +252,12 @@ begin
 				  '1' 		 when REGN_WR(3 downto 1) = "100" and SUBSTEP = 0 else
 				  '0';
 
-	REGS_DO <= REGRAM(to_integer(unsigned(REGS_ADDR_RD)));
-	
 	process(CLK, RST_N)
 	begin
 		if RST_N = '0' then
-			REGRAM <= (others=>(others=>'0'));
+			REGS_DO <= (others=>'0');
 		elsif rising_edge(CLK) then
+			REGS_DO <= REGRAM(to_integer(unsigned(REGS_ADDR_RD)));
 			if ENABLE = '1' and CE = '1' then
 				if REGS_WE = '1' then
 					REGRAM(to_integer(unsigned(REGS_ADDR_WR))) <= REGS_DI;
@@ -546,6 +554,19 @@ begin
 		end if;
 	end process;
 
+	process( RST_N, CLK )
+		variable GTBL_POS: unsigned(7 downto 0);
+	begin
+		if rising_edge(CLK) then
+			GTBL_POS := unsigned(INTERP_POS(INS.V)(11 downto 4));
+			GTBL_POS_A <= GTBL_POS;
+			GTBL_POS_B <= not GTBL_POS;
+			GTBL_L_Q_A <= GTBL_L(to_integer(GTBL_POS_A));
+			GTBL_L_Q_B <= GTBL_L(to_integer(GTBL_POS_B));
+			GTBL_H_Q_A <= GTBL_H(to_integer(GTBL_POS_A));
+			GTBL_H_Q_B <= GTBL_H(to_integer(GTBL_POS_B));
+		end if;
+	end process;
 
 	process(CLK, RST_N)
 		variable GSUM, OUT_TEMP : signed(15 downto 0);
@@ -553,7 +574,6 @@ begin
 		variable VOL_TEMP : signed(16 downto 0);
 		variable BB_POS : unsigned(3 downto 0);
 		variable NEW_INTERP_POS : unsigned(15 downto 0);
-		variable GTBL_POS : unsigned(7 downto 0);
 		variable ENV_TEMP, ENV_TEMP2 : signed(12 downto 0);
 		variable ENV_RATE : unsigned(4 downto 0);
 		variable GAIN_MODE : unsigned(2 downto 0);
@@ -685,12 +705,11 @@ begin
 						
 					when IS_ENV2 =>							
 						BB_POS := "0" & unsigned(INTERP_POS(INS.V)(14 downto 12));
-						GTBL_POS := unsigned(INTERP_POS(INS.V)(11 downto 4));
 
-						SUM012 := resize( shift_right((GTBL(to_integer("0" & not GTBL_POS)) * BRR_BUF(INS.V)(to_integer(BB_POS + 0))), 11), 17 ) + 
-									 resize( shift_right((GTBL(to_integer("1" & not GTBL_POS)) * BRR_BUF(INS.V)(to_integer(BB_POS + 1))), 11), 17 ) + 
-									 resize( shift_right((GTBL(to_integer("1" &     GTBL_POS)) * BRR_BUF(INS.V)(to_integer(BB_POS + 2))), 11), 17 );
-						SUM3   := resize( shift_right((GTBL(to_integer("0" &     GTBL_POS)) * BRR_BUF(INS.V)(to_integer(BB_POS + 3))), 11), 17 );
+						SUM012 := resize( shift_right((GTBL_L_Q_B * BRR_BUF(INS.V)(to_integer(BB_POS + 0))), 11), 17 ) + 
+									 resize( shift_right((GTBL_H_Q_B * BRR_BUF(INS.V)(to_integer(BB_POS + 1))), 11), 17 ) + 
+									 resize( shift_right((GTBL_H_Q_A * BRR_BUF(INS.V)(to_integer(BB_POS + 2))), 11), 17 );
+						SUM3   := resize( shift_right((GTBL_L_Q_A * BRR_BUF(INS.V)(to_integer(BB_POS + 3))), 11), 17 );
 						GSUM := CLAMP16( resize(SUM012(15)&SUM012(15 downto 0) + SUM3, 17) );
 						
 						if TNON(INS.V) = '0' then

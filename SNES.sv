@@ -118,7 +118,6 @@ module emu
 );
 
 assign ADC_BUS  = 'Z;
-assign USER_OUT = '1;
 assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 
 assign AUDIO_S   = 1;
@@ -233,6 +232,7 @@ parameter CONF_STR = {
     "O56,Mouse,None,Port1,Port2;",
     "O7,Swap Joysticks,No,Yes;",
     "OH,Multitap,Disabled,Port2;",
+    "O8,Serial,OFF,SNAC;",
     "-;",
     "OPQ,Super Scope,Disabled,Joy1,Joy2,Mouse;",
     "D4OR,Super Scope Btn,Joy,Mouse;",
@@ -466,14 +466,14 @@ main main
 	.HSYNC(HSYNC),
 	.VSYNC(VSYNC),
 
-	.JOY1_DI(JOY1_DO),
-	.JOY2_DI(GUN_MODE ? LG_DO : JOY2_DO),
+	.JOY1_DI(JOY1_DI),
+	.JOY2_DI(GUN_MODE ? LG_DO : JOY2_DI),
 	.JOY_STRB(JOY_STRB),
 	.JOY1_CLK(JOY1_CLK),
 	.JOY2_CLK(JOY2_CLK),
 	.JOY1_P6(JOY1_P6),
 	.JOY2_P6(JOY2_P6),
-	.JOY2_P6_in(LG_P6_out | !GUN_MODE),
+	.JOY2_P6_in(JOY2_P6_DI),
 
 	.GG_EN(status[24]),
 	.GG_CODE(gg_code),
@@ -706,7 +706,7 @@ ioport port1
 	.PORT_P6(JOY1_P6),
 	.PORT_DO(JOY1_DO),
 
-	.JOYSTICK1(joy_swap ? joy1 : joy0),
+	.JOYSTICK1((joy_swap ^ raw_serial) ? joy1 : joy0),
 
 	.MOUSE(ps2_mouse),
 	.MOUSE_EN(mouse_mode[0])
@@ -726,7 +726,7 @@ ioport port2
 	.PORT_P6(JOY2_P6),
 	.PORT_DO(JOY2_DO),
 
-	.JOYSTICK1(joy_swap ? joy0 : joy1),
+	.JOYSTICK1((joy_swap ^ raw_serial) ? joy0 : joy1),
 	.JOYSTICK2(joy2),
 	.JOYSTICK3(joy3),
 	.JOYSTICK4(joy4),
@@ -768,6 +768,44 @@ lightgun lightgun
 	.PORT_P6(LG_P6_out),
 	.PORT_DO(LG_DO)
 );
+
+// Indexes:
+// 0 = D+    = Latch
+// 1 = D-    = CLK
+// 2 = TX-   = P5
+// 3 = GND_d
+// 4 = RX+   = P6
+// 5 = RX-   = P4
+
+wire raw_serial = status[8];
+
+assign USER_OUT[2] = 1'b1;
+assign USER_OUT[3] = 1'b1;
+assign USER_OUT[5] = 1'b1;
+
+// JOYX_DO[0] is P4, JOYX_DO[1] is P5
+wire [1:0] JOY1_DI;
+wire [1:0] JOY2_DI;
+wire JOY2_P6_DI;
+
+always_comb begin
+	if (raw_serial) begin
+		USER_OUT[0] = JOY_STRB;
+		USER_OUT[1] = joy_swap ? ~JOY2_CLK : ~JOY1_CLK;
+		USER_OUT[4] = joy_swap ? JOY2_P6 : JOY1_P6;
+		JOY1_DI = joy_swap ? JOY1_DO : {USER_IN[2], USER_IN[5]};
+		JOY2_DI = joy_swap ? {USER_IN[2], USER_IN[5]} : JOY2_DO;
+		JOY2_P6_DI = joy_swap ? USER_IN[4] : (LG_P6_out | !GUN_MODE);
+	end else begin
+		USER_OUT[0] = 1'b1;
+		USER_OUT[1] = 1'b1;
+		USER_OUT[4] = 1'b1;
+		JOY1_DI = JOY1_DO;
+		JOY2_DI = JOY2_DO;
+		JOY2_P6_DI = (LG_P6_out | !GUN_MODE);
+	end
+end
+
 
 /////////////////////////  STATE SAVE/LOAD  /////////////////////////////
 

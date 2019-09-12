@@ -788,6 +788,7 @@ wire raw_serial = status[8];
 assign USER_OUT[2] = 1'b1;
 assign USER_OUT[3] = 1'b1;
 assign USER_OUT[5] = 1'b1;
+assign USER_OUT[6] = 1'b1;
 
 // JOYX_DO[0] is P4, JOYX_DO[1] is P5
 wire [1:0] JOY1_DI;

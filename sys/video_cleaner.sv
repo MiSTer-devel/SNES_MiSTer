@@ -49,8 +49,9 @@ always @(posedge clk_vid) begin
 	if(ce_pix) begin
 		HBlank_out <= hbl;
 
-		VGA_VS <= vs;
 		VGA_HS <= hs;
+		if(~VGA_HS & hs) VGA_VS <= vs;
+
 		VGA_R  <= R;
 		VGA_G  <= G;
 		VGA_B  <= B;

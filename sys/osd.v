@@ -143,6 +143,7 @@ always @(posedge clk_video) begin
 	reg [21:0] osd_hcnt;
 	reg        osd_de1,osd_de2;
 	reg  [1:0] osd_en;
+	reg        f1;
 
 	if(ce_pix) begin
 
@@ -168,28 +169,31 @@ always @(posedge clk_video) begin
 
 			if(h_cnt > {dsp_width, 2'b00}) begin
 				v_cnt <= 1;
+				f1 <= ~f1; // skip every other frame for interlace compatibility.
+				if(~f1) begin
 
-				osd_en <= (osd_en << 1) | osd_enable;
-				if(~osd_enable) osd_en <= 0;
+					osd_en <= (osd_en << 1) | osd_enable;
+					if(~osd_enable) osd_en <= 0;
 
-				if(v_cnt_below320) begin
-					multiscan <= 0;
-					v_osd_start <= info ? infoy : v_osd_start_320;
-				end
-				else if(v_cnt_below640) begin
-					multiscan <= 1;
-					v_osd_start <= info ? (infoy<<1) : v_osd_start_640;
-				end
-				else if(v_cnt_below960) begin
-					multiscan <= 2;
-					v_osd_start <= info ? (infoy + (infoy << 1)) : v_osd_start_960;
-				end
-				else begin
-					multiscan <= 3;
-					v_osd_start <= info ? (infoy<<2) : v_osd_start_other;
+					if(v_cnt_below320) begin
+						multiscan <= 0;
+						v_osd_start <= info ? infoy : v_osd_start_320;
+					end
+					else if(v_cnt_below640) begin
+						multiscan <= 1;
+						v_osd_start <= info ? (infoy<<1) : v_osd_start_640;
+					end
+					else if(v_cnt_below960) begin
+						multiscan <= 2;
+						v_osd_start <= info ? (infoy + (infoy << 1)) : v_osd_start_960;
+					end
+					else begin
+						multiscan <= 3;
+						v_osd_start <= info ? (infoy<<2) : v_osd_start_other;
+					end
 				end
 			end
-			
+
 			osd_div <= osd_div + 1'd1;
 			if(osd_div == multiscan) begin
 				osd_div <= 0;
@@ -211,7 +215,7 @@ assign dout = rdout;
 reg [23:0] osd_rdout, normal_rdout;
 reg osd_mux;
 reg de_dly;
-									 
+
 always @(posedge clk_video) begin
 	normal_rdout <= din;
 	osd_rdout <= {{osd_pixel, osd_pixel, OSD_COLOR[2], din[23:19]},// 23:16

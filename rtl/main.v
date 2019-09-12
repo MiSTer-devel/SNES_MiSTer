@@ -30,6 +30,7 @@ module main (
    output            WRAM_CE_N,
    output            WRAM_OE_N,
    output            WRAM_WE_N,
+   output            WRAM_RD_N,
 
    output     [15:0] VRAM1_ADDR,
    input       [7:0] VRAM1_DI,
@@ -154,6 +155,7 @@ SNES SNES
 	.wsram_ce_n(WRAM_CE_N),
 	.wsram_oe_n(WRAM_OE_N),
 	.wsram_we_n(WRAM_WE_N),
+	.wsram_rd_n(WRAM_RD_N),
 
 	.vram_addra(VRAM1_ADDR),
 	.vram_addrb(VRAM2_ADDR),

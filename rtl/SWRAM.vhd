@@ -19,6 +19,9 @@ entity SWRAM is
 		PARD_N		: in std_logic;
 		PAWR_N		: in std_logic;
 
+		CPURD_CYC_N		: in std_logic;
+		PARD_CYC_N		: in std_logic;
+
 		DI				: in std_logic_vector(7 downto 0);
 		DO				: out std_logic_vector(7 downto 0);
 		
@@ -27,7 +30,8 @@ entity SWRAM is
 		RAM_Q 		: in  std_logic_vector(7 downto 0);
 		RAM_WE_N		: out std_logic;
 		RAM_CE_N		: out std_logic;
-		RAM_OE_N		: out std_logic
+		RAM_OE_N		: out std_logic;
+		RAM_RD_N		: out std_logic
 	);
 end SWRAM;
 
@@ -85,7 +89,12 @@ begin
 					'0' when RAMSEL_N = '0' and CPURD_N = '0' else
 					'0' when PA = x"80" and PARD_N = '0' and RAMSEL_N = '1' else 
 					'1';
-				
+
+	RAM_RD_N <= '0' when ENABLE = '0' else 
+					'0' when RAMSEL_N = '0' and CPURD_CYC_N = '0' else
+					'0' when PA = x"80" and PARD_CYC_N = '0' and RAMSEL_N = '1' else 
+					'1';
+
 	RAM_WE_N <= '1' when ENABLE = '0' else
 					'0' when RAMSEL_N = '0' and CPUWR_N = '0' else
 					'0' when PA = x"80" and PAWR_N = '0' and RAMSEL_N = '1' else 

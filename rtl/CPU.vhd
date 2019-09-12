@@ -13,7 +13,10 @@ entity SCPU is
 		CA       		: out std_logic_vector(23 downto 0);
 		CPURD_N			: out std_logic;
 		CPUWR_N			: out std_logic;
-		
+
+		CPURD_CYC_N     : out std_logic;
+		PARD_CYC_N      : out std_logic;
+
 		PA					: out std_logic_vector(7 downto 0);
 		PARD_N			: out std_logic;
 		PAWR_N			: out std_logic;
@@ -94,6 +97,8 @@ architecture rtl of SCPU is
 	signal DMA_B, HDMA_B : std_logic_vector(7 downto 0);
 	signal DMA_A_WR, HDMA_A_WR, DMA_A_RD, HDMA_A_RD : std_logic;
 	signal DMA_B_WR, DMA_B_RD, HDMA_B_WR, HDMA_B_RD	: std_logic;
+	signal DMA_A_WR_CYC, HDMA_A_WR_CYC, DMA_A_RD_CYC, HDMA_A_RD_CYC : std_logic;
+	signal DMA_B_WR_CYC, DMA_B_RD_CYC, HDMA_B_WR_CYC, HDMA_B_RD_CYC	: std_logic;
 
 	-- CPU IO Registers
 	signal MDR : std_logic_vector(7 downto 0);
@@ -478,7 +483,31 @@ begin
 	CPURD_N <= INT_CPURD_N;
 	CPUWR_N <= INT_CPUWR_N; 
 
-	
+	process(P65_A, EN, P65_R_WN, DMA_RUN, HDMA_RUN, P65_EN,
+		DMA_A_RD_CYC, DMA_B_RD_CYC, HDMA_A_RD_CYC, HDMA_B_RD_CYC)
+	begin
+		-- Read signal for a full clock cycle
+		if HDMA_RUN = '1' and EN = '1' then
+			PARD_CYC_N <= not HDMA_B_RD_CYC;
+		elsif DMA_RUN = '1' and EN = '1' then
+			PARD_CYC_N <= not DMA_B_RD_CYC;
+		elsif P65_A(22) = '0' and P65_A(15 downto 8) = x"21" and P65_EN = '1' then
+			PARD_CYC_N <= not P65_R_WN;
+		else
+			PARD_CYC_N <= '1';
+		end if;
+
+		if HDMA_RUN = '1' and EN = '1' then
+			CPURD_CYC_N <= not HDMA_A_RD_CYC;
+		elsif DMA_RUN = '1' and EN = '1' then
+			CPURD_CYC_N <= not DMA_A_RD_CYC;
+		elsif P65_EN = '1' then
+			CPURD_CYC_N <= not P65_R_WN;
+		else
+			CPURD_CYC_N <= '1';
+		end if;
+	end process;
+
 	--IO Registers
 	IO_SEL <= '1' when P65_EN = '1' and P65_A(22) = '0' and P65_A(15 downto 10) = "010000" and (P65_VPA = '1' or P65_VDA = '1') else '0';	--$00-$3F/$80-$BF:$4000-$43FF
 
@@ -1153,6 +1182,35 @@ begin
 				 (others => '1');
 	HDMA_B <= std_logic_vector( unsigned(BBAD(HCH)) + DMA_TRMODE_TAB(to_integer(unsigned(DMAP(HCH)(2 downto 0))),to_integer(HDMA_TRMODE_STEP)) ) when HDS = HDS_TRANSFER else (others => '1');
 
+	process( DS, HDS, DMAP, DCH, HCH )
+	begin
+		DMA_A_WR_CYC <= '0';
+		DMA_A_RD_CYC <= '0';
+		DMA_B_WR_CYC <= '0';
+		DMA_B_RD_CYC <= '0';
+
+		if DS = DS_TRANSFER then
+			DMA_A_WR_CYC <= DMAP(DCH)(7);
+			DMA_A_RD_CYC <= not DMAP(DCH)(7);
+			DMA_B_WR_CYC <= not DMAP(DCH)(7);
+			DMA_B_RD_CYC <= DMAP(DCH)(7);
+		end if;
+
+		HDMA_A_WR_CYC <= '0';
+		HDMA_A_RD_CYC <= '0';
+		HDMA_B_WR_CYC <= '0';
+		HDMA_B_RD_CYC <= '0';
+
+		if HDS = HDS_TRANSFER then
+			HDMA_A_WR_CYC <= DMAP(HCH)(7);
+			HDMA_A_RD_CYC <= not DMAP(HCH)(7);
+			HDMA_B_WR_CYC <= not DMAP(HCH)(7);
+			HDMA_B_RD_CYC <= DMAP(HCH)(7);
+		elsif (HDS = HDS_INIT or HDS = HDS_INIT_IND) then
+			HDMA_A_RD_CYC <= '1';
+		end if;
+	end process;
+
 	process( RST_N, CLK )
 	begin
 		if RST_N = '0' then
@@ -1166,11 +1224,11 @@ begin
 			HDMA_B_RD <= '0';	
 		elsif rising_edge(CLK) then
 			if EN = '1' then
-				if DS = DS_TRANSFER and INT_CLKR_CE = '1' then
-					DMA_A_WR <= DMAP(DCH)(7);
-					DMA_A_RD <= not DMAP(DCH)(7);
-					DMA_B_WR <= not DMAP(DCH)(7);
-					DMA_B_RD <= DMAP(DCH)(7);
+				if INT_CLKR_CE = '1' then
+					DMA_A_WR <= DMA_A_WR_CYC;
+					DMA_A_RD <= DMA_A_RD_CYC;
+					DMA_B_WR <= DMA_B_WR_CYC;
+					DMA_B_RD <= DMA_B_RD_CYC;
 				elsif INT_CLKF_CE = '1' then
 					DMA_A_WR <= '0';
 					DMA_A_RD <= '0';
@@ -1178,16 +1236,11 @@ begin
 					DMA_B_RD <= '0';
 				end if;
 				
-				if HDS = HDS_TRANSFER and INT_CLKR_CE = '1' then
-					HDMA_A_WR <= DMAP(HCH)(7);
-					HDMA_A_RD <= not DMAP(HCH)(7);
-					HDMA_B_WR <= not DMAP(HCH)(7);
-					HDMA_B_RD <= DMAP(HCH)(7);
-				elsif (HDS = HDS_INIT or HDS = HDS_INIT_IND) and INT_CLKR_CE = '1' then
-					HDMA_A_WR <= '0';
-					HDMA_A_RD <= '1';
-					HDMA_B_WR <= '0';
-					HDMA_B_RD <= '0';
+				if INT_CLKR_CE = '1' then
+					HDMA_A_WR <= HDMA_A_WR_CYC;
+					HDMA_A_RD <= HDMA_A_RD_CYC;
+					HDMA_B_WR <= HDMA_B_WR_CYC;
+					HDMA_B_RD <= HDMA_B_RD_CYC;
 				elsif INT_CLKF_CE = '1' then
 					HDMA_A_WR <= '0';
 					HDMA_A_RD <= '0';

@@ -16,5 +16,6 @@ set_global_assignment -name VHDL_FILE bram.vhd
 set_global_assignment -name SYSTEMVERILOG_FILE sdram.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ioport.sv
 set_global_assignment -name SYSTEMVERILOG_FILE lightgun.sv
+set_global_assignment -name SYSTEMVERILOG_FILE LLIO.sv
 set_global_assignment -name SDC_FILE SNES.sdc
 set_global_assignment -name SYSTEMVERILOG_FILE SNES.sv

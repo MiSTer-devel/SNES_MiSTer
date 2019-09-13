@@ -200,7 +200,7 @@ always @(posedge FPGA_CLK2_50) begin
 		if(&deb_user) btn_user <= 1;
 		if(!deb_user) btn_user <= 0;
 
-		deb_osd <= {deb_osd[6:0], btn_o | ~KEY[0]};
+		deb_osd <= {deb_osd[6:0], btn_o | osd_trigger | ~KEY[0]};
 		if(&deb_osd) btn_osd <= 1;
 		if(!deb_osd) btn_osd <= 0;
 	end
@@ -1081,6 +1081,7 @@ wire        uart_rts;
 wire        uart_rxd;
 wire        uart_txd;
 wire        osd_status;
+wire        osd_trigger;
 
 wire  [6:0] user_out, user_in;
 
@@ -1172,6 +1173,7 @@ emu emu
 	.USER_OUT(user_out),
 	.USER_IN(user_in),
 
+	.OSD_TRIGGER(osd_trigger),
 	.OSD_STATUS(osd_status)
 );
 

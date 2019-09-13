@@ -119,6 +119,7 @@ module emu
 	input   [6:0] USER_IN,
 	output  [6:0] USER_OUT,
 
+	output        OSD_TRIGGER,
 	input         OSD_STATUS
 );
 
@@ -128,8 +129,8 @@ assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 assign AUDIO_S   = 1;
 assign AUDIO_MIX = status[20:19];
 
-assign LED_USER  = cart_download | (status[23] & bk_pending);
-assign LED_DISK  = 0;
+assign LED_USER  = cart_download | (status[23] & bk_pending) | llio_en;
+assign LED_DISK  = |llio_buttons;
 assign LED_POWER = 0;
 assign BUTTONS   = 0;
 
@@ -239,6 +240,7 @@ parameter CONF_STR = {
     "O7,Swap Joysticks,No,Yes;",
     "OH,Multitap,Disabled,Port2;",
     "O8,Serial,OFF,SNAC;",
+    "OL,Serial2,OFF,LLAPI;",
     "-;",
     "OPQ,Super Scope,Disabled,Joy1,Joy2,Mouse;",
     "D4OR,Super Scope Btn,Joy,Mouse;",
@@ -277,6 +279,8 @@ wire  [7:0] ioctl_index;
 wire [11:0] joy0,joy1,joy2,joy3,joy4;
 wire [24:0] ps2_mouse;
 
+wire [11:0] joy0_hps;
+
 wire  [7:0] joy0_x,joy0_y,joy1_x,joy1_y;
 
 hps_io #(.STRLEN($size(CONF_STR)>>3), .WIDE(1)) hps_io
@@ -291,7 +295,7 @@ hps_io #(.STRLEN($size(CONF_STR)>>3), .WIDE(1)) hps_io
 
 	.joystick_analog_0({joy0_y, joy0_x}),
 	.joystick_analog_1({joy1_y, joy1_x}),
-	.joystick_0(joy0),
+	.joystick_0(joy0_hps),
 	.joystick_1(joy1),
 	.joystick_2(joy2),
 	.joystick_3(joy3),
@@ -775,17 +779,18 @@ lightgun lightgun
 	.PORT_DO(LG_DO)
 );
 
+
 // Indexes:
-// 0 = D+    = Latch
-// 1 = D-    = CLK
-// 2 = TX-   = P5
-// 3 = GND_d
-// 4 = RX+   = P6
-// 5 = RX-   = P4
+// 0 = D+    = P1 Latch
+// 1 = D-    = P1 Data
+// 2 = TX-   = LLAPI Enable
+// 3 = GND_d = N/C
+// 4 = RX+   = P2 Latch
+// 5 = RX-   = P2 Data
 
 wire raw_serial = status[8];
 
-assign USER_OUT[2] = 1'b1;
+assign USER_OUT[2] = ~(status[21] & ~OSD_STATUS);
 assign USER_OUT[3] = 1'b1;
 assign USER_OUT[5] = 1'b1;
 assign USER_OUT[6] = 1'b1;
@@ -804,8 +809,8 @@ always_comb begin
 		JOY2_DI = joy_swap ? {USER_IN[2], USER_IN[5]} : JOY2_DO;
 		JOY2_P6_DI = joy_swap ? USER_IN[4] : (LG_P6_out | !GUN_MODE);
 	end else begin
-		USER_OUT[0] = 1'b1;
-		USER_OUT[1] = 1'b1;
+		USER_OUT[0] = llio_user_out[0];
+		USER_OUT[1] = llio_user_out[1];
 		USER_OUT[4] = 1'b1;
 		JOY1_DI = JOY1_DO;
 		JOY2_DI = JOY2_DO;
@@ -813,6 +818,41 @@ always_comb begin
 	end
 end
 
+// LLAPI
+wire [31:0] llio_buttons;
+wire [71:0] llio_analog;
+wire [7:0]  llio_type;
+wire llio_en;
+
+wire [1:0] llio_user_out;
+
+LLIO llio
+(
+	.CLK_50M(CLK_50M),
+	.LLIO_SYNC(~VBlank_n),
+	.IO_LATCH_IN(USER_IN[0]),
+	.IO_LATCH_OUT(llio_user_out[0]),
+	.IO_DATA_IN(USER_IN[1]),
+	.IO_DATA_OUT(llio_user_out[1]),
+	.ENABLE(status[21] & ~OSD_STATUS),
+	.LLIO_BUTTONS(llio_buttons),
+	.LLIO_ANALOG(llio_analog),
+	.LLIO_TYPE(llio_type),
+	.LLIO_EN(llio_en)
+);
+
+wire use_llio = llio_en && status[21];
+wire use_llio_gun = use_llio && llio_type == 8'd28;
+
+wire [11:0] joy_ll_a = use_llio_gun ? 12'd0 : {
+	llio_buttons[5], llio_buttons[4], llio_buttons[7], llio_buttons[6],
+	llio_buttons[2], llio_buttons[3], llio_buttons[0], llio_buttons[1],
+	llio_buttons[27], llio_buttons[26], llio_buttons[25], llio_buttons[24]
+};
+
+assign OSD_TRIGGER = llio_buttons[24] & llio_buttons[5];
+
+assign joy0 = use_llio ? joy_ll_a : joy0_hps;
 
 /////////////////////////  STATE SAVE/LOAD  /////////////////////////////
 

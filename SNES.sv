@@ -127,7 +127,7 @@ assign ADC_BUS  = 'Z;
 assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 
 assign AUDIO_S   = 1;
-assign AUDIO_MIX = status[20:19];
+assign AUDIO_MIX = status[19:18];
 
 assign LED_USER  = cart_download | (status[23] & bk_pending) | llio_en;
 assign LED_DISK  = |llio_buttons;
@@ -221,39 +221,38 @@ parameter CONF_STR = {
     "SNES;;",
     "FS,SFCSMCBIN;",
     "-;",
-    "OEF,Video Region,Auto,NTSC,PAL;",
+    "ODE,Video Region,Auto,NTSC,PAL;",
     "O13,ROM Header,Auto,No Header,LoROM,HiROM,ExHiROM;",
     "-;",
     "C,Cheats;",
     "H2OO,Cheats Enabled,Yes,No;",
     "-;",
-    "D0RC,Load Backup RAM;",
-    "D0RD,Save Backup RAM;",
+    "D0RB,Load Backup RAM;",
+    "D0RC,Save Backup RAM;",
     "D0ON,Autosave,Off,On;",
     "D0-;",
     "OUV,Aspect Ratio,4:3,8:7,16:9;",
-    "O9B,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
-    "OG,Pseudo Transparency,Blend,Off;",
-    "OJK,Stereo Mix,None,25%,50%,100%;", 
+    "O8A,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
+    "OF,Pseudo Transparency,Blend,Off;",
+    "OIJ,Stereo Mix,None,25%,50%,100%;",
     "-;",
     "O56,Mouse,None,Port1,Port2;",
     "O7,Swap Joysticks,No,Yes;",
-    "OH,Multitap,Disabled,Port2;",
-    "O8,Serial,OFF,SNAC;",
-    "OL,Serial2,OFF,LLAPI;",
+    "OG,Multitap,Disabled,Port2;",
+    "OKL,Serial,OFF,SNAC,LLAPI;",
     "-;",
     "OPQ,Super Scope,Disabled,Joy1,Joy2,Mouse;",
     "D4OR,Super Scope Btn,Joy,Mouse;",
     "D4OST,Cross,Small,Big,None;",
     "-;",
-    "D1OI,SuperFX Speed,Normal,Turbo;",
+    "D1OH,SuperFX Speed,Normal,Turbo;",
     "D3O4,CPU Speed,Normal,Turbo;",
     "-;",
     "R0,Reset;",
     "J1,A(SS Fire),B(SS Cursor),X(SS TurboSw),Y(SS Pause),LT(SS Cursor),RT(SS Fire),Select,Start;",
     "V,v",`BUILD_DATE
 };
-// free bits: 8,L,M
+// free bits: M
 
 wire  [1:0] buttons;
 wire [31:0] status;
@@ -329,8 +328,8 @@ hps_io #(.STRLEN($size(CONF_STR)>>3), .WIDE(1)) hps_io
 
 wire       GUN_BTN = status[27];
 wire [1:0] GUN_MODE = status[26:25];
-wire       GSU_TURBO = status[18];
-wire       BLEND = ~status[16];
+wire       GSU_TURBO = status[17];
+wire       BLEND = ~status[15];
 wire [1:0] mouse_mode = status[6:5];
 wire       joy_swap = status[7];
 wire [2:0] LHRom_type = status[3:1];
@@ -403,7 +402,7 @@ always @(posedge clk_sys) begin
 		end
 	end
 	else begin
-		PAL <= (!status[15:14]) ? rom_region : status[15];
+		PAL <= (!status[14:13]) ? rom_region : status[14];
 	end
 end
 
@@ -678,7 +677,7 @@ end
 assign VGA_F1 = interlace & FIELD;
 assign VGA_SL = {~interlace,~interlace}&sl[1:0];
 
-wire [2:0] scale = status[11:9];
+wire [2:0] scale = status[10:8];
 wire [2:0] sl = scale ? scale - 1'd1 : 3'd0;
 wire       scandoubler = ~interlace && (scale || forced_scandoubler);
 
@@ -729,7 +728,7 @@ ioport port2
 (
 	.CLK(clk_sys),
 
-	.MULTITAP(status[17]),
+	.MULTITAP(status[16]),
 
 	.PORT_LATCH(JOY_STRB),
 	.PORT_CLK(JOY2_CLK),
@@ -788,7 +787,7 @@ lightgun lightgun
 // 4 = RX+   = P2 Latch
 // 5 = RX-   = P2 Data
 
-wire raw_serial = status[8];
+wire raw_serial = status[20];
 
 assign USER_OUT[2] = ~(status[21] & ~OSD_STATUS);
 assign USER_OUT[3] = 1'b1;
@@ -850,7 +849,7 @@ wire [11:0] joy_ll_a = use_llio_gun ? 12'd0 : {
 	llio_buttons[27], llio_buttons[26], llio_buttons[25], llio_buttons[24]
 };
 
-assign OSD_TRIGGER = llio_buttons[24] & llio_buttons[5];
+assign OSD_TRIGGER = llio_buttons[27] & llio_buttons[5];
 
 assign joy0 = use_llio ? joy_ll_a : joy0_hps;
 
@@ -876,8 +875,8 @@ always @(posedge clk_sys) begin
 	if(cart_download && img_mounted && !img_readonly) bk_ena <= |ram_mask;
 end
 
-wire bk_load    = status[12];
-wire bk_save    = status[13] | (bk_pending & OSD_STATUS && status[23]);
+wire bk_load    = status[11];
+wire bk_save    = status[12] | (bk_pending & OSD_STATUS && status[23]);
 reg  bk_loading = 0;
 reg  bk_state   = 0;
 

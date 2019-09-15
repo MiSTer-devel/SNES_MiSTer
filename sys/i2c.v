@@ -1,178 +1,94 @@
-module i2c_master
+
+module i2c
 (
-	input            clk,
-	input            rst,
-	input      [6:0] addr,
-	input     [15:0] data_in,
-	input            start,
-	input            rw,
+	input        CLK,
 
-	output reg       error,
-	
-	output reg [7:0] data_out,
-	output reg       ready,
+	input        START,
+	input        READ,
+	input  [6:0] I2C_ADDR,
+	input        I2C_WLEN,   // 0 - one byte, 1 - two bytes
+	input  [7:0] I2C_WDATA1,
+	input  [7:0] I2C_WDATA2,
+	output [7:0] I2C_RDATA,
+	output reg   END = 1,
+	output reg   ACK = 0,
 
-	inout            i2c_sda,
-	output           i2c_scl
+	//I2C bus
+	output       I2C_SCL,
+ 	inout        I2C_SDA
 );
 
+
+//	Clock Setting
 parameter CLK_Freq = 50_000_000;	//	50 MHz
 parameter I2C_Freq = 400_000;		//	400 KHz
 
-localparam IDLE        = 0;
-localparam START       = 1;
-localparam ADDRESS     = 2;
-localparam READ_ACK    = 3;
-localparam WRITE_DATA  = 4;
-localparam WRITE_DATA2 = 5;
-localparam WRITE_ACK   = 6;
-localparam READ_DATA   = 7;
-localparam READ_ACK2   = 8;
-localparam READ_ACK3   = 9;
-localparam STOP        = 10;
-localparam STOP2       = 11;
+localparam I2C_FreqX2 = I2C_Freq*2;
 
-localparam I2C_Rate = CLK_Freq/(I2C_Freq*2);
+reg         I2C_CLOCK;
+reg  [31:0] cnt;
+wire [31:0] cnt_next = cnt + I2C_FreqX2;
 
-assign i2c_scl = scl_disable | i2c_clk;
-assign i2c_sda = ~sda_out ? 1'b0 : 1'bz;
-
-reg i2c_clk;
-reg i2c_clk_d;
-always@(posedge clk) begin
-	integer div = 0;
-	if(div < I2C_Rate) begin
-		div <= div + 1;
-	end else	begin
-		div <= 0;
-		i2c_clk <= ~i2c_clk;
+always @(posedge CLK) begin
+	cnt <= cnt_next;
+	if(cnt_next >= CLK_Freq) begin
+		cnt <= cnt_next - CLK_Freq;
+		I2C_CLOCK <= ~I2C_CLOCK;
 	end
-	i2c_clk_d <= i2c_clk;
 end
 
-reg sda_out     = 1;
-reg scl_disable = 0;
+assign I2C_SCL = SCLK | I2C_CLOCK;
+assign I2C_SDA = SDO[3] ? 1'bz : 1'b0;
 
-always @(posedge clk, posedge rst) begin
-	reg [3:0] state;
-	reg [7:0] saved_addr;
-	reg [7:0] saved_data1;
-	reg [7:0] saved_data2;
-	reg [2:0] counter;
-	reg       old_st;
+reg       SCLK = 1;
+reg [3:0] SDO  = 4'b1111;
+reg [0:7] rdata;
 
-	if(rst) begin
-		state <= IDLE;
-		scl_disable <= 1;
-		sda_out <= 1;
-		ready <= 0;
-	end		
-	else begin
-		if(i2c_clk & ~i2c_clk_d) begin
-			old_st <= start;
+assign I2C_RDATA = rdata;
 
-			case(state)
-			
-				IDLE: begin
-					ready <= 1;
-					if (~old_st & start) begin
-						state <= START;
-						saved_addr <= {addr, rw};
-						{saved_data1,saved_data2} <= data_in;
-						error <= 0;
-						ready <= 0;
-					end
-				end
+always @(posedge CLK) begin
+	reg old_clk;
+	reg old_st;
+	reg rd,len;
 
-				START: begin
-					scl_disable <= 0;
-					counter <= 7;
-					state <= ADDRESS;
-				end
+	reg  [5:0] SD_COUNTER = 'b111111;
+	reg [0:31] SD;
 
-				ADDRESS: begin
-					if (counter == 0) begin 
-						state <= READ_ACK;
-					end else counter <= counter - 1'd1;
-				end
+	old_clk <= I2C_CLOCK;
+	old_st  <= START;
+	
+	// delay to make sure SDA changed while SCL is stabilized at low
+	if(old_clk && ~I2C_CLOCK && ~SD_COUNTER[5]) SDO[0] <= SD[SD_COUNTER[4:0]];
+	SDO[3:1] <= SDO[2:0];
 
-				READ_ACK: begin
-					if (i2c_sda == 0) begin
-						counter <= 7;
-						if(saved_addr[0] == 0) state <= WRITE_DATA;
-						else state <= READ_DATA;
-					end
-					else begin
-						state <= STOP;
-						error <= 1;
-					end
-				end
-
-				WRITE_DATA: begin
-					if(counter == 0) begin
-						state <= READ_ACK2;
-					end else counter <= counter - 1'd1;
-				end
-				
-				READ_ACK2: begin
-					if (i2c_sda == 0) begin
-						state <= WRITE_DATA2;
-						counter <= 7;
-					end
-					else begin
-						state <= STOP;
-						error <= 1;
-					end
-				end
-
-				WRITE_DATA2: begin
-					if(counter == 0) state <= READ_ACK3;
-					else counter <= counter - 1'd1;
-				end
-
-				READ_ACK3: begin
-					if (i2c_sda == 0) state <= STOP;
-					else begin
-						state <= STOP;
-						error <= 1;
-					end
-				end
-
-				READ_DATA: begin
-					data_out[counter] <= i2c_sda;
-					if (counter == 0) state <= WRITE_ACK;
-					else counter <= counter - 1'd1;
-				end
-				
-				WRITE_ACK: begin
-					state <= STOP;
-				end
-
-				STOP: begin
-					scl_disable <= 1;
-					state <= STOP2;
-				end
-
-				STOP2: begin
-					state <= IDLE;
-				end
+	if(~old_st && START) begin
+		SCLK <= 1;
+		SDO  <= 4'b1111;
+		ACK  <= 0;
+		END  <= 0;
+		rd   <= READ;
+		len  <= I2C_WLEN;
+		if(READ) SD <= {2'b10, I2C_ADDR, 1'b1, 1'b1, 8'b11111111, 1'b0, 3'b011, 9'b111111111};
+			else  SD <= {2'b10, I2C_ADDR, 1'b0, 1'b1, I2C_WDATA1,  1'b1, I2C_WDATA2,  4'b1011};
+		SD_COUNTER <= 0;
+	end else begin
+		if(~old_clk && I2C_CLOCK && ~&SD_COUNTER) begin
+			SD_COUNTER <= SD_COUNTER + 6'd1;	
+			case(SD_COUNTER)
+			      01: SCLK <= 0;
+			      10: ACK  <= ACK | I2C_SDA;
+			      19: if(~rd) begin
+							ACK <= ACK | I2C_SDA;
+							if(~len) SD_COUNTER <= 29;
+						 end
+					20: if(rd)  SCLK <= 1;
+					23: if(rd)  END  <= 1;
+			      28: if(~rd) ACK  <= ACK | I2C_SDA;
+			      29: if(~rd) SCLK <= 1;
+			      32: if(~rd) END  <= 1;
 			endcase
-		end
 
-		if(~i2c_clk & i2c_clk_d) begin
-			case(state)
-				START:       sda_out <= 0;
-				ADDRESS:     sda_out <= saved_addr[counter];
-				READ_ACK:    sda_out <= 1;
-				READ_ACK2:   sda_out <= 1;
-				READ_ACK3:   sda_out <= 1;
-				WRITE_DATA:  sda_out <= saved_data1[counter];
-				WRITE_DATA2: sda_out <= saved_data2[counter];
-				WRITE_ACK:   sda_out <= 0;
-				READ_DATA:   sda_out <= 1;
-				STOP:        sda_out <= 0;
-				STOP2:       sda_out <= 1;
-			endcase
+			if(SD_COUNTER >= 11 && SD_COUNTER <= 18) rdata[SD_COUNTER[4:0]-11] <= I2C_SDA;
 		end
 	end
 end

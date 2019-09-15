@@ -102,7 +102,7 @@ module sys_top
 	output        SD_SPI_MOSI,
 
 	inout         SDCD_SPDIF,
-	inout         IO_SCL,
+	output        IO_SCL,
 	inout         IO_SDA,
 
 	////////// ADC //////////////
@@ -444,7 +444,7 @@ always @(posedge FPGA_CLK2_50) begin
 end
 
 wire clk_100m;
-wire clk_hdmi  = ~hdmi_tx_clk;  // Internal HDMI clock, inverted in relation to external clock
+wire clk_hdmi  = ~hdmi_clk_out;  // Internal HDMI clock, inverted in relation to external clock
 wire clk_audio = FPGA_CLK3_50;
 wire clk_pal   = FPGA_CLK3_50;
 
@@ -509,7 +509,9 @@ wire [127:0] vbuf_writedata;
 wire  [15:0] vbuf_byteenable;
 wire         vbuf_write;
 
-wire         hdmi_vs, hdmi_hs;
+wire  [23:0] hdmi_data;
+wire         hdmi_vs, hdmi_hs, hdmi_de;
+
 ascal 
 #(
 	.RAMBASE(32'h20000000),
@@ -527,10 +529,10 @@ ascal
 	.i_r      (r_out),
 	.i_g      (g_out),
 	.i_b      (b_out),
-	.i_hs     (hs),
-	.i_vs     (vs),
+	.i_hs     (hs_fix),
+	.i_vs     (vs_fix),
 	.i_fl     (f1),
-	.i_de     (de),
+	.i_de     (de_emu),
 	.iauto    (1),
 	.himin    (0),
 	.himax    (0),
@@ -701,14 +703,14 @@ fbpal fbpal
 
 /////////////////////////  HDMI output  /////////////////////////////////
 
-wire hdmi_tx_clk;
+wire hdmi_clk_out;
 pll_hdmi pll_hdmi
 (
 	.refclk(FPGA_CLK1_50),
 	.rst(reset_req),
 	.reconfig_to_pll(reconfig_to_pll),
 	.reconfig_from_pll(reconfig_from_pll),
-	.outclk_0(hdmi_tx_clk)
+	.outclk_0(hdmi_clk_out)
 );
 
 //1920x1080@60 PCLK=148.5MHz CEA
@@ -791,23 +793,26 @@ hdmi_config hdmi_config
 	.ypbpr(ypbpr_en & direct_video)
 );
 
-wire [23:0] hdmi_data;
 wire [23:0] hdmi_data_sl;
-wire        hdmi_de;
-
+wire        hdmi_de_sl, hdmi_vs_sl, hdmi_hs_sl;
 scanlines #(1) HDMI_scanlines
 (
 	.clk(clk_hdmi),
 
 	.scanlines(scanlines),
 	.din(hdmi_data),
+	.hs_in(hdmi_hs),
+	.vs_in(hdmi_vs),
+	.de_in(hdmi_de),
+	
 	.dout(hdmi_data_sl),
-	.hs(HDMI_TX_HS),
-	.vs(HDMI_TX_VS)
+	.hs_out(hdmi_hs_sl),
+	.vs_out(hdmi_vs_sl),
+	.de_out(hdmi_de_sl)
 );
 
-wire [23:0] hdmi_tx_d;
-wire        hdmi_tx_de;
+wire [23:0] hdmi_data_osd;
+wire        hdmi_de_osd, hdmi_vs_osd, hdmi_hs_osd;
 osd hdmi_osd
 (
 	.clk_sys(clk_sys),
@@ -818,14 +823,19 @@ osd hdmi_osd
 
 	.clk_video(clk_hdmi),
 	.din(hdmi_data_sl),
-	.dout(hdmi_tx_d),
-	.de_in(hdmi_de),
-	.de_out(hdmi_tx_de),
+	.hs_in(hdmi_hs_sl),
+	.vs_in(hdmi_vs_sl),
+	.de_in(hdmi_de_sl),
+
+	.dout(hdmi_data_osd),
+	.hs_out(hdmi_hs_osd),
+	.vs_out(hdmi_vs_osd),
+	.de_out(hdmi_de_osd),
 
 	.osd_status(osd_status)
 );
 
-reg [23:0] dv_d;
+reg [23:0] dv_data;
 reg        dv_hs, dv_vs, dv_de;
 always @(negedge clk_vid) begin
 	reg [23:0] dv_d1, dv_d2;
@@ -836,58 +846,64 @@ always @(negedge clk_vid) begin
 	reg  [3:0] hss;
 
 	if(ce_pix) begin
-		hss <= (hss << 1) | hs;
+		hss <= (hss << 1) | vga_hs_osd;
 
-		old_hs <= hs;
-		if(~old_hs && hs) begin
-			old_vs <= vs;
+		old_hs <= vga_hs_osd;
+		if(~old_hs && vga_hs_osd) begin
+			old_vs <= vga_vs_osd;
 			if(~&vcnt) vcnt <= vcnt + 1'd1;
-			if(~old_vs & vs & ~f1) vsz <= vcnt;
-			if(old_vs & ~vs) vcnt <= 0;
+			if(~old_vs & vga_vs_osd & ~f1) vsz <= vcnt;
+			if(old_vs & ~vga_vs_osd) vcnt <= 0;
 			
 			if(vcnt == 1) vde <= 1;
 			if(vcnt == vsz - 3) vde <= 0;
 		end
 
-		dv_de1 <= !{hss,hs} && vde;
-		dv_hs1 <= csync_en ? cs : hs;
-		dv_vs1 <= vs;
+		dv_de1 <= !{hss,vga_hs_osd} && vde;
+		dv_hs1 <= csync_en ? vga_cs_osd : vga_hs_osd;
+		dv_vs1 <= vga_vs_osd;
 	end
 
-	dv_d1  <= vga_q;
+	dv_d1  <= vga_data_osd;
 	dv_d2  <= dv_d1;
 	dv_de2 <= dv_de1;
 	dv_hs2 <= dv_hs1;
 	dv_vs2 <= dv_vs1;
 
-	dv_d   <= dv_d2;
+	dv_data<= dv_d2;
 	dv_de  <= dv_de2;
 	dv_hs  <= dv_hs2;
 	dv_vs  <= dv_vs2;
 end
 
-assign HDMI_TX_CLK = direct_video ? clk_vid : hdmi_tx_clk;
-assign HDMI_TX_HS  = direct_video ? dv_hs   : hdmi_hs    ;
-assign HDMI_TX_VS  = direct_video ? dv_vs   : hdmi_vs    ;
-assign HDMI_TX_D   = direct_video ? dv_d    : hdmi_tx_d  ;
-assign HDMI_TX_DE  = direct_video ? dv_de   : hdmi_tx_de ;
+assign HDMI_TX_CLK = direct_video ? clk_vid : hdmi_clk_out;
+assign HDMI_TX_HS  = direct_video ? dv_hs   : hdmi_hs_osd;
+assign HDMI_TX_VS  = direct_video ? dv_vs   : hdmi_vs_osd;
+assign HDMI_TX_DE  = direct_video ? dv_de   : hdmi_de_osd;
+assign HDMI_TX_D   = direct_video ? dv_data : hdmi_data_osd;
 
 /////////////////////////  VGA output  //////////////////////////////////
 
 wire [23:0] vga_data_sl;
-
+wire        vga_de_sl, vga_vs_sl, vga_hs_sl;
 scanlines #(0) VGA_scanlines
 (
 	.clk(clk_vid),
 
 	.scanlines(scanlines),
-	.din(de ? {r_out, g_out, b_out} : 24'd0),
+	.din(de_emu ? {r_out, g_out, b_out} : 24'd0),
+	.hs_in(hs_fix),
+	.vs_in(vs_fix),
+	.de_in(de_emu),
+
 	.dout(vga_data_sl),
-	.hs(hs),
-	.vs(vs)
+	.hs_out(vga_hs_sl),
+	.vs_out(vga_vs_sl),
+	.de_out(vga_de_sl)
 );
 
-wire [23:0] vga_q;
+wire [23:0] vga_data_osd;
+wire        vga_vs_osd, vga_hs_osd;
 osd vga_osd
 (
 	.clk_sys(clk_sys),
@@ -898,12 +914,17 @@ osd vga_osd
 
 	.clk_video(clk_vid),
 	.din(vga_data_sl),
-	.dout(vga_q),
-	.de_in(de)
+	.hs_in(vga_hs_sl),
+	.vs_in(vga_vs_sl),
+	.de_in(vga_de_sl),
+
+	.dout(vga_data_osd),
+	.hs_out(vga_hs_osd),
+	.vs_out(vga_vs_osd)
 );
 
-wire cs;
-csync csync_vga(clk_vid, hs, vs, cs);
+wire vga_cs_osd;
+csync csync_vga(clk_vid, vga_hs_osd, vga_vs_osd, vga_cs_osd);
 
 `ifndef DUAL_SDRAM
 	wire [23:0] vga_o;
@@ -912,15 +933,15 @@ csync csync_vga(clk_vid, hs, vs, cs);
 		.ypbpr_full(0),
 		.ypbpr_en(ypbpr_en),
 		.dout(vga_o),
-		.din(vga_scaler ? {24{hdmi_tx_de}} & hdmi_tx_d : vga_q)
+		.din(vga_scaler ? {24{hdmi_de_osd}} & hdmi_data_osd : vga_data_osd)
 	);
 
-	wire hdmi_cs;
-	csync csync_hdmi(clk_hdmi, hdmi_hs, hdmi_vs, hdmi_cs);
+	wire hdmi_cs_osd;
+	csync csync_hdmi(clk_hdmi, hdmi_hs_osd, hdmi_vs_osd, hdmi_cs_osd);
 
-	wire vs1 = vga_scaler ? hdmi_vs : vs;
-	wire hs1 = vga_scaler ? hdmi_hs : hs;
-	wire cs1 = vga_scaler ? hdmi_cs : cs;
+	wire vs1 = vga_scaler ? hdmi_vs_osd : vga_vs_osd;
+	wire hs1 = vga_scaler ? hdmi_hs_osd : vga_hs_osd;
+	wire cs1 = vga_scaler ? hdmi_cs_osd : vga_cs_osd;
 
 	assign VGA_VS = (VGA_EN | SW[3]) ? 1'bZ      : csync_en ? 1'b1 : ~vs1;
 	assign VGA_HS = (VGA_EN | SW[3]) ? 1'bZ      : csync_en ? ~cs1 : ~hs1;
@@ -1050,7 +1071,7 @@ wire [15:0] audio_ls, audio_rs;
 wire        audio_s;
 wire  [1:0] audio_mix;
 wire  [7:0] r_out, g_out, b_out;
-wire        vs, hs, de, f1;
+wire        vs_fix, hs_fix, de_emu, f1;
 wire  [1:0] scanlines;
 wire        clk_sys, clk_vid, ce_pix;
 
@@ -1071,8 +1092,8 @@ wire  [1:0] led_disk;
 wire  [1:0] btn;
 
 wire vs_emu, hs_emu;
-sync_fix sync_v(clk_vid, vs_emu, vs);
-sync_fix sync_h(clk_vid, hs_emu, hs);
+sync_fix sync_v(clk_vid, vs_emu, vs_fix);
+sync_fix sync_h(clk_vid, hs_emu, hs_fix);
 
 wire        uart_dtr;
 wire        uart_dsr;
@@ -1088,7 +1109,7 @@ emu emu
 (
 	.CLK_50M(FPGA_CLK3_50),
 	.RESET(reset),
-	.HPS_BUS({f1, HDMI_TX_VS, clk_100m, clk_vid, ce_pix, de, hs, vs, io_wait, clk_sys, io_fpga, io_uio, io_strobe, io_wide, io_din, io_dout}),
+	.HPS_BUS({f1, HDMI_TX_VS, clk_100m, clk_vid, ce_pix, de_emu, hs_fix, vs_fix, io_wait, clk_sys, io_fpga, io_uio, io_strobe, io_wide, io_din, io_dout}),
 
 	.CLK_VIDEO(clk_vid),
 	.CE_PIXEL(ce_pix),
@@ -1098,7 +1119,7 @@ emu emu
 	.VGA_B(b_out),
 	.VGA_HS(hs_emu),
 	.VGA_VS(vs_emu),
-	.VGA_DE(de),
+	.VGA_DE(de_emu),
 	.VGA_F1(f1),
 	.VGA_SL(scanlines),
 

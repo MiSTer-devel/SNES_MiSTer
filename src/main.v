@@ -4,6 +4,7 @@
 `define USE_SDD1
 `define USE_GSU
 `define USE_SA1
+`define USE_SPC7110
 
 module main
 (
@@ -106,7 +107,7 @@ wire        SYSCLKF_CE;
 wire        SYSCLKR_CE;
 wire        REFRESH;
 
-wire  [3:0] MAP_ACTIVE;
+wire  [4:0] MAP_ACTIVE;
 
 SNES SNES
 (
@@ -492,12 +493,71 @@ SA1Map SA1Map
 assign MAP_ACTIVE[3] = 0;
 `endif
 
+`ifdef USE_SPC7110
+wire [7:0]  SPC7110_DO;
+wire        SPC7110_IRQ_N;
+wire [22:0] SPC7110_ROM_ADDR;
+wire        SPC7110_ROM_CE_N;
+wire        SPC7110_ROM_OE_N;
+wire        SPC7110_ROM_WORD;
+wire [19:0] SPC7110_BSRAM_ADDR;
+wire [7:0]  SPC7110_BSRAM_D;
+wire        SPC7110_BSRAM_CE_N;
+wire        SPC7110_BSRAM_OE_N;
+wire        SPC7110_BSRAM_WE_N;
+
+SPC7110Map SPC7110Map
+(
+	.mclk(MCLK),
+	.rst_n(RESET_N),
+
+	.ca(CA),
+	.di(DO),
+	.do(SPC7110_DO),
+	.cpurd_n(CPURD_N),
+	.cpuwr_n(CPUWR_N),
+
+	.pa(PA),
+	.pard_n(PARD_N),
+	.pawr_n(PAWR_N),
+
+	.romsel_n(ROMSEL_N),
+	.ramsel_n(RAMSEL_N),
+
+	.sysclkf_ce(SYSCLKF_CE),
+	.sysclkr_ce(SYSCLKR_CE),
+	.refresh(REFRESH),
+
+	.irq_n(SPC7110_IRQ_N),
+
+	.rom_addr(SPC7110_ROM_ADDR),
+	.rom_q(ROM_Q),
+	.rom_ce_n(SPC7110_ROM_CE_N),
+	.rom_oe_n(SPC7110_ROM_OE_N),
+	.rom_word(SPC7110_ROM_WORD),
+
+	.bsram_addr(SPC7110_BSRAM_ADDR),
+	.bsram_d(SPC7110_BSRAM_D),
+	.bsram_q(BSRAM_Q),
+	.bsram_ce_n(SPC7110_BSRAM_CE_N),
+	.bsram_oe_n(SPC7110_BSRAM_OE_N),
+	.bsram_we_n(SPC7110_BSRAM_WE_N),
+
+	.map_active(MAP_ACTIVE[4]),
+	.map_ctrl(ROM_TYPE),
+	.rom_mask(ROM_MASK),
+	.bsram_mask(RAM_MASK)
+);
+`else
+assign MAP_ACTIVE[4] = 0;
+`endif
+
 assign TURBO_ALLOW = ~(MAP_ACTIVE[3] | MAP_ACTIVE[1]);
 
 always @(*) begin
 	case (MAP_ACTIVE)
 `ifdef USE_CX4
-	'b0001:
+	'b00001:
 		begin
 			DI         = CX4_DO;
 			IRQ_N      = CX4_IRQ_N;
@@ -513,7 +573,7 @@ always @(*) begin
 		end
 `endif
 `ifdef USE_SDD1
-	'b0010:
+	'b00010:
 		begin
 			DI         = SDD_DO;
 			IRQ_N      = SDD_IRQ_N;
@@ -529,7 +589,7 @@ always @(*) begin
 		end
 `endif
 `ifdef USE_GSU
-	'b0100:
+	'b00100:
 		begin
 			DI         = GSU_DO;
 			IRQ_N      = GSU_IRQ_N;
@@ -545,7 +605,7 @@ always @(*) begin
 		end
 `endif
 `ifdef USE_SA1
-	'b1000:
+	'b01000:
 		begin
 			DI         = SA1_DO;
 			IRQ_N      = SA1_IRQ_N;
@@ -558,6 +618,22 @@ always @(*) begin
 			BSRAM_OE_N = SA1_BSRAM_OE_N;
 			BSRAM_WE_N = SA1_BSRAM_WE_N;
 			ROM_WORD   = SA1_ROM_WORD;
+		end
+`endif
+`ifdef USE_SPC7110
+	'b10000:
+		begin
+			DI         = SPC7110_DO;
+			IRQ_N      = SPC7110_IRQ_N;
+			ROM_ADDR   = {1'b0,SPC7110_ROM_ADDR};
+			ROM_CE_N   = SPC7110_ROM_CE_N;
+			ROM_OE_N   = SPC7110_ROM_OE_N;
+			BSRAM_ADDR = SPC7110_BSRAM_ADDR;
+			BSRAM_D    = SPC7110_BSRAM_D;
+			BSRAM_CE_N = SPC7110_BSRAM_CE_N;
+			BSRAM_OE_N = SPC7110_BSRAM_OE_N;
+			BSRAM_WE_N = SPC7110_BSRAM_WE_N;
+			ROM_WORD   = SPC7110_ROM_WORD;
 		end
 `endif
 `ifdef USE_DLH

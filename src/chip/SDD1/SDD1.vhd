@@ -255,7 +255,7 @@ begin
 		INIT_DONE	=> DEC_INIT_DONE
 	); 
 	
-	DEC: entity work.Decoder 
+	DEC: entity work.SDD1_Decoder 
 	port map (
 		CLK			=> CLK,
 		RST_N			=> RST_N,

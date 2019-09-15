@@ -24,19 +24,21 @@ wire       mI2C_ACK;
 reg [15:0] LUT_DATA;
 reg  [7:0] LUT_INDEX = 0;
 
-i2c_master #(50_000_000, 20_000) i2c_av
+i2c #(50_000_000, 20_000) i2c_av
 (
-	.clk(iCLK),
-	.rst(~iRST_N),
+	.CLK(iCLK),
 
-	.i2c_scl(I2C_SCL),		// I2C CLOCK
-	.i2c_sda(I2C_SDA),		// I2C DATA
+	.I2C_SCL(I2C_SCL),  // I2C CLOCK
+	.I2C_SDA(I2C_SDA),  // I2C DATA
 
-	.addr(8'h39),           // 0x39 is the Slave Address of the ADV7513 chip
-	.data_in(init_data[LUT_INDEX]),
-	.start(mI2C_GO),			// START transfer
-	.ready(mI2C_END),			// END transfer 
-	.error(mI2C_ACK) 			// ACK
+	.I2C_ADDR('h39),    // 0x39 is the Slave Address of the ADV7513 chip!
+	.I2C_WLEN(1),
+	.I2C_WDATA1(init_data[LUT_INDEX][15:8]), // SUB_ADDR
+	.I2C_WDATA2(init_data[LUT_INDEX][7:0]),  // DATA
+	.START(mI2C_GO),    // START transfer
+	.READ(0),
+	.END(mI2C_END),     // END transfer 
+	.ACK(mI2C_ACK)      // ACK
 );
 
 //////////////////////	Config Control	////////////////////////////

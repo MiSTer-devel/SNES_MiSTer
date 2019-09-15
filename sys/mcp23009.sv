@@ -22,21 +22,20 @@ reg        rw;
 wire [7:0] dout;
 reg [15:0] din;
 
-i2c_master #(50_000_000, 500_000) i2c
+i2c #(50_000_000, 500_000) i2c
 (
-	.clk(clk),
-	.rst(0),
-	.addr('h20),
-	.data_in(din),
-	.start(start),
-	.rw(rw),
-	.error(error),
-	
-	.data_out(dout),
-	.ready(ready),
-
-	.i2c_sda(sda),
-	.i2c_scl(scl)
+	.CLK(clk),
+	.START(start),
+	.READ(rw),
+	.I2C_ADDR('h20),
+	.I2C_WLEN(1),
+	.I2C_WDATA1(din[15:8]),
+	.I2C_WDATA2(din[7:0]),
+	.I2C_RDATA(dout),
+	.END(ready),
+	.ACK(error),
+	.I2C_SCL(scl),
+ 	.I2C_SDA(sda)
 );
 
 always@(posedge clk) begin

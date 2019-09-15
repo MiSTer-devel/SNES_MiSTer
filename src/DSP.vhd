@@ -47,7 +47,6 @@ architecture rtl of DSP is
 	signal MCLK_FREQ 		: integer;
 	signal CE 				: std_logic;
 
-	signal REGRAM 			: RegRam_t;
 	signal RI 				: std_logic_vector(7 downto 0);
 	signal REGN_WR 		: std_logic_vector(6 downto 0);
 	signal REGN_RD 		: std_logic_vector(6 downto 0);
@@ -242,21 +241,16 @@ begin
 				  '1' 		 when SMP_WE = '0' and SMP_A = x"00F3" and SUBSTEP = 3 else
 				  '1' 		 when REGN_WR(3 downto 1) = "100" and SUBSTEP = 0 else
 				  '0';
-
-	REGS_DO <= REGRAM(to_integer(unsigned(REGS_ADDR_RD)));
 	
-	process(CLK, RST_N)
-	begin
-		if RST_N = '0' then
-			REGRAM <= (others=>(others=>'0'));
-		elsif rising_edge(CLK) then
-			if ENABLE = '1' and CE = '1' then
-				if REGS_WE = '1' then
-					REGRAM(to_integer(unsigned(REGS_ADDR_WR))) <= REGS_DI;
-				end if;
-			end if;
-		end if;
-	end process;
+	REGRAM : entity work.dpram generic map(7,8)
+	port map(
+		clock			=> CLK,
+		data_a		=> REGS_DI,
+		address_a	=> REGS_ADDR_WR,
+		address_b	=> REGS_ADDR_RD,
+		wren_a		=> REGS_WE and CE,
+		q_b			=> REGS_DO
+	);
 
 	
 	process(CLK, RST_N)

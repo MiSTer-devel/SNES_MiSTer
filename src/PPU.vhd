@@ -169,6 +169,7 @@ signal IN_VBL 				: std_logic;
 signal BG_VRAM_ADDRA 	: std_logic_vector(15 downto 0);
 signal BG_VRAM_ADDRB 	: std_logic_vector(15 downto 0);
 signal BG_FETCH 			: std_logic;
+signal M7_FETCH 			: std_logic;
 signal SPR_GET_PIXEL 	: std_logic;
 signal BG_GET_PIXEL 		: std_logic;
 signal BG_MATH 			: std_logic;
@@ -189,10 +190,10 @@ signal BG1_PIX_DATA 		: std_logic_vector(11 downto 0);
 signal BG2_PIX_DATA 		: std_logic_vector(7 downto 0);
 signal BG3_PIX_DATA 		: std_logic_vector(5 downto 0);
 signal BG4_PIX_DATA 		: std_logic_vector(5 downto 0);
+signal M7_PIX_DATA 		: std_logic_vector(7 downto 0);
 
-signal M7_TEMP_X 			: signed(23 downto 0);
-signal M7_TEMP_Y 			: signed(23 downto 0);
 signal MPY 					: signed(23 downto 0);
+signal M7_SCREEN_X  		: unsigned(7 downto 0);
 signal M7_TILE_N 			: unsigned(7 downto 0);
 signal M7_TILE_ROW 		: unsigned(2 downto 0);
 signal M7_TILE_COL 		: unsigned(2 downto 0);
@@ -918,6 +919,12 @@ begin
 		BG_FETCH <= '0';
 	end if;
 	
+	if H_CNT >= M7_FETCH_START and H_CNT <= M7_FETCH_END and V_CNT >= 0 and V_CNT <= LAST_VIS_LINE then
+		M7_FETCH <= '1';
+	else
+		M7_FETCH <= '0';
+	end if;
+
 	if H_CNT >= SPR_GET_PIX_START and H_CNT <= SPR_GET_PIX_END and V_CNT >= 1 and V_CNT <= LAST_VIS_LINE then
 		SPR_GET_PIXEL <= '1';
 	else
@@ -969,7 +976,7 @@ BF <= BF_TBL(to_integer(unsigned(BG_MODE)), to_integer(H_CNT(2 downto 0)));
 
 process( RST_N, CLK, BF, BG_MODE, BG_SIZE, BG_SC_ADDR, BG_SC_SIZE, BG_NBA, BG_HOFS, BG_VOFS, H_CNT, V_CNT, IN_VBL, FORCE_BLANK,
 			BG_DATA, BG_TILE_INFO, BG3_OPT_DATA0, BG3_OPT_DATA1, BG_MOSAIC_Y, BG_MOSAIC_EN, FIELD, HIRES, BGINTERLACE, VRAM_DAI,
-			M7_TILE_N, M7_TILE_COL, M7_TILE_ROW, M7SEL, M7HOFS, M7VOFS, M7X, M7Y, M7A, M7B, M7C, M7D, M7_TEMP_X, M7_TEMP_Y)
+			M7_SCREEN_X, M7_TILE_N, M7_TILE_COL, M7_TILE_ROW, M7SEL, M7HOFS, M7VOFS, M7X, M7Y, M7A, M7B, M7C, M7D)
 variable SCREEN_X : unsigned(8 downto 0);
 variable SCREEN_Y : unsigned(7 downto 0);
 variable OPTH_EN, OPTV_EN : std_logic;
@@ -991,7 +998,9 @@ variable TILE_OFFS : unsigned(14 downto 0);
 variable TILEPOS_INC : unsigned(4 downto 0);
 variable M7_VRAM_X, M7_VRAM_Y : signed(23 downto 0);
 variable ORG_X, ORG_Y  : signed(10 downto 0);
-variable M7_SCREEN_X, M7_SCREEN_Y  : signed(8 downto 0);
+variable M7_CALC_X : signed(23 downto 0);
+variable M7_CALC_Y : signed(23 downto 0);
+variable M7_X, M7_Y : signed(8 downto 0);
 variable M7_TILE : unsigned(7 downto 0);
 variable BG_TILEMAP_ADDR, BG_TILEDATA_ADDR : unsigned(15 downto 0);
 variable M7_VRAM_ADDRA, M7_VRAM_ADDRB : unsigned(13 downto 0);
@@ -1165,22 +1174,30 @@ begin
 	ORG_Y := resize(signed(M7VOFS) - signed(M7Y), ORG_Y'length);
 	
 	if M7SEL(0) = '0' then
-		M7_SCREEN_X := signed(resize(SCREEN_X(7 downto 0), 9));
+		M7_X := signed(resize(M7_SCREEN_X, 9));
 	else
-		M7_SCREEN_X := signed(resize(not SCREEN_X(7 downto 0), 9));
+		M7_X := signed(resize(not M7_SCREEN_X, 9));
 	end if;
 	
 	if M7SEL(1) = '0' then
-		M7_SCREEN_Y := signed(resize(MOSAIC_Y, 9));
+		M7_Y := signed(resize(MOSAIC_Y, 9));
 	else
-		M7_SCREEN_Y := signed(resize(not MOSAIC_Y, 9));
+		M7_Y := signed(resize(not MOSAIC_Y, 9));
 	end if;
 				
 	MPY <= resize(signed(M7A) * signed(M7B(15 downto 8)), MPY'length);
 	
-	M7_VRAM_X := M7_TEMP_X + resize(signed(M7A) * M7_SCREEN_X, M7_VRAM_X'length);
-	M7_VRAM_Y := M7_TEMP_Y + resize(signed(M7C) * M7_SCREEN_X, M7_VRAM_Y'length);
-
+	M7_CALC_X := (resize(signed(M7X), M7_CALC_X'length) sll 8) + 
+					 (resize(signed(M7A) * signed(ORG_X), M7_CALC_X'length) and x"FFFFC0") + 
+					 (resize(signed(M7B) * signed(ORG_Y), M7_CALC_X'length) and x"FFFFC0") + 
+					 (resize(signed(M7B) * M7_Y, M7_CALC_X'length) and x"FFFFC0");
+	M7_CALC_Y := (resize(signed(M7Y), M7_CALC_Y'length) sll 8) + 
+					 (resize(signed(M7C) * signed(ORG_X), M7_CALC_Y'length) and x"FFFFC0") + 
+					 (resize(signed(M7D) * signed(ORG_Y), M7_CALC_Y'length) and x"FFFFC0") + 
+					 (resize(signed(M7D) * M7_Y, M7_CALC_Y'length) and x"FFFFC0");
+	
+	M7_VRAM_X := M7_CALC_X + resize(signed(M7A) * M7_X, M7_VRAM_X'length);
+	M7_VRAM_Y := M7_CALC_Y + resize(signed(M7C) * M7_X, M7_VRAM_Y'length);
 					 
 	if M7_VRAM_X(23 downto 18) = "000000" and M7_VRAM_Y(23 downto 18) = "000000" then
 		M7_IS_OUTSIDE := '0';
@@ -1210,21 +1227,16 @@ begin
 	end case;
 	
 	if RST_N = '0' then
+		M7_SCREEN_X <= (others => '0');
+
 		M7_TILE_N <= (others => '0');
 		M7_TILE_ROW <= (others => '0');
 		M7_TILE_COL <= (others => '0');
 		M7_TILE_OUTSIDE <= '0';
 	elsif rising_edge(CLK) then 
 		if ENABLE = '1' and DOT_CLKR_CE = '1' then
-			if H_CNT = LAST_DOT then
-				M7_TEMP_X <= (resize(signed(M7X), M7_TEMP_X'length) sll 8) + 
-								 (resize(signed(M7A) * signed(ORG_X), M7_TEMP_X'length) and x"FFFFC0") + 
-								 (resize(signed(M7B) * signed(ORG_Y), M7_TEMP_X'length) and x"FFFFC0") + 
-								 (resize(signed(M7B) * M7_SCREEN_Y, M7_TEMP_X'length) and x"FFFFC0");
-				M7_TEMP_Y <= (resize(signed(M7Y), M7_TEMP_Y'length) sll 8) + 
-								 (resize(signed(M7C) * signed(ORG_X), M7_TEMP_Y'length) and x"FFFFC0") + 
-								 (resize(signed(M7D) * signed(ORG_Y), M7_TEMP_Y'length) and x"FFFFC0") + 
-								 (resize(signed(M7D) * M7_SCREEN_Y, M7_TEMP_Y'length) and x"FFFFC0");
+			if M7_FETCH = '1' then
+				M7_SCREEN_X <= M7_SCREEN_X + 1;
 			end if;
 
 			M7_TILE_N <= M7_TILE;
@@ -1271,13 +1283,6 @@ begin
 			if BG_FETCH = '1' and BG_FORCE_BLANK = '0' then
 				if BG_MODE /= "111" then 
 					BG_DATA(to_integer(H_CNT(2 downto 0))) <= VRAM_DBI & VRAM_DAI;
-				else
-					if M7SEL(7 downto 6) = "10" and M7_TILE_OUTSIDE = '1' then 
-						M7_PIX := (others => '0');
-					else  
-						M7_PIX := VRAM_DBI;
-					end if;
-					BG_DATA(to_integer(H_CNT(2 downto 0)))(15 downto 8) <= M7_PIX;
 				end if;
 				
 				if H_CNT(2 downto 0) = 0 then
@@ -1373,15 +1378,7 @@ begin
 							BG_TILES(0).PLANES( 6) <= FlipBGPlaneHR(BG_DATA(5)( 7 downto 0) & BG_DATA(7)( 7 downto 0), BG_TILE_INFO(BG1)(14), '1');
 							BG_TILES(0).PLANES( 7) <= FlipBGPlaneHR(BG_DATA(5)(15 downto 8) & BG_DATA(7)(15 downto 8), BG_TILE_INFO(BG1)(14), '1');
 							
-						when others =>
-							BG_TILES(0).PLANES( 0) <= BG_DATA(1)( 8) & BG_DATA(2)( 8) & BG_DATA(3)( 8) & BG_DATA(4)( 8) & BG_DATA(5)( 8) & BG_DATA(6)( 8) & BG_DATA(7)( 8) & M7_PIX(0);
-							BG_TILES(0).PLANES( 1) <= BG_DATA(1)( 9) & BG_DATA(2)( 9) & BG_DATA(3)( 9) & BG_DATA(4)( 9) & BG_DATA(5)( 9) & BG_DATA(6)( 9) & BG_DATA(7)( 9) & M7_PIX(1);
-							BG_TILES(0).PLANES( 2) <= BG_DATA(1)(10) & BG_DATA(2)(10) & BG_DATA(3)(10) & BG_DATA(4)(10) & BG_DATA(5)(10) & BG_DATA(6)(10) & BG_DATA(7)(10) & M7_PIX(2);
-							BG_TILES(0).PLANES( 3) <= BG_DATA(1)(11) & BG_DATA(2)(11) & BG_DATA(3)(11) & BG_DATA(4)(11) & BG_DATA(5)(11) & BG_DATA(6)(11) & BG_DATA(7)(11) & M7_PIX(3);
-							BG_TILES(0).PLANES( 4) <= BG_DATA(1)(12) & BG_DATA(2)(12) & BG_DATA(3)(12) & BG_DATA(4)(12) & BG_DATA(5)(12) & BG_DATA(6)(12) & BG_DATA(7)(12) & M7_PIX(4);
-							BG_TILES(0).PLANES( 5) <= BG_DATA(1)(13) & BG_DATA(2)(13) & BG_DATA(3)(13) & BG_DATA(4)(13) & BG_DATA(5)(13) & BG_DATA(6)(13) & BG_DATA(7)(13) & M7_PIX(5);
-							BG_TILES(0).PLANES( 6) <= BG_DATA(1)(14) & BG_DATA(2)(14) & BG_DATA(3)(14) & BG_DATA(4)(14) & BG_DATA(5)(14) & BG_DATA(6)(14) & BG_DATA(7)(14) & M7_PIX(6);
-							BG_TILES(0).PLANES( 7) <= BG_DATA(1)(15) & BG_DATA(2)(15) & BG_DATA(3)(15) & BG_DATA(4)(15) & BG_DATA(5)(15) & BG_DATA(6)(15) & BG_DATA(7)(15) & M7_PIX(7);
+						when others => null;
 					end case;
 
 					BG_TILES(0).ATR(0) <= BG_TILE_INFO(BG1)(13 downto 10);
@@ -1685,6 +1682,12 @@ begin
 
 			if SPR_GET_PIXEL = '1' then
 				SPR_PIX_DATA_BUF <= SPR_PIX_Q;
+				
+				if M7SEL(7 downto 6) = "10" and M7_TILE_OUTSIDE = '1' then 
+					M7_PIX_DATA <= (others => '0');
+				else  
+					M7_PIX_DATA <= VRAM_DBI;
+				end if;
 			
 				SPR_PIXEL_X <= SPR_PIXEL_X + 1;
 			end if;
@@ -1724,16 +1727,7 @@ begin
 											 BG_TILES(to_integer(N1(3 downto 3))).PLANES(1)(to_integer(N1(2 downto 0))) &
 											 BG_TILES(to_integer(N1(3 downto 3))).PLANES(0)(to_integer(N1(2 downto 0)));
 					else
-						N1 := not ("0"&GET_PIXEL_X(2 downto 0));
-						BG1_PIX_DATA <= "0000" &
-											 BG_TILES(to_integer(N1(3 downto 3))).PLANES(7)(to_integer(N1(2 downto 0))) &
-											 BG_TILES(to_integer(N1(3 downto 3))).PLANES(6)(to_integer(N1(2 downto 0))) &
-											 BG_TILES(to_integer(N1(3 downto 3))).PLANES(5)(to_integer(N1(2 downto 0))) &
-											 BG_TILES(to_integer(N1(3 downto 3))).PLANES(4)(to_integer(N1(2 downto 0))) &
-											 BG_TILES(to_integer(N1(3 downto 3))).PLANES(3)(to_integer(N1(2 downto 0))) &
-											 BG_TILES(to_integer(N1(3 downto 3))).PLANES(2)(to_integer(N1(2 downto 0))) &
-											 BG_TILES(to_integer(N1(3 downto 3))).PLANES(1)(to_integer(N1(2 downto 0))) &
-											 BG_TILES(to_integer(N1(3 downto 3))).PLANES(0)(to_integer(N1(2 downto 0)));
+						BG1_PIX_DATA <= "0000" & M7_PIX_DATA;
 					end if;
 				end if;
 				
@@ -1746,15 +1740,7 @@ begin
 											 BG_TILES(to_integer(N2(3 downto 3))).PLANES( 9)(to_integer(N2(2 downto 0))) &
 											 BG_TILES(to_integer(N2(3 downto 3))).PLANES( 8)(to_integer(N2(2 downto 0)));
 					else
-						N2 := not ("0"&GET_PIXEL_X(2 downto 0));
-						BG2_PIX_DATA <= BG_TILES(to_integer(N2(3 downto 3))).PLANES(7)(to_integer(N2(2 downto 0))) &
-											 BG_TILES(to_integer(N2(3 downto 3))).PLANES(6)(to_integer(N2(2 downto 0))) &
-											 BG_TILES(to_integer(N2(3 downto 3))).PLANES(5)(to_integer(N2(2 downto 0))) &
-											 BG_TILES(to_integer(N2(3 downto 3))).PLANES(4)(to_integer(N2(2 downto 0))) &
-											 BG_TILES(to_integer(N2(3 downto 3))).PLANES(3)(to_integer(N2(2 downto 0))) &
-											 BG_TILES(to_integer(N2(3 downto 3))).PLANES(2)(to_integer(N2(2 downto 0))) &
-											 BG_TILES(to_integer(N2(3 downto 3))).PLANES(1)(to_integer(N2(2 downto 0))) &
-											 BG_TILES(to_integer(N2(3 downto 3))).PLANES(0)(to_integer(N2(2 downto 0)));
+						BG2_PIX_DATA <= M7_PIX_DATA;
 					end if;
 				end if;
 				

@@ -485,7 +485,6 @@ package DSP_PKG is
 	type Env_t is array (0 to 7) of signed(11 downto 0);
 	type EnvxBuf_t is array (0 to 7) of std_logic_vector(7 downto 0);
 	type InterpPos_t is array (0 to 7) of unsigned(15 downto 0);
-	type RegRam_t is array (0 to 127) of std_logic_vector(7 downto 0);
 	
 	function CLAMP16(a: signed(16 downto 0)) return signed; 
 	

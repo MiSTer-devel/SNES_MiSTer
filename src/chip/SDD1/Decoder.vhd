@@ -4,7 +4,7 @@ library STD;
 use IEEE.NUMERIC_STD.ALL;
 
 
-entity Decoder is
+entity SDD1_Decoder is
 	port(
 		RST_N			: in std_logic;
 		CLK			: in std_logic;
@@ -23,9 +23,9 @@ entity Decoder is
 		PLANE_DONE	: out std_logic;
 		DONE			: out std_logic
 	);
-end Decoder;
+end SDD1_Decoder;
 
-architecture rtl of Decoder is
+architecture rtl of SDD1_Decoder is
 
 	signal BIT_CNT	: unsigned(2 downto 0);
 	signal BITPLANE_CNT : unsigned(2 downto 0);

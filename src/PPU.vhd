@@ -194,6 +194,8 @@ signal M7_PIX_DATA 		: std_logic_vector(7 downto 0);
 
 signal MPY 					: signed(23 downto 0);
 signal M7_SCREEN_X  		: unsigned(7 downto 0);
+signal M7_TEMP_X 			: signed(23 downto 0);
+signal M7_TEMP_Y 			: signed(23 downto 0);
 signal M7_TILE_N 			: unsigned(7 downto 0);
 signal M7_TILE_ROW 		: unsigned(2 downto 0);
 signal M7_TILE_COL 		: unsigned(2 downto 0);
@@ -976,7 +978,7 @@ BF <= BF_TBL(to_integer(unsigned(BG_MODE)), to_integer(H_CNT(2 downto 0)));
 
 process( RST_N, CLK, BF, BG_MODE, BG_SIZE, BG_SC_ADDR, BG_SC_SIZE, BG_NBA, BG_HOFS, BG_VOFS, H_CNT, V_CNT, IN_VBL, FORCE_BLANK,
 			BG_DATA, BG_TILE_INFO, BG3_OPT_DATA0, BG3_OPT_DATA1, BG_MOSAIC_Y, BG_MOSAIC_EN, FIELD, HIRES, BGINTERLACE, VRAM_DAI,
-			M7_SCREEN_X, M7_TILE_N, M7_TILE_COL, M7_TILE_ROW, M7SEL, M7HOFS, M7VOFS, M7X, M7Y, M7A, M7B, M7C, M7D)
+			M7_SCREEN_X, M7_TEMP_X, M7_TEMP_Y, M7_TILE_N, M7_TILE_COL, M7_TILE_ROW, M7SEL, M7HOFS, M7VOFS, M7X, M7Y, M7A, M7B, M7C, M7D)
 variable SCREEN_X : unsigned(8 downto 0);
 variable SCREEN_Y : unsigned(7 downto 0);
 variable OPTH_EN, OPTV_EN : std_logic;
@@ -998,8 +1000,6 @@ variable TILE_OFFS : unsigned(14 downto 0);
 variable TILEPOS_INC : unsigned(4 downto 0);
 variable M7_VRAM_X, M7_VRAM_Y : signed(23 downto 0);
 variable ORG_X, ORG_Y  : signed(10 downto 0);
-variable M7_CALC_X : signed(23 downto 0);
-variable M7_CALC_Y : signed(23 downto 0);
 variable M7_X, M7_Y : signed(8 downto 0);
 variable M7_TILE : unsigned(7 downto 0);
 variable BG_TILEMAP_ADDR, BG_TILEDATA_ADDR : unsigned(15 downto 0);
@@ -1187,17 +1187,8 @@ begin
 				
 	MPY <= resize(signed(M7A) * signed(M7B(15 downto 8)), MPY'length);
 	
-	M7_CALC_X := (resize(signed(M7X), M7_CALC_X'length) sll 8) + 
-					 (resize(signed(M7A) * signed(ORG_X), M7_CALC_X'length) and x"FFFFC0") + 
-					 (resize(signed(M7B) * signed(ORG_Y), M7_CALC_X'length) and x"FFFFC0") + 
-					 (resize(signed(M7B) * M7_Y, M7_CALC_X'length) and x"FFFFC0");
-	M7_CALC_Y := (resize(signed(M7Y), M7_CALC_Y'length) sll 8) + 
-					 (resize(signed(M7C) * signed(ORG_X), M7_CALC_Y'length) and x"FFFFC0") + 
-					 (resize(signed(M7D) * signed(ORG_Y), M7_CALC_Y'length) and x"FFFFC0") + 
-					 (resize(signed(M7D) * M7_Y, M7_CALC_Y'length) and x"FFFFC0");
-	
-	M7_VRAM_X := M7_CALC_X + resize(signed(M7A) * M7_X, M7_VRAM_X'length);
-	M7_VRAM_Y := M7_CALC_Y + resize(signed(M7C) * M7_X, M7_VRAM_Y'length);
+	M7_VRAM_X := M7_TEMP_X + resize(signed(M7A) * M7_X, M7_VRAM_X'length);
+	M7_VRAM_Y := M7_TEMP_Y + resize(signed(M7C) * M7_X, M7_VRAM_Y'length);
 					 
 	if M7_VRAM_X(23 downto 18) = "000000" and M7_VRAM_Y(23 downto 18) = "000000" then
 		M7_IS_OUTSIDE := '0';
@@ -1237,6 +1228,17 @@ begin
 		if ENABLE = '1' and DOT_CLKR_CE = '1' then
 			if M7_FETCH = '1' then
 				M7_SCREEN_X <= M7_SCREEN_X + 1;
+			end if;
+			
+			if H_CNT = LAST_DOT then
+				M7_TEMP_X <= (resize(signed(M7X), M7_TEMP_X'length) sll 8) + 
+								 (resize(signed(M7A) * signed(ORG_X), M7_TEMP_X'length) and x"FFFFC0") + 
+								 (resize(signed(M7B) * signed(ORG_Y), M7_TEMP_X'length) and x"FFFFC0") + 
+								 (resize(signed(M7B) * M7_Y, M7_TEMP_X'length) and x"FFFFC0");
+				M7_TEMP_Y <= (resize(signed(M7Y), M7_TEMP_Y'length) sll 8) + 
+								 (resize(signed(M7C) * signed(ORG_X), M7_TEMP_Y'length) and x"FFFFC0") + 
+								 (resize(signed(M7D) * signed(ORG_Y), M7_TEMP_Y'length) and x"FFFFC0") + 
+								 (resize(signed(M7D) * M7_Y, M7_TEMP_Y'length) and x"FFFFC0");
 			end if;
 
 			M7_TILE_N <= M7_TILE;

@@ -701,7 +701,7 @@ begin
 	DROM_A <= DROM_ADDR(22 downto 0);
 	DROM_OE_N <= not DROM_READ;
 	
-	PROM_OE_N <= '0' when CA(23 downto 20) = x"C" or (CA(22) = '0' and CA(15) = '1') else '1';
+	PROM_OE_N <= '0' when CA(22 downto 20) = "100" or (CA(22) = '0' and CA(15) = '1') else '1';
 	SRAM_CE_N <= not SRAM_EN when CA(22) = '0' and CA(15 downto 13) = "011" else '1';
 	
 end rtl;

@@ -178,13 +178,13 @@ begin
 			if SPC7110_DROM_ACTIVE = '1' then
 				ROM_ADDR <= std_logic_vector(unsigned(SPC7110_DROM_A(22 downto 20)) + "001") & SPC7110_DROM_A(19 downto 0);
 			else
-				ROM_ADDR <= "000"&CA(19 downto 0);
+				ROM_ADDR <= (not CA(23) and CA(22)) & (not CA(23) and CA(22)) & "0" & CA(19 downto 0);
 			end if;
 		else
 			if SNES_DROM_OE_N = '0' then
 				ROM_ADDR <= std_logic_vector(unsigned(SNES_DROM_A(22 downto 20)) + "001") & SNES_DROM_A(19 downto 0);
 			else
-				ROM_ADDR <= "000"&CA(19 downto 0);
+				ROM_ADDR <= (not CA(23) and CA(22)) & (not CA(23) and CA(22)) & "0" & CA(19 downto 0);
 			end if;
 		end if;
 	end process;

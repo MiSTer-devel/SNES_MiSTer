@@ -13,23 +13,25 @@ entity RTC4513 is
 		DO				: out std_logic_vector(3 downto 0);
 		DI				: in std_logic_vector(3 downto 0);
 		CE				: in std_logic;
-		CK				: in std_logic
+		CK				: in std_logic;
+		
+		EXT_RTC		: in std_logic_vector(64 downto 0)
 	);
 end RTC4513;
 
 architecture rtl of RTC4513 is
 
 	type Regs_t is array(0 to 15) of std_logic_vector(3 downto 0);
-	signal REGS  : Regs_t;
-	signal INDEX  : unsigned(3 downto 0);
---	signal REG_RD  : std_logic;
-	signal REG_WR  : std_logic;
-	signal STATE  : std_logic_vector(1 downto 0);
-	signal CK_OLD : std_logic;
-	signal CE_OLD : std_logic;
-	signal SEC_DIV  : integer;
-	signal SEC_TICK : std_logic;
-	signal HOLD : std_logic;
+	signal REGS  		: Regs_t := (x"0",x"0",x"0",x"0",x"0",x"0",x"1",x"0",x"1",x"0",x"0",x"0",x"0",x"2",x"F",x"4");
+	signal INDEX  		: unsigned(3 downto 0) := (others => '0');
+	signal REG_WR  	: std_logic := '0';
+	signal STATE  		: std_logic_vector(1 downto 0) := (others => '0');
+	signal CK_OLD 		: std_logic := '0';
+	signal CE_OLD 		: std_logic := '0';
+	signal LAST_HOLD 	: std_logic := '0';
+	signal LAST_RTC64 : std_logic := '0';
+	signal SEC_DIV  	: integer;
+	signal SEC_TICK 	: std_logic;
 	
 	type LastDayOfMonth_t is array(0 to 18) of std_logic_vector(5 downto 0);
 	constant DAYS_TBL	: LastDayOfMonth_t := (
@@ -65,31 +67,23 @@ begin
 			SEC_TICK <= '0';
 			
 			SEC_DIV <= SEC_DIV + 1;
-			if SEC_DIV = 21470000-1 then
+			if SEC_DIV = 21477270-1 then
 				SEC_DIV <= 0;
 				SEC_TICK <= '1';
 			end if;
 		end if;
 	end process;
 				
-	process( RST_N, CLK)
+	process( CLK )
 	variable DAY_OF_MONTH_L : std_logic_vector(3 downto 0);
 	variable DAY_OF_MONTH_H : std_logic_vector(1 downto 0);
 	begin
-		if RST_N = '0' then
-			REGS <= (x"0",x"0",x"0",x"0",x"0",x"0",x"1",x"0",x"1",x"0",x"0",x"0",x"0",x"1",x"F",x"6");
-			INDEX <= (others => '0');
-			CK_OLD <= '0';
-			CE_OLD <= '0';
-			REG_WR <= '0';
---			REG_RD <= '0';
-			STATE <= (others => '0');
-			HOLD <= '0';
-		elsif rising_edge(CLK) then
+		if rising_edge(CLK) then
 			DAY_OF_MONTH_H := DAYS_TBL(to_integer(unsigned(REGS(9)(0)&REGS(8))))(5 downto 4);
 			DAY_OF_MONTH_L := DAYS_TBL(to_integer(unsigned(REGS(9)(0)&REGS(8))))(3 downto 0);
-			
-			if (SEC_TICK = '1' and HOLD = '0' and REGS(15)(1) = '0') or (HOLD = '1' and REGS(13)(0) = '0') then
+
+			LAST_HOLD <= REGS(13)(0);
+			if (SEC_TICK = '1' and REGS(13)(0) = '0' and REGS(15)(1) = '0') or (LAST_HOLD = '1' and REGS(13)(0) = '0') then
 				REGS(0) <= std_logic_vector( unsigned(REGS(0)) + 1 );	--sec low inc
 				if REGS(0) = x"9" then
 					REGS(0) <= (others => '0');
@@ -145,18 +139,32 @@ begin
 					end if;
 				end if;
 			end if;
+			
+			if REGS(13)(0) = '0' and REGS(15)(1) = '0' then
+				if EXT_RTC(64) /= LAST_RTC64 then
+					LAST_RTC64 <= EXT_RTC(64);
+					REGS(0) <= EXT_RTC(3 downto 0);
+					REGS(1) <= EXT_RTC(7 downto 4);
+					REGS(2) <= EXT_RTC(11 downto 8);
+					REGS(3) <= EXT_RTC(15 downto 12);
+					REGS(4) <= EXT_RTC(19 downto 16);
+					REGS(5) <= EXT_RTC(23 downto 20);
+					if REGS(13)(1) = '1' then	--CAL/HW
+						REGS(6) <= EXT_RTC(27 downto 24);
+						REGS(7) <= EXT_RTC(31 downto 28);
+						REGS(8) <= EXT_RTC(35 downto 32);
+						REGS(9) <= EXT_RTC(39 downto 36);
+						REGS(10) <= EXT_RTC(43 downto 40);
+						REGS(11) <= EXT_RTC(47 downto 44);
+					end if;
+					REGS(12) <= EXT_RTC(51 downto 48);
+				end if;
+			end if;
 				
 			if ENABLE = '1' then
-				if REGS(13)(0) = '1' then
-					HOLD <= '1';
-				elsif REGS(13)(0) = '0' then
-					HOLD <= '0';
-				end if;
-				
 				CE_OLD <= CE;
 				if CE = '0' and CE_OLD = '1' then
 					REG_WR <= '0';
---					REG_RD <= '0';
 					STATE <= (others => '0');
 					REGS(3)(3) <= '0';
 					REGS(5)(3) <= '0';
@@ -178,8 +186,6 @@ begin
 						when "00" =>
 							if DI = x"3" then
 								REG_WR <= '1';
---							elsif DI = x"C" then
---								REG_RD <= '1';
 							end if;
 							STATE <= "01";
 							

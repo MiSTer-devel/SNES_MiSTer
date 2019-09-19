@@ -49,6 +49,8 @@ entity SPC7110Map is
 		ROM_MASK		: in std_logic_vector(23 downto 0);
 		BSRAM_MASK	: in std_logic_vector(23 downto 0);
 		
+		EXT_RTC		: in std_logic_vector(64 downto 0);
+		
 		BRK_OUT		: out std_logic;
 		DBG_REG		: in std_logic_vector(7 downto 0) := (others => '0');
 		DBG_DAT_IN	: in std_logic_vector(7 downto 0) := (others => '0');
@@ -128,7 +130,9 @@ begin
 		DO				=> RTC_DO,
 		DI				=> RTC_DI,
 		CE				=> RTC_CE,
-		CK				=> RTC_CK
+		CK				=> RTC_CK,
+		
+		EXT_RTC		=> EXT_RTC
 	);
 	
 	

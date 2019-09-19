@@ -79,6 +79,8 @@ module main
    output            JOY1_P6,
    output            JOY2_P6,
    input             JOY2_P6_in,
+	
+	input      [64:0] EXT_RTC,
 
    input             GG_EN,
    input     [128:0] GG_CODE,
@@ -546,7 +548,9 @@ SPC7110Map SPC7110Map
 	.map_active(MAP_ACTIVE[4]),
 	.map_ctrl(ROM_TYPE),
 	.rom_mask(ROM_MASK),
-	.bsram_mask(RAM_MASK)
+	.bsram_mask(RAM_MASK),
+	
+	.ext_rtc(EXT_RTC)
 );
 `else
 assign MAP_ACTIVE[4] = 0;

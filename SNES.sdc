@@ -12,11 +12,7 @@ create_generated_clock -source [get_pins -compatibility_mode {*|pll|pll_inst|alt
 
 derive_clock_uncertainty
 
-set_clock_groups -asynchronous -group [get_clocks { *|pll|pll_inst|altera_pll_i|*[0].*|divclk \
-																	 *|pll|pll_inst|altera_pll_i|*[2].*|divclk \
-																	 *|pll|pll_inst|altera_pll_i|*[3].*|divclk }]
 set_clock_groups -asynchronous -group [get_clocks { GSU_CASHE_CLK CX4_MEM_CLK }] 
-set_clock_groups -asynchronous -group [get_clocks { *|pll|pll_inst|altera_pll_i|*[1].*|divclk SDRAM_CLK }]
 
 set_input_delay -max -clock SDRAM_CLK 6.4ns [get_ports SDRAM_DQ[*]]
 set_input_delay -min -clock SDRAM_CLK 3.7ns [get_ports SDRAM_DQ[*]]

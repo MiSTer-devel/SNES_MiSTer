@@ -1107,7 +1107,7 @@ wire  [6:0] user_out, user_in;
 
 emu emu
 (
-	.CLK_50M(FPGA_CLK3_50),
+	.CLK_50M(FPGA_CLK2_50),
 	.RESET(reset),
 	.HPS_BUS({f1, HDMI_TX_VS, clk_100m, clk_vid, ce_pix, de_emu, hs_fix, vs_fix, io_wait, clk_sys, io_fpga, io_uio, io_strobe, io_wide, io_din, io_dout}),
 

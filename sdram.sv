@@ -49,7 +49,7 @@ module sdram
 assign SDRAM_CKE = 1;
 assign {SDRAM_DQMH,SDRAM_DQML} = SDRAM_A[12:11];
 
-localparam RASCAS_DELAY   = 3'd2; // tRCD=20ns -> 2 cycles@85MHz
+localparam RASCAS_DELAY   = 3'd1; // tRCD=20ns -> 2 cycles@85MHz
 localparam BURST_LENGTH   = 3'd0; // 0=1, 1=2, 2=4, 3=8, 7=full page
 localparam ACCESS_TYPE    = 1'd0; // 0=sequential, 1=interleaved
 localparam CAS_LATENCY    = 3'd2; // 2/3 allowed
@@ -60,7 +60,6 @@ localparam MODE = { 3'b000, NO_WRITE_BURST, OP_MODE, CAS_LATENCY, ACCESS_TYPE, B
 
 localparam STATE_IDLE  = 3'd0;             // state to check the requests
 localparam STATE_START = STATE_IDLE+1'd1;  // state in which a new command is started
-localparam STATE_NEXT  = STATE_START+1'd1;
 localparam STATE_CONT  = STATE_START+RASCAS_DELAY;
 localparam STATE_READY = STATE_CONT+CAS_LATENCY+1'd1;
 localparam STATE_LAST  = STATE_READY;      // last state in cycle
@@ -119,8 +118,7 @@ always @(posedge clk) begin
 	end
 end
 
-assign dout = ram_req ? ((~ds & a[0]) ? {SDRAM_DQ[7:0], SDRAM_DQ[15:8]}  : SDRAM_DQ) :
-								((~ds & a[0]) ? {last_data[7:0],last_data[15:8]} : last_data);
+assign dout = ((~ds & a[0]) ? {last_data[7:0],last_data[15:8]} : last_data);
 
 localparam MODE_NORMAL = 2'b00;
 localparam MODE_RESET  = 2'b01;
@@ -178,7 +176,6 @@ always @(posedge clk) begin
 	if(mode == MODE_NORMAL) begin
 		casex(state)
 			STATE_START: SDRAM_A <= addr[13:1];
-			STATE_NEXT:  SDRAM_A <= '1;
 			STATE_CONT:  SDRAM_A <= {dqm, 2'b10, a[22:14]};
 		endcase;
 	end

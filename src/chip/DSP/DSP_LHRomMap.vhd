@@ -60,6 +60,7 @@ end DSP_LHRomMap;
 architecture rtl of DSP_LHRomMap is
 
 	signal CART_ADDR 		: std_logic_vector(23 downto 0);
+	signal ROM_SEL 		: std_logic;
 	signal BRAM_ADDR 		: std_logic_vector(19 downto 0);
 	signal BSRAM_SEL 		: std_logic;
 	signal DP_SEL    		: std_logic;
@@ -80,7 +81,7 @@ architecture rtl of DSP_LHRomMap is
 	signal MAP_OBC1_SEL 	: std_logic;
 	signal DSP_CLK	  		: integer;
 	signal ROM_RD	  		: std_logic;
-	
+		
 begin
 	
 	CEGen : entity work.CEGen
@@ -173,6 +174,8 @@ begin
 		end if;
 	end process;
 	
+	ROM_SEL <= not ROMSEL_N and not DSP_SEL and not DP_SEL and not BSRAM_SEL and not OBC1_SEL;
+	
 	MAP_DSP_SEL <= not MAP_CTRL(6) and (MAP_CTRL(7) or not (MAP_CTRL(5) or MAP_CTRL(4)));	--8..B
 	MAP_OBC1_SEL <= MAP_CTRL(7) and MAP_CTRL(6) and not MAP_CTRL(5) and not MAP_CTRL(4);	--C
 	MAP_ACTIVE <= MAP_DSP_SEL or MAP_OBC1_SEL;
@@ -249,9 +252,9 @@ begin
 		end if;
 	end process;
 	
-	DO <= DSP_DO when DSP_SEL = '1' or DP_SEL = '1' else
+	DO <= ROM_Q(7 downto 0) when ROM_SEL = '1' else
+			DSP_DO when DSP_SEL = '1' or DP_SEL = '1' else
 			BSRAM_Q when BSRAM_SEL = '1' or OBC1_SEL = '1' else
-			ROM_Q(7 downto 0) when ROMSEL_N = '0' else
 			OPENBUS;
 
 	IRQ_N <= '1';

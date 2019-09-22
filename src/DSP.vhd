@@ -55,6 +55,8 @@ architecture rtl of DSP is
 	signal REGS_DI 		: std_logic_vector(7 downto 0);
 	signal REGS_DO 		: std_logic_vector(7 downto 0);
 	signal REGS_WE 		: std_logic;
+	signal REG_RST_ADDR 	: std_logic_vector(6 downto 0);
+	signal REG_RST_DATA 	: std_logic_vector(7 downto 0);
 
 	signal SMP_EN_INT 	: std_logic;
 	signal STEP_CNT 		: unsigned(4 downto 0);
@@ -229,12 +231,28 @@ begin
 	STEP <= to_integer(STEP_CNT);
 	SUBSTEP <= to_integer(SUBSTEP_CNT);
 	
-	REGS_ADDR_WR <= DBG_REG(6 downto 0) when ENABLE = '0' else REGN_WR;
+	
+	process(CLK)
+	begin
+		if rising_edge(CLK) then
+			REG_RST_DATA <= std_logic_vector( unsigned(REG_RST_DATA) + 1 );
+			if RST_N = '0'then
+				REG_RST_ADDR <= std_logic_vector( unsigned(REG_RST_ADDR) + 1 );
+			else
+				REG_RST_ADDR <= (others=>'0');
+			end if;
+		end if;
+	end process;
+	
+	REGS_ADDR_WR <= REG_RST_ADDR        when RST_N = '0' else 
+						 DBG_REG(6 downto 0) when ENABLE = '0' else 
+						 REGN_WR;
 	REGS_ADDR_RD <= DBG_REG(6 downto 0) when ENABLE = '0' else REGN_RD;					
-	REGS_DI <= DBG_DAT_IN when ENABLE = '0' else 
-				  SMP_DO 	 when SUBSTEP = 3 else
-				  ENVX_OUT   when REGN_WR(3 downto 0) = x"8" else 
-				  OUTX_OUT   when REGN_WR(3 downto 0) = x"9" else
+	REGS_DI <= REG_RST_DATA when RST_N = '0' else 
+				  DBG_DAT_IN   when ENABLE = '0' else 
+				  SMP_DO 	   when SUBSTEP = 3 else
+				  ENVX_OUT     when REGN_WR(3 downto 0) = x"8" else 
+				  OUTX_OUT     when REGN_WR(3 downto 0) = x"9" else
 				  SMP_DO;
 						
 	REGS_WE <= DBG_DAT_WR when ENABLE = '0' and DBG_REG(7) = '0' else
@@ -248,7 +266,7 @@ begin
 		data_a		=> REGS_DI,
 		address_a	=> REGS_ADDR_WR,
 		address_b	=> REGS_ADDR_RD,
-		wren_a		=> REGS_WE and CE,
+		wren_a		=> (REGS_WE and CE) or not RST_N,
 		q_b			=> REGS_DO
 	);
 

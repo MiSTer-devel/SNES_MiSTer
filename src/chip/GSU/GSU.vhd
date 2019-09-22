@@ -314,7 +314,23 @@ begin
 				R, SFR, BRAMR, PBR, ROMBR, RAMBR, CBR, BRAM_CACHE_Q_B, FLAG_GO, GSU_ROM_ACCESS, ROM_DI, RAM_DI )
 	begin
 		DO <= x"00";
-		if MMIO_REG_SEL = '1' then
+		if ROM_SEL = '1' then
+			if GSU_ROM_ACCESS = '0' then
+				DO <= ROM_DI;
+			else	
+				if ADDR(0) = '1' then
+					DO <= x"01";
+				elsif ADDR(3 downto 0) = x"E" then
+					DO <= x"0C";
+				elsif ADDR(3 downto 0) = x"A" then
+					DO <= x"08";
+				elsif ADDR(3 downto 0) = x"4" then
+					DO <= x"04";
+				else
+					DO <= x"00";
+				end if;
+			end if;
+		elsif MMIO_REG_SEL = '1' then
 			if ADDR(0) = '0' then
 				DO <= R(to_integer(unsigned(ADDR(4 downto 1))))(7 downto 0);
 			else
@@ -344,22 +360,6 @@ begin
 			end case;
 		elsif MMIO_CACHE_SEL = '1' then
 			DO <= BRAM_CACHE_Q_B;
-		elsif ROM_SEL = '1' then
-			if GSU_ROM_ACCESS = '1' then
-				if ADDR(0) = '1' then
-					DO <= x"01";
-				elsif ADDR(3 downto 0) = x"E" then
-					DO <= x"0C";
-				elsif ADDR(3 downto 0) = x"A" then
-					DO <= x"08";
-				elsif ADDR(3 downto 0) = x"4" then
-					DO <= x"04";
-				else
-					DO <= x"00";
-				end if;
-			else
-				DO <= ROM_DI;
-			end if;
 		elsif SRAM_SEL = '1' then
 			DO <= RAM_DI;
 		end if;

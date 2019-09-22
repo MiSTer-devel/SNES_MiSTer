@@ -202,8 +202,8 @@ begin
 	BSRAM_OE_N <= CPURD_N;
 	BSRAM_WE_N <= CPUWR_N;
 
-	DO <= BSRAM_Q when SRAM_CE_N = '0' else 
-			ROM_Q(7 downto 0) when PROM_OE_N = '0' or SNES_DROM_OE_N = '0' else
+	DO <= ROM_Q(7 downto 0) when PROM_OE_N = '0' or SNES_DROM_OE_N = '0' else
+			BSRAM_Q when SRAM_CE_N = '0' else 
 			SPC7110_DO;
 			
 	IRQ_N <= '1';

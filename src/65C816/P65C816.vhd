@@ -220,23 +220,25 @@ begin
 			 '1' when (MC.LOAD_AXY(1) = '1') and XF = '0' and EF = '0' else
 			 '0';
 			 
-	SB <= A           when MC.BUS_CTRL(5 downto 3) = "000" else
-		   X           when MC.BUS_CTRL(5 downto 3) = "001" else
-		   Y           when MC.BUS_CTRL(5 downto 3) = "010" else
-		   D           when MC.BUS_CTRL(5 downto 3) = "011" else
-		   T           when MC.BUS_CTRL(5 downto 3) = "100" else
-			SP          when MC.BUS_CTRL(5 downto 3) = "101" else
-			x"00" & PBR when MC.BUS_CTRL(5 downto 3) = "110" else
-			x"00" & DBR when MC.BUS_CTRL(5 downto 3) = "111" else
-			x"0000";
+	with MC.BUS_CTRL(5 downto 3) select
+		SB <= A           when "000",
+				X           when "001",
+				Y           when "010",
+				D           when "011",
+				T           when "100",
+				SP          when "101",
+				x"00" & PBR when "110",
+				x"00" & DBR when "111",
+				x"0000"	   when others;
 	
-	DB <= x"00" & D_IN when MC.BUS_CTRL(2 downto 0) = "000" else
-		   D_IN & DR    when MC.BUS_CTRL(2 downto 0) = "001" else
-		   SB           when MC.BUS_CTRL(2 downto 0) = "010" else
-		   D            when MC.BUS_CTRL(2 downto 0) = "011" else
-		   T            when MC.BUS_CTRL(2 downto 0) = "100" else
-			x"0001"      when MC.BUS_CTRL(2 downto 0) = "101" else
-			x"0000";
+	with MC.BUS_CTRL(2 downto 0) select
+		DB <= x"00" & D_IN when "000",
+				D_IN & DR    when "001",
+				SB           when "010",
+				D            when "011",
+				T            when "100",
+				x"0001"      when "101",
+				x"0000" 		 when others;
 			
 	ALU: entity work.ALU
 	port map (

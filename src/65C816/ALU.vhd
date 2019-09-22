@@ -87,7 +87,7 @@ begin
 	AddSub: entity work.AddSubBCD
 	port map (
 		A     	=> L,
-		B     	=> IntR16, 
+		B     	=> R, 
 		CI     	=> CIIn, 
 		ADD     	=> ADDIn, 
 		BCD     	=> BCDIn,

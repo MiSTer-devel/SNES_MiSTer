@@ -118,30 +118,18 @@ architecture rtl of SPC7110 is
 	signal DP_DATA_OUT 		: std_logic_vector(7 downto 0);
 	
 	--MUL/DIV
+	signal UMUL_RES 			: std_logic_vector(31 downto 0);
+	signal SMUL_RES 			: std_logic_vector(31 downto 0);
+	signal UDIV_QUOT 			: std_logic_vector(31 downto 0);
+	signal UDIV_REM 			: std_logic_vector(15 downto 0);
+	signal SDIV_QUOT 			: std_logic_vector(31 downto 0);
+	signal SDIV_REM 			: std_logic_vector(15 downto 0);
 	signal MULDIV_RES 		: std_logic_vector(31 downto 0);
 	signal REM_RES 			: std_logic_vector(15 downto 0);
 	signal MUL_RUN 			: std_logic;
 	signal DIV_RUN 			: std_logic;
 	signal ALU_CNT 			: unsigned(5 downto 0);
 	signal ALU_BUSY 			: std_logic;
-	signal DIV_REM 			: std_logic_vector(31 downto 0);
-	signal DIV_QUOT 			: std_logic_vector(31 downto 0);
-	signal DIV_TEMP 			: std_logic_vector(46 downto 0);
-	signal MUL_TEMP 			: std_logic_vector(31 downto 0);
-	
-	impure function ChangeSign32(v: std_logic_vector(31 downto 0); s: std_logic) return std_logic_vector is
-		variable res: std_logic_vector(31 downto 0); 
-	begin
-		res := std_logic_vector( (unsigned(v) xor (31 downto 0 => s)) + ("0000000000000000000000000000000" & s) );
-		return res;
-	end function;
-	
-	impure function ChangeSign16(v: std_logic_vector(15 downto 0); s: std_logic) return std_logic_vector is
-		variable res: std_logic_vector(15 downto 0); 
-	begin
-		res := std_logic_vector( (unsigned(v) xor (15 downto 0 => s)) + ("000000000000000" & s) );
-		return res;
-	end function;
 	
 	--DATA ROM
 	signal DROM_ADDR 			: std_logic_vector(23 downto 0);
@@ -172,7 +160,7 @@ begin
 			DEC_BUF_RD_ADDR <= (others => '0');
 			DEC_DONE <= '0';
 			MULDIV_RES <= (others => '0');
-			DIV_REM <= (others => '0');
+			REM_RES <= (others => '0');
 			MUL_RUN <= '0';
 			DIV_RUN <= '0';
 			ALU_CNT <= (others => '0');
@@ -274,16 +262,11 @@ begin
 								MULTIPLIER(7 downto 0) <= DI;
 							when "0100101" =>						--4825
 								MULTIPLIER(15 downto 8) <= DI;
-								MUL_TEMP <= (15 downto 0 => DI(7) and SIGN) & DI & MULTIPLIER(7 downto 0);
-								MULDIV_RES <= (others => '0');
 								MUL_RUN <= '1';
 							when "0100110" =>						--4826
 								DIVISOR(7 downto 0) <= DI;
 							when "0100111" =>						--4827
 								DIVISOR(15 downto 8) <= DI;
-								DIV_TEMP <= ChangeSign16(DI & DIVISOR(7 downto 0), SIGN and DI(7)) & "0000000000000000000000000000000";
-								DIV_REM <= ChangeSign32(DIVIDEND, SIGN and DIVIDEND(31));
-								DIV_QUOT <= (others => '0');
 								DIV_RUN <= '1';
 							when "0101110" =>						--482E
 								SIGN <= DI(0);
@@ -350,38 +333,33 @@ begin
 				end if;
 				
 				if MUL_RUN = '1' then
-					if MULTIPLICAND(0) = '1' then
-						if SIGN = '0' then
-							MULDIV_RES <= std_logic_vector(unsigned(MULDIV_RES) + unsigned(MUL_TEMP));
-						else
-							MULDIV_RES <= std_logic_vector(signed(MULDIV_RES) + signed(MUL_TEMP));
-						end if;
-					end if;
-					MULTIPLICAND <= "0" & MULTIPLICAND(15 downto 1);
-					MUL_TEMP <= MUL_TEMP(30 downto 0) & "0";
-					
-					ALU_CNT <= ALU_CNT + 1;
-					if ALU_CNT = 15 then
+					if ALU_CNT = 29 then
 						ALU_CNT <= (others => '0');
 						MUL_RUN <= '0';
+						if SIGN = '0' then
+							MULDIV_RES <= UMUL_RES;
+						else
+							MULDIV_RES <= SMUL_RES;
+						end if;
+					else
+						ALU_CNT <= ALU_CNT + 1;
 					end if;
 				elsif DIV_RUN = '1' then
-					ALU_CNT <= ALU_CNT + 1;
-					if ALU_CNT <= 31 then
-						if unsigned(DIV_REM) >= unsigned(DIV_TEMP) then
-							DIV_REM <= std_logic_vector( unsigned(DIV_REM) - unsigned(DIV_TEMP(31 downto 0)) );
-							DIV_QUOT <= DIV_QUOT(30 downto 0) & "1";
-						else
-							DIV_QUOT <= DIV_QUOT(30 downto 0) & "0";
-						end if;
-						DIV_TEMP <= "0" & DIV_TEMP(46 downto 1);
-					elsif ALU_CNT = 32 then
+					if ALU_CNT = 39 then
 						ALU_CNT <= (others => '0');
 						DIV_RUN <= '0';
-						MULDIV_RES <= std_logic_vector(ChangeSign32(DIV_QUOT, SIGN and (DIVIDEND(31) xor DIVISOR(15))));
-						REM_RES <= std_logic_vector(ChangeSign16(DIV_REM(15 downto 0), SIGN and (DIVIDEND(31) xor DIVISOR(15))));
+						if SIGN = '0' then
+							MULDIV_RES <= UDIV_QUOT;
+							REM_RES <= UDIV_REM;
+						else
+							MULDIV_RES <= SDIV_QUOT;
+							REM_RES <= SDIV_REM;
+						end if;
+					else
+						ALU_CNT <= ALU_CNT + 1;
 					end if;
 				end if;
+
 			end if;
 		end if;
 	end process; 
@@ -703,5 +681,38 @@ begin
 	
 	PROM_OE_N <= '0' when CA(22 downto 20) = "100" or (CA(22) = '0' and CA(15) = '1') else '1';
 	SRAM_CE_N <= not SRAM_EN when CA(22) = '0' and CA(15 downto 13) = "011" else '1';
+	
+	UMULT : entity work.SPC7110_UMULT
+	PORT MAP (
+		dataa 	=> MULTIPLICAND,
+		datab 	=> MULTIPLIER,
+		result 	=> UMUL_RES
+	);
+	
+	SMULT : entity work.SPC7110_SMULT
+	PORT MAP (
+		dataa 	=> MULTIPLICAND,
+		datab 	=> MULTIPLIER,
+		result 	=> SMUL_RES
+	);
+	
+	UDIV : entity work.SPC7110_UDIV
+	PORT MAP (
+		clock 	=> CLK,
+		numer 	=> DIVIDEND,
+		denom 	=> DIVISOR,
+		quotient => UDIV_QUOT,
+		remain 	=> UDIV_REM
+	);
+	
+	SDIV : entity work.SPC7110_SDIV
+	PORT MAP (
+		clock 	=> CLK,
+		numer 	=> DIVIDEND,
+		denom 	=> DIVISOR,
+		quotient => SDIV_QUOT,
+		remain 	=> SDIV_REM
+	);
+
 	
 end rtl;

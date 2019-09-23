@@ -1228,6 +1228,8 @@ begin
 		if ENABLE = '1' and DOT_CLKR_CE = '1' then
 			if M7_FETCH = '1' then
 				M7_SCREEN_X <= M7_SCREEN_X + 1;
+			elsif H_CNT = LAST_DOT then
+				M7_SCREEN_X <= (others => '0');
 			end if;
 			
 			if H_CNT = LAST_DOT then

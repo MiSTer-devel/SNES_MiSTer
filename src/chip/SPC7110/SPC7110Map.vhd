@@ -123,7 +123,6 @@ begin
 	
 	RTC : entity work.RTC4513
 	port map(
-		RST_N			=> RST_N and MAP_SEL,
 		CLK			=> MCLK,
 		ENABLE		=> ENABLE,
 

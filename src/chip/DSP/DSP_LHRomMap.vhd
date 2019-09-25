@@ -49,6 +49,8 @@ entity DSP_LHRomMap is
 		ROM_MASK		: in std_logic_vector(23 downto 0);
 		BSRAM_MASK	: in std_logic_vector(23 downto 0);
 		
+		EXT_RTC		: in std_logic_vector(64 downto 0);
+		
 		BRK_OUT		: out std_logic;
 		DBG_REG		: in std_logic_vector(7 downto 0) := (others => '0');
 		DBG_DAT_IN	: in std_logic_vector(7 downto 0) := (others => '0');
@@ -75,6 +77,9 @@ architecture rtl of DSP_LHRomMap is
 	signal OBC1_SRAM_A 	: std_logic_vector(12 downto 0);
 	signal OBC1_SRAM_DO 	: std_logic_vector(7 downto 0);
 	
+	signal SRTC_DO 		: std_logic_vector(7 downto 0);
+	signal SRTC_SEL		: std_logic;
+	
 	signal OPENBUS   		: std_logic_vector(7 downto 0);
 
 	signal MAP_DSP_SEL 	: std_logic;
@@ -83,6 +88,10 @@ architecture rtl of DSP_LHRomMap is
 	signal ROM_RD	  		: std_logic;
 		
 begin
+	
+	MAP_DSP_SEL <= not MAP_CTRL(6) and (MAP_CTRL(7) or not (MAP_CTRL(5) or MAP_CTRL(4)));	--8..B
+	MAP_OBC1_SEL <= MAP_CTRL(7) and MAP_CTRL(6) and not MAP_CTRL(5) and not MAP_CTRL(4);	--C
+	MAP_ACTIVE <= MAP_DSP_SEL or MAP_OBC1_SEL;
 	
 	CEGen : entity work.CEGen
 	port map(
@@ -174,12 +183,9 @@ begin
 		end if;
 	end process;
 	
-	ROM_SEL <= not ROMSEL_N and not DSP_SEL and not DP_SEL and not BSRAM_SEL and not OBC1_SEL;
+	SRTC_SEL <= '1' when CA(22) = '0' and CA(15 downto 1) = x"280"&"000" else '0';
+	ROM_SEL <= not ROMSEL_N and not DSP_SEL and not DP_SEL and not SRTC_SEL and not BSRAM_SEL and not OBC1_SEL;
 	
-	MAP_DSP_SEL <= not MAP_CTRL(6) and (MAP_CTRL(7) or not (MAP_CTRL(5) or MAP_CTRL(4)));	--8..B
-	MAP_OBC1_SEL <= MAP_CTRL(7) and MAP_CTRL(6) and not MAP_CTRL(5) and not MAP_CTRL(4);	--C
-	MAP_ACTIVE <= MAP_DSP_SEL or MAP_OBC1_SEL;
-
 
 	DSP_CS_N <= not DSP_SEL;
 	
@@ -228,6 +234,22 @@ begin
 		SRAM_DO		=> OBC1_SRAM_DO
 	);
 	
+	SRTC : entity work.SRTC
+	port map(
+		CLK			=> MCLK,
+
+		A0				=> CA(0),
+		DI				=> DI,
+		DO				=> SRTC_DO,
+		CS				=> SRTC_SEL,
+		CPURD_N		=> CPURD_N,
+		CPUWR_N		=> CPUWR_N,
+		
+		SYSCLKF_CE	=> SYSCLKF_CE,
+		
+		EXT_RTC		=> EXT_RTC
+	);
+	
 	ROM_RD <= (SYSCLKF_CE or SYSCLKR_CE) when rising_edge(MCLK);
 
 	ROM_ADDR <= CART_ADDR and ROM_MASK;
@@ -254,6 +276,7 @@ begin
 	
 	DO <= ROM_Q(7 downto 0) when ROM_SEL = '1' else
 			DSP_DO when DSP_SEL = '1' or DP_SEL = '1' else
+			SRTC_DO when SRTC_SEL = '1' else
 			BSRAM_Q when BSRAM_SEL = '1' or OBC1_SEL = '1' else
 			OPENBUS;
 

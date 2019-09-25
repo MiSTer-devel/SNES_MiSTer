@@ -248,7 +248,9 @@ DSP_LHRomMap DSP_LHRomMap
 
 	.map_ctrl(ROM_TYPE),
 	.rom_mask(ROM_MASK),
-	.bsram_mask(RAM_MASK)
+	.bsram_mask(RAM_MASK),
+	
+	.ext_rtc(EXT_RTC)
 );
 `endif
 

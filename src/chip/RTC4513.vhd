@@ -6,7 +6,6 @@ library work;
 
 entity RTC4513 is
 	port(
-		RST_N			: in std_logic;
 		CLK			: in std_logic;
 		ENABLE		: in std_logic;
 		
@@ -30,8 +29,8 @@ architecture rtl of RTC4513 is
 	signal CE_OLD 		: std_logic := '0';
 	signal LAST_HOLD 	: std_logic := '0';
 	signal LAST_RTC64 : std_logic := '0';
-	signal SEC_DIV  	: integer;
-	signal SEC_TICK 	: std_logic;
+	signal SEC_DIV  	: integer := 0;
+	signal SEC_TICK 	: std_logic := '0';
 	
 	type LastDayOfMonth_t is array(0 to 18) of std_logic_vector(5 downto 0);
 	constant DAYS_TBL	: LastDayOfMonth_t := (
@@ -58,12 +57,9 @@ architecture rtl of RTC4513 is
 
 begin
 
-	process( RST_N, CLK)
+	process( CLK)
 	begin
-		if RST_N = '0' then
-			SEC_DIV <= 0;
-			SEC_TICK <= '0';
-		elsif rising_edge(CLK) then
+		if rising_edge(CLK) then
 			SEC_TICK <= '0';
 			
 			SEC_DIV <= SEC_DIV + 1;

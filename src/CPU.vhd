@@ -1205,36 +1205,36 @@ begin
 			AUTO_JOY_CLK <= '0';
 		elsif rising_edge(CLK) then
 			if ENABLE = '1' and DOT_CLK_CE = '1' then
-				if V_CNT = 0 then
-					JOY_POLL_CNT <= (others => '0');
-				end if;
-				
 				JOY_POLL_CLK <= JOY_POLL_CLK + 1;
-				if JOY_POLL_CLK = 63 and VBLANK = '1' and JOY_POLL_RUN = '0' and JOY_POLL_CNT = 0 and AUTO_JOY_EN = '1' then
-					JOY_POLL_RUN <= '1';
-				elsif JOY_POLL_CLK(4 downto 0) = 31 and JOY_POLL_RUN = '1' then
-					if JOY_POLL_STRB = '0' then
-						if JOY_POLL_CLK(5) = '0' then
-							AUTO_JOY_STRB <= '1';
-							JOYRD_BUSY <= '1';
+				if JOY_POLL_CLK(4 downto 0) = 31 then
+					if JOY_POLL_CLK(5) = '1' and VBLANK = '1' and JOY_POLL_RUN = '0' and AUTO_JOY_EN = '1' then
+						JOY_POLL_RUN <= '1';
+						JOY_POLL_CNT <= (others => '0');
+					elsif JOY_POLL_CLK(5) = '1' and VBLANK = '0' and JOY_POLL_RUN = '1' and JOY_POLL_CNT = 16 then
+						JOY_POLL_RUN <= '0';
+					elsif JOY_POLL_RUN = '1' and JOY_POLL_CNT <= 15 then
+						if JOY_POLL_STRB = '0' then
+							if JOY_POLL_CLK(5) = '0' then
+								AUTO_JOY_STRB <= '1';
+								JOYRD_BUSY <= '1';
+							else
+								AUTO_JOY_STRB <= '0';
+								JOY_POLL_STRB <= '1';
+							end if;
 						else
-							AUTO_JOY_STRB <= '0';
-							JOY_POLL_STRB <= '1';
-						end if;
-					else
-						if JOY_POLL_CLK(5) = '0' then
-							JOY1_DATA(15 downto 0) <= JOY1_DATA(14 downto 0) & not JOY1_DI(0);
-							JOY2_DATA(15 downto 0) <= JOY2_DATA(14 downto 0) & not JOY2_DI(0);
-							JOY3_DATA(15 downto 0) <= JOY3_DATA(14 downto 0) & not JOY1_DI(1);
-							JOY4_DATA(15 downto 0) <= JOY4_DATA(14 downto 0) & not JOY2_DI(1);
-							AUTO_JOY_CLK <= '1';
-						else
-							AUTO_JOY_CLK <= '0';
-							JOY_POLL_CNT <= JOY_POLL_CNT + 1;
-							if JOY_POLL_CNT = 15 then
-								JOYRD_BUSY <= '0';
-								JOY_POLL_RUN <= '0';
-								JOY_POLL_STRB <= '0';
+							if JOY_POLL_CLK(5) = '0' then
+								JOY1_DATA(15 downto 0) <= JOY1_DATA(14 downto 0) & not JOY1_DI(0);
+								JOY2_DATA(15 downto 0) <= JOY2_DATA(14 downto 0) & not JOY2_DI(0);
+								JOY3_DATA(15 downto 0) <= JOY3_DATA(14 downto 0) & not JOY1_DI(1);
+								JOY4_DATA(15 downto 0) <= JOY4_DATA(14 downto 0) & not JOY2_DI(1);
+								AUTO_JOY_CLK <= '1';
+							else
+								AUTO_JOY_CLK <= '0';
+								JOY_POLL_CNT <= JOY_POLL_CNT + 1;
+								if JOY_POLL_CNT = 15 then
+									JOYRD_BUSY <= '0';
+									JOY_POLL_STRB <= '0';
+								end if;
 							end if;
 						end if;
 					end if;

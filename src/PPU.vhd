@@ -809,7 +809,11 @@ VRAM_ADDRB <= DBG_VRAM_ADDR(16 downto 1) when ENABLE = '0' else
 
 VRAM_DAO <= DI;
 VRAM_DBO <= DI;
-VRAM_RD_N <= '0' when ENABLE = '0' else VRAM1_WRITE or VRAM2_WRITE;
+
+VRAM_RD_N <= '0' when ENABLE = '0' else 
+             '0' when BG_FORCE_BLANK = '0' and IN_VBL = '0' else
+			 '0' when PA /= x"18" and PA /= x"19" else
+			 '1';
 VRAM_WRA_N <= '1' when ENABLE = '0' else not VRAM1_WRITE;
 VRAM_WRB_N <= '1' when ENABLE = '0' else not VRAM2_WRITE;
 

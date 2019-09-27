@@ -17,6 +17,8 @@ entity SCPU is
 		CPURD_CYC_N     : out std_logic;
 		PARD_CYC_N      : out std_logic;
 
+		DOT_CLK_CE_O	: out std_logic;
+
 		PA					: out std_logic_vector(7 downto 0);
 		PARD_N			: out std_logic;
 		PAWR_N			: out std_logic;
@@ -347,6 +349,7 @@ begin
 	SYSCLKF_CE <= INT_CLKF_CE;
 	SYSCLKR_CE <= INT_CLKR_CE;
 
+	DOT_CLK_CE_O <= DOT_CLK_CE;
 
 	-- 65C816
 	P65C816: entity work.P65C816 

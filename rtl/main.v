@@ -66,6 +66,8 @@ module main (
    output            HSYNC,
    output            VSYNC,
 
+   output            DOT_CLK_CE,
+
    input       [1:0] JOY1_DI,
    input       [1:0] JOY2_DI,
    output            JOY_STRB,
@@ -144,6 +146,7 @@ SNES SNES
 
 	.sysclkf_ce(SYSCLKF_CE),
 	.sysclkr_ce(SYSCLKR_CE),
+	.dot_clk_ce(DOT_CLK_CE),
 
 	.refresh(REFRESH),
 

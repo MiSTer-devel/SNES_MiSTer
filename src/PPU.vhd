@@ -133,6 +133,8 @@ signal OPVCT 				: std_logic_vector(8 downto 0);
 
 signal OPHCT_latch 		: std_logic;
 signal OPVCT_latch 		: std_logic;
+signal EXTLATCHr 			: std_logic;
+signal F_LATCH 			: std_logic;
 signal CGRAM_Lsb 			: std_logic_vector(7 downto 0);
 signal BGOFS_latch 		: std_logic_vector(7 downto 0);
 signal M7_latch 			: std_logic_vector(7 downto 0);
@@ -140,16 +142,15 @@ signal BGHOFS_latch 		: std_logic_vector(2 downto 0);
 signal OAM_latch 			: std_logic_vector(7 downto 0);
 signal VRAMDATA_Prefetch: std_logic_vector(15 downto 0);
 signal VMADD_INC 			: unsigned(7 downto 0);
-signal F_LATCH 			: std_logic;
 signal OBJ_TIME_OFL 		: std_logic;
 signal OBJ_RANGE_OFL 	: std_logic;
+signal PARD_Nr 			: std_logic;
 
 signal BG_FORCE_BLANK	: std_logic;
 signal VMADD_TRANS 		: std_logic_vector(15 downto 0);
 signal VRAM1_WRITE 		: std_logic;
 signal VRAM2_WRITE 		: std_logic;
 signal VRAM_ADDR_INC 	: std_logic;
-signal EXTLATCHr 			: std_logic;
 signal OAM_ADDR_REQ 		: std_logic;
 signal OAM_PRIO_REQ 		: std_logic;
 signal VRAMPRERD_REQ 	: std_logic;
@@ -414,6 +415,7 @@ begin
 		BGOFS_latch <= (others => '0');
 		BGHOFS_latch <= (others => '0');
 		EXTLATCHr <= '1';
+		PARD_Nr <= '1';
 		
 		OAM_ADDR <= (others => '0');
 		OAM_PRIO <= '0';
@@ -645,19 +647,13 @@ begin
 						BGINTERLACE <= DI(0);
 						OBJINTERLACE <= DI(1);
 						OVERSCAN <= DI(2);
-						PSEUDOHIRES <= DI(3);		--Always out H512
+						PSEUDOHIRES <= DI(3);
 						M7EXTBG <= DI(6);
 					when others => null;
 				end case;
 	
 			elsif PARD_N = '0' and SYSCLK_CE = '1' then
 				case PA is
-					when x"37" =>						--SLHV
-						if EXTLATCH = '1' then
-							OPHCT <= std_logic_vector(H_CNT);
-							OPVCT <= std_logic_vector(V_CNT);	
-							F_LATCH <= '1';
-						end if;
 					when x"38" =>			--RDOAM
 						OAM_ADDR <= std_logic_vector(unsigned(OAM_ADDR) + 1);
 						OAM_PRIO_REQ <= '1';
@@ -701,7 +697,9 @@ begin
 			end if;
 			
 			EXTLATCHr <= EXTLATCH;
-			if EXTLATCH = '0' and EXTLATCHr = '1' then
+			PARD_Nr <= PARD_N;
+			if (EXTLATCH = '0' and EXTLATCHr = '1') or 
+				(PARD_N = '0' and PARD_Nr = '1' and PA = x"37") then	--SLHV 
 				OPHCT <= std_logic_vector(H_CNT);
 				OPVCT <= std_logic_vector(V_CNT);	
 				F_LATCH <= '1';

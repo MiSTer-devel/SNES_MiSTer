@@ -210,9 +210,6 @@ RST_N <= reset_n;
           when "00" =>
             state := "01";
           when "01" =>
-            if SMP_DBG_REG = "00000111" then
-               SMP_DBG_REG <= (others => '0');
-            end if;
             SMP_DBG_REG <= std_logic_vector(unsigned(SMP_DBG_REG) + 1);
             DSP_DBG_REG <= std_logic_vector(unsigned(DSP_DBG_REG) + 1);
             state := "10";

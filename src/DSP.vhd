@@ -46,6 +46,7 @@ architecture rtl of DSP is
 
 	signal MCLK_FREQ 		: integer;
 	signal CE 				: std_logic;
+	signal CEGEN_RST_N 			: std_logic;
 
 	signal RI 				: std_logic_vector(7 downto 0);
 	signal REGN_WR 		: std_logic_vector(6 downto 0);
@@ -196,11 +197,12 @@ architecture rtl of DSP is
 begin
 	
 	MCLK_FREQ <= MCLK_PAL_FREQ when PAL = '1' else MCLK_NTSC_FREQ;
+	CEGEN_RST_N <= RST_N and ENABLE;
 	
 	CEGen : entity work.CEGen
 	port map(
 		CLK      => CLK,
-		RST_N    => RST_N and ENABLE,
+		RST_N    => CEGEN_RST_N,
 		IN_CLK   => MCLK_FREQ,
 		OUT_CLK  => ACLK_FREQ,
 		CE       => CE
@@ -240,8 +242,8 @@ begin
 				  SMP_DO;
 						
 	REGS_WE <= DBG_DAT_WR when ENABLE = '0' and DBG_REG(7) = '0' else
-				  '1' 		 when SMP_WE = '0' and SMP_A = x"00F3" and SUBSTEP = 3 else
-				  '1' 		 when REGN_WR(3 downto 1) = "100" and SUBSTEP = 0 else
+				  '1' 		 when SMP_WE = '0' and SMP_A = x"00F3" and SUBSTEP = 3 and CE = '1' else
+				  '1' 		 when REGN_WR(3 downto 1) = "100" and SUBSTEP = 0 and CE = '1' else
 				  '0';
 	
 	REGRAM : entity work.dpram generic map(7,8)
@@ -250,7 +252,7 @@ begin
 		data_a		=> REGS_DI,
 		address_a	=> REGS_ADDR_WR,
 		address_b	=> REGS_ADDR_RD,
-		wren_a		=> REGS_WE and CE,
+		wren_a		=> REGS_WE,
 		q_b			=> REGS_DO
 	);
 

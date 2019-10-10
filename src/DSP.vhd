@@ -35,6 +35,8 @@ entity DSP is
 		DBG_DAT_IN  : in std_logic_vector(7 downto 0);
 		DBG_DAT_OUT : out std_logic_vector(7 downto 0);
 		DBG_DAT_WR 	: in std_logic;
+		DBG_BBPOS 	: out unsigned(3 downto 0);
+		DBG_BBPOS0 	: out unsigned(4 downto 0);
 
 		AUDIO_L		: out std_logic_vector(15 downto 0);
 		AUDIO_R		: out std_logic_vector(15 downto 0);
@@ -108,6 +110,7 @@ architecture rtl of DSP is
 	signal TBRRHDR 		: std_logic_vector(7 downto 0);
 	signal BRR_BUF 		: VoiceBrrBuf_t;
 	signal BRR_END 		: std_logic_vector(7 downto 0);
+	signal BRR_BUF_ADDR 	: VoiceBrrBufAddr_t;
 	
 	signal ECHO_POS 		: unsigned(14 downto 0);
 	signal ECHO_ADDR 		: unsigned(15 downto 0);
@@ -492,9 +495,12 @@ begin
 		variable SR: signed(15 downto 0);
 		variable SF: signed(16 downto 0);
 		variable S: std_logic_vector(15 downto 0);
+		variable BRR_BUF_ADDR_PREV: unsigned(3 downto 0);
+		variable BRR_BUF_ADDR_NEXT: unsigned(3 downto 0);
 	begin
 		if RST_N = '0' then
 			BRR_BUF <= (others => (others => (others => '0')));
+			BRR_BUF_ADDR <= (others => (others => '0'));
 		elsif rising_edge(CLK) then
 			if ENABLE = '1' and CE = '1' then
 				if BDS.S /= BDS_IDLE and BRR_DECODE_EN = '1' then
@@ -519,8 +525,15 @@ begin
 						SR := signed(S and x"F800");
 					end if;
 					
-					P0 := BRR_BUF(BDS.V)(11);
-					P1 := shift_right(BRR_BUF(BDS.V)(10), 1);
+					BRR_BUF_ADDR_PREV := BRR_BUF_ADDR(BDS.V);
+					if BRR_BUF_ADDR_PREV = 0 then
+						BRR_BUF_ADDR_PREV := to_unsigned(11, 4);
+					else
+						BRR_BUF_ADDR_PREV := BRR_BUF_ADDR_PREV - 1;
+					end if;
+					P0 := BRR_BUF(BDS.V)(to_integer(BRR_BUF_ADDR(BDS.V)));
+					P1 := shift_right(BRR_BUF(BDS.V)(to_integer(BRR_BUF_ADDR_PREV)), 1);
+
 					
 					case FILTER is
 						when "00" => 
@@ -535,10 +548,14 @@ begin
 
 					SOUT := shift_left(CLAMP16(SF), 1);
 					
-					for i in 0 to 10 loop
-						BRR_BUF(BDS.V)(i) <= BRR_BUF(BDS.V)(i+1);
-					end loop;
-					BRR_BUF(BDS.V)(11) <= SOUT;
+					if BRR_BUF_ADDR(BDS.V) = 11 then
+						BRR_BUF_ADDR_NEXT := (others => '0');
+					else
+						BRR_BUF_ADDR_NEXT := BRR_BUF_ADDR(BDS.V) + 1;
+					end if;
+					BRR_BUF(BDS.V)(to_integer(BRR_BUF_ADDR_NEXT)) <= SOUT;
+					BRR_BUF_ADDR(BDS.V) <= BRR_BUF_ADDR_NEXT;
+
 				end if;
 			end if;
 		end if;
@@ -550,6 +567,10 @@ begin
 		variable SUM012, SUM3 : signed(16 downto 0);
 		variable VOL_TEMP : signed(16 downto 0);
 		variable BB_POS : unsigned(3 downto 0);
+		variable BB_POS0 : unsigned(4 downto 0);
+		variable BB_POS1 : unsigned(3 downto 0);
+		variable BB_POS2 : unsigned(3 downto 0);
+		variable BB_POS3 : unsigned(3 downto 0);
 		variable NEW_INTERP_POS : unsigned(15 downto 0);
 		variable GTBL_POS : unsigned(7 downto 0);
 		variable ENV_TEMP, ENV_TEMP2 : signed(12 downto 0);
@@ -683,12 +704,20 @@ begin
 						
 					when IS_ENV2 =>							
 						BB_POS := "0" & unsigned(INTERP_POS(INS.V)(14 downto 12));
+						BB_POS0 := '0' & BB_POS + BRR_BUF_ADDR(INS.V) + 1;
+						DBG_BBPOS  <= BB_POS;
+						DBG_BBPOS0 <= BB_POS0;
+						if BB_POS0 > 11 then BB_POS0 := BB_POS0 - 12; end if;
+						if BB_POS0 = 11 then BB_POS1 := "0000"; else BB_POS1 := BB_POS0(3 downto 0) + to_unsigned(1,1); end if;
+						if BB_POS1 = 11 then BB_POS2 := "0000"; else BB_POS2 := BB_POS1 + to_unsigned(1,1); end if;
+						if BB_POS2 = 11 then BB_POS3 := "0000"; else BB_POS3 := BB_POS2 + to_unsigned(1,1); end if;
+
 						GTBL_POS := unsigned(INTERP_POS(INS.V)(11 downto 4));
 
-						SUM012 := resize( shift_right((GTBL(to_integer("0" & not GTBL_POS)) * BRR_BUF(INS.V)(to_integer(BB_POS + 0))), 11), 17 ) + 
-									 resize( shift_right((GTBL(to_integer("1" & not GTBL_POS)) * BRR_BUF(INS.V)(to_integer(BB_POS + 1))), 11), 17 ) + 
-									 resize( shift_right((GTBL(to_integer("1" &     GTBL_POS)) * BRR_BUF(INS.V)(to_integer(BB_POS + 2))), 11), 17 );
-						SUM3   := resize( shift_right((GTBL(to_integer("0" &     GTBL_POS)) * BRR_BUF(INS.V)(to_integer(BB_POS + 3))), 11), 17 );
+						SUM012 := resize( shift_right((GTBL(to_integer("0" & not GTBL_POS)) * BRR_BUF(INS.V)(to_integer(BB_POS0))), 11), 17 ) + 
+									 resize( shift_right((GTBL(to_integer("1" & not GTBL_POS)) * BRR_BUF(INS.V)(to_integer(BB_POS1))), 11), 17 ) + 
+									 resize( shift_right((GTBL(to_integer("1" &     GTBL_POS)) * BRR_BUF(INS.V)(to_integer(BB_POS2))), 11), 17 );
+						SUM3   := resize( shift_right((GTBL(to_integer("0" &     GTBL_POS)) * BRR_BUF(INS.V)(to_integer(BB_POS3))), 11), 17 );
 						GSUM := CLAMP16( resize(SUM012(15)&SUM012(15 downto 0) + SUM3, 17) );
 						
 						if TNON(INS.V) = '0' then

@@ -900,7 +900,7 @@ begin
 			if H_CNT = 275-1 then HDE <= '0'; end if;
 
 			if H_CNT = HSYNC_START then HSYNC <= '1'; end if;
-			if H_CNT = HSYNC_START+24 then HSYNC <= '0'; end if;
+			if H_CNT = HSYNC_START+23 then HSYNC <= '0'; end if;
 
 			if V_CNT = 1               then VDE <= '1'; end if;
 			if V_CNT = LAST_VIS_LINE+1 then VDE <= '0'; end if;

@@ -35,3 +35,14 @@ set_false_path -to [get_ports {AUDIO_R}]
 set_false_path -to {cfg[*]}
 set_false_path -from {cfg[*]}
 set_false_path -to {wcalc[*] hcalc[*]}
+
+set_multicycle_path -to {*_osd|osd_vcnt*} -setup 2
+set_multicycle_path -to {*_osd|osd_vcnt*} -hold 2
+set_false_path -to {*_osd|v_cnt*}
+set_false_path -to {*_osd|v_osd_start*}
+set_false_path -to {*_osd|h_osd_start*}
+set_false_path -from {*_osd|v_osd_start*}
+set_false_path -from {*_osd|h_osd_start*}
+set_false_path -from {*_osd|rot*}
+set_false_path -from {*_osd|dsp_width*}
+set_false_path -to {*_osd|half}

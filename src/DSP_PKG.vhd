@@ -403,6 +403,13 @@ package DSP_PKG is
 		GS_BRR3
 	);
 
+	type BrrDecState_t is (
+		BD_IDLE,
+		BD_WAIT,
+		BD_P0,
+		BD_P1
+	);
+
 	--Envelope Modes
 	type EnvMode_t is (
 		EM_RELEASE,

@@ -118,6 +118,11 @@ architecture rtl of DSP is
 	signal G_SAMPLE1 	: signed(15 downto 0);
 	signal G_SAMPLE2 	: signed(15 downto 0);
 
+	signal BD_STATE 	: BrrDecState_t;
+	signal SR 		: signed(15 downto 0);
+	signal BD_VOICE 	: integer range 0 to 7;
+	signal P0 		: signed(15 downto 0);
+
 	signal ECHO_POS 		: unsigned(14 downto 0);
 	signal ECHO_ADDR 		: unsigned(15 downto 0);
 	signal ECHO_BUF 		: ChEchoBuf_t;
@@ -497,8 +502,7 @@ begin
 		variable FILTER : std_logic_vector(1 downto 0);
 		variable SCALE : unsigned(3 downto 0);
 		variable SOUT : signed(15 downto 0);
-		variable P0, P1 : signed(15 downto 0);
-		variable SR: signed(15 downto 0);
+		variable P1 : signed(15 downto 0);
 		variable SF: signed(16 downto 0);
 		variable S: std_logic_vector(15 downto 0);
 		variable BRR_BUF_ADDR_PREV: unsigned(3 downto 0);
@@ -507,6 +511,7 @@ begin
 		if RST_N = '0' then
 			BRR_BUF <= (others => (others => (others => '0')));
 			BRR_BUF_ADDR <= (others => (others => '0'));
+			BD_STATE <= BD_IDLE;
 		elsif rising_edge(CLK) then
 			if ENABLE = '1' and CE = '1' then
 				if BDS.S /= BDS_IDLE and BRR_DECODE_EN = '1' then
@@ -526,21 +531,30 @@ begin
 					end case;
 					
 					if SCALE <= 12 then
-						SR := shift_right(shift_left(signed(S), to_integer(SCALE)), 1);
+						SR <= shift_right(shift_left(signed(S), to_integer(SCALE)), 1);
 					else
-						SR := signed(S and x"F800");
+						SR <= signed(S and x"F800");
 					end if;
-					
-					BRR_BUF_ADDR_PREV := BRR_BUF_ADDR(BDS.V);
+					BD_VOICE <= BDS.V;
+					BD_STATE <= BD_WAIT;
+				end if;
+			end if;
+
+			case BD_STATE is
+				when BD_WAIT =>
+					BD_STATE <= BD_P0;
+				when BD_P0 =>
+					BD_STATE <= BD_P1;
+					P0 <= BRR_BUF(BD_VOICE)(to_integer(BRR_BUF_ADDR(BD_VOICE)));
+				when BD_P1 =>
+					BRR_BUF_ADDR_PREV := BRR_BUF_ADDR(BD_VOICE);
 					if BRR_BUF_ADDR_PREV = 0 then
 						BRR_BUF_ADDR_PREV := to_unsigned(11, 4);
 					else
 						BRR_BUF_ADDR_PREV := BRR_BUF_ADDR_PREV - 1;
 					end if;
-					P0 := BRR_BUF(BDS.V)(to_integer(BRR_BUF_ADDR(BDS.V)));
-					P1 := shift_right(BRR_BUF(BDS.V)(to_integer(BRR_BUF_ADDR_PREV)), 1);
+					P1 := shift_right(BRR_BUF(BD_VOICE)(to_integer(BRR_BUF_ADDR_PREV)), 1);
 
-					
 					case FILTER is
 						when "00" => 
 							SF := (resize(SR, 17));
@@ -554,16 +568,17 @@ begin
 
 					SOUT := shift_left(CLAMP16(SF), 1);
 					
-					if BRR_BUF_ADDR(BDS.V) = 11 then
+					if BRR_BUF_ADDR(BD_VOICE) = 11 then
 						BRR_BUF_ADDR_NEXT := (others => '0');
 					else
-						BRR_BUF_ADDR_NEXT := BRR_BUF_ADDR(BDS.V) + 1;
+						BRR_BUF_ADDR_NEXT := BRR_BUF_ADDR(BD_VOICE) + 1;
 					end if;
-					BRR_BUF(BDS.V)(to_integer(BRR_BUF_ADDR_NEXT)) <= SOUT;
-					BRR_BUF_ADDR(BDS.V) <= BRR_BUF_ADDR_NEXT;
+					BRR_BUF(BD_VOICE)(to_integer(BRR_BUF_ADDR_NEXT)) <= SOUT;
+					BRR_BUF_ADDR(BD_VOICE) <= BRR_BUF_ADDR_NEXT;
 
-				end if;
-			end if;
+					BD_STATE <= BD_IDLE;
+				when others => null;
+			end case;
 		end if;
 	end process;
 

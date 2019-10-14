@@ -35,8 +35,6 @@ entity DSP is
 		DBG_DAT_IN  : in std_logic_vector(7 downto 0);
 		DBG_DAT_OUT : out std_logic_vector(7 downto 0);
 		DBG_DAT_WR 	: in std_logic;
-		DBG_BBPOS 	: out unsigned(3 downto 0);
-		DBG_BBPOS0 	: out unsigned(4 downto 0);
 
 		AUDIO_L		: out std_logic_vector(15 downto 0);
 		AUDIO_R		: out std_logic_vector(15 downto 0);
@@ -111,7 +109,15 @@ architecture rtl of DSP is
 	signal BRR_BUF 		: VoiceBrrBuf_t;
 	signal BRR_END 		: std_logic_vector(7 downto 0);
 	signal BRR_BUF_ADDR 	: VoiceBrrBufAddr_t;
-	
+
+	signal BB_POS0 		: unsigned(4 downto 0);
+	signal GS_STATE 	: GaussStep_t;
+	signal GTBL_POS 	: unsigned(7 downto 0);
+	signal G_VOICE  	: integer range 0 to 7;
+	signal G_SAMPLE0 	: signed(15 downto 0);
+	signal G_SAMPLE1 	: signed(15 downto 0);
+	signal G_SAMPLE2 	: signed(15 downto 0);
+
 	signal ECHO_POS 		: unsigned(14 downto 0);
 	signal ECHO_ADDR 		: unsigned(15 downto 0);
 	signal ECHO_BUF 		: ChEchoBuf_t;
@@ -567,12 +573,8 @@ begin
 		variable SUM012, SUM3 : signed(16 downto 0);
 		variable VOL_TEMP : signed(16 downto 0);
 		variable BB_POS : unsigned(3 downto 0);
-		variable BB_POS0 : unsigned(4 downto 0);
-		variable BB_POS1 : unsigned(3 downto 0);
-		variable BB_POS2 : unsigned(3 downto 0);
-		variable BB_POS3 : unsigned(3 downto 0);
+		variable BB_POS0_TEMP : unsigned(4 downto 0);
 		variable NEW_INTERP_POS : unsigned(15 downto 0);
-		variable GTBL_POS : unsigned(7 downto 0);
 		variable ENV_TEMP, ENV_TEMP2 : signed(12 downto 0);
 		variable ENV_RATE : unsigned(4 downto 0);
 		variable GAIN_MODE : unsigned(2 downto 0);
@@ -623,6 +625,7 @@ begin
 			ENVX_OUT <= (others => '0');
 			BRR_DECODE_EN <= '0';
 			BRR_END <= (others => '0');
+			GS_STATE <= GS_IDLE;
 		elsif rising_edge(CLK) then
 			if ENABLE = '0' then 
 				if DBG_DAT_WR = '1' and DBG_REG(7) = '0' then 
@@ -702,114 +705,14 @@ begin
 						
 						TENVX(INS.V) <= "0" & std_logic_vector(ENV(INS.V)(10 downto 4));
 						
-					when IS_ENV2 =>							
+					when IS_ENV2 =>
 						BB_POS := "0" & unsigned(INTERP_POS(INS.V)(14 downto 12));
-						BB_POS0 := '0' & BB_POS + BRR_BUF_ADDR(INS.V) + 1;
-						DBG_BBPOS  <= BB_POS;
-						DBG_BBPOS0 <= BB_POS0;
-						if BB_POS0 > 11 then BB_POS0 := BB_POS0 - 12; end if;
-						if BB_POS0 = 11 then BB_POS1 := "0000"; else BB_POS1 := BB_POS0(3 downto 0) + to_unsigned(1,1); end if;
-						if BB_POS1 = 11 then BB_POS2 := "0000"; else BB_POS2 := BB_POS1 + to_unsigned(1,1); end if;
-						if BB_POS2 = 11 then BB_POS3 := "0000"; else BB_POS3 := BB_POS2 + to_unsigned(1,1); end if;
-
-						GTBL_POS := unsigned(INTERP_POS(INS.V)(11 downto 4));
-
-						SUM012 := resize( shift_right((GTBL(to_integer("0" & not GTBL_POS)) * BRR_BUF(INS.V)(to_integer(BB_POS0))), 11), 17 ) + 
-									 resize( shift_right((GTBL(to_integer("1" & not GTBL_POS)) * BRR_BUF(INS.V)(to_integer(BB_POS1))), 11), 17 ) + 
-									 resize( shift_right((GTBL(to_integer("1" &     GTBL_POS)) * BRR_BUF(INS.V)(to_integer(BB_POS2))), 11), 17 );
-						SUM3   := resize( shift_right((GTBL(to_integer("0" &     GTBL_POS)) * BRR_BUF(INS.V)(to_integer(BB_POS3))), 11), 17 );
-						GSUM := CLAMP16( resize(SUM012(15)&SUM012(15 downto 0) + SUM3, 17) );
-						
-						if TNON(INS.V) = '0' then
-							OUT_TEMP := GSUM and x"FFFE";
-						else
-							OUT_TEMP := NOISE & "0";
-						end if;
-						
-						--env apply
-						TOUT <= resize( shift_right(OUT_TEMP * LAST_ENV, 11), TOUT'length ) and x"FFFE";
-						
-						--envelope
-						if KON_CNT(INS.V) = 0 then
-							if ENV_MODE(INS.V) = EM_RELEASE then
-								ENV_TEMP2 := resize(ENV(INS.V), ENV_TEMP2'length) - 8;
-								if ENV_TEMP2 < 0 then
-									ENV_TEMP2 := (others => '0');
-								end if;
-								ENV(INS.V) <= resize(ENV_TEMP2, ENV(INS.V)'length);
-								ENV_RATE := (others => '1');
-							else
-								if TADSR1(7) = '1' then
-									if ENV_MODE(INS.V) = EM_DECAY or ENV_MODE(INS.V) = EM_SUSTAIN then
-										ENV_TEMP := resize(ENV(INS.V), ENV_TEMP'length) - shift_right(ENV(INS.V) - 1, 8) - 1;
-										if ENV_MODE(INS.V) = EM_DECAY then
-											ENV_RATE := ("1" & unsigned(TADSR1(6 downto 4)) & "0") ;
-										else
-											ENV_RATE := unsigned(TADSR2(4 downto 0));
-										end if;
-									else
-										ENV_RATE := (unsigned(TADSR1(3 downto 0)) & "1");
-										if ENV_RATE /= 31 then
-											ENV_TEMP := resize(ENV(INS.V), ENV_TEMP'length) + x"020";
-										else
-											ENV_TEMP := resize(ENV(INS.V), ENV_TEMP'length) + x"400";
-										end if;
-									end if;
-								else
-									GAIN_MODE := unsigned(TADSR2(7 downto 5));
-									if GAIN_MODE(2) = '0' then
-										ENV_TEMP := signed(resize(unsigned(TADSR2(6 downto 0)) & "0000", ENV_TEMP'length));
-										ENV_RATE := (others => '1');
-									else
-										ENV_RATE := unsigned(TADSR2(4 downto 0));
-										if GAIN_MODE(1 downto 0) = "00" then
-											ENV_TEMP := resize(ENV(INS.V), ENV_TEMP'length) - x"020";
-										elsif GAIN_MODE(1 downto 0) = "01" then
-											ENV_TEMP := resize(ENV(INS.V), ENV_TEMP'length) - shift_right(ENV(INS.V) - 1, 8) - 1;
-										elsif GAIN_MODE(1 downto 0) = "10" then
-											ENV_TEMP := resize(ENV(INS.V), ENV_TEMP'length) + x"020";
-										else 
-											if BENT_INC_MODE(INS.V) = '0' then
-												ENV_TEMP := resize(ENV(INS.V), ENV_TEMP'length) + x"020";
-											else
-												ENV_TEMP := resize(ENV(INS.V), ENV_TEMP'length) + x"008";
-											end if;
-										end if;
-									end if;
-								end if;
-								
-								if unsigned(ENV_TEMP(10 downto 0)) >= x"600" or ENV_TEMP(12 downto 11) /= "00" then
-									BENT_INC_MODE(INS.V) <= '1';
-								else
-									BENT_INC_MODE(INS.V) <= '0';
-								end if;
-								
-								if unsigned(ENV_TEMP(10 downto 8)) = unsigned(TADSR2(7 downto 5)) and ENV_MODE(INS.V) = EM_DECAY then
-									ENV_MODE(INS.V) <= EM_SUSTAIN;
-								end if;
-
-								if ENV_TEMP(12 downto 11) /= "00" then
-									if ENV_TEMP < 0 then
-										ENV_TEMP2 := (others => '0');
-									else
-										ENV_TEMP2 := "0011111111111";
-									end if;
-									if ENV_MODE(INS.V) = EM_ATTACK then
-										ENV_MODE(INS.V) <= EM_DECAY;
-									end if;
-								else
-									ENV_TEMP2 := ENV_TEMP;
-								end if;
-									
-								if GCOUNT_TRIGGER(to_integer(ENV_RATE)) = '1' then
-									ENV(INS.V) <= resize(ENV_TEMP2, ENV(INS.V)'length);
-								end if;
-							end if;								
-						else
-							ENV(INS.V) <= (others => '0');
-							BENT_INC_MODE(INS.V) <= '0';
-						end if;
-												
+						BB_POS0_TEMP := '0' & BB_POS + BRR_BUF_ADDR(INS.V) + 1;
+						if BB_POS0_TEMP > 11 then BB_POS0_TEMP := BB_POS0_TEMP - 12; end if;
+						BB_POS0 <= BB_POS0_TEMP;
+						GTBL_POS <= unsigned(INTERP_POS(INS.V)(11 downto 4));
+						G_VOICE <= INS.V;
+						GS_STATE <= GS_WAIT;
 					when others => null;
 				end case;
 				
@@ -977,7 +880,122 @@ begin
 					end if;
 					FFC_CNT <= FFC_CNT + 1;
 				end if;
-			end if;	
+			end if; -- CE='1'
+
+			case GS_STATE is
+				when GS_WAIT =>
+					GS_STATE <= GS_BRR0;
+				when GS_BRR0 =>
+					G_SAMPLE0 <= BRR_BUF(G_VOICE)(to_integer(BB_POS0));
+					if BB_POS0 = 11 then BB_POS0 <= "00000"; else BB_POS0 <= BB_POS0 + to_unsigned(1,1); end if;
+					GS_STATE <= GS_BRR1;
+				when GS_BRR1 =>
+					G_SAMPLE1 <= BRR_BUF(G_VOICE)(to_integer(BB_POS0));
+					if BB_POS0 = 11 then BB_POS0 <= "00000"; else BB_POS0 <= BB_POS0 + to_unsigned(1,1); end if;
+					GS_STATE <= GS_BRR2;
+				when GS_BRR2 =>
+					G_SAMPLE2 <= BRR_BUF(G_VOICE)(to_integer(BB_POS0));
+					if BB_POS0 = 11 then BB_POS0 <= "00000"; else BB_POS0 <= BB_POS0 + to_unsigned(1,1); end if;
+					GS_STATE <= GS_BRR3;
+				when GS_BRR3 =>
+					SUM012 := resize( shift_right((GTBL(to_integer("0" & not GTBL_POS)) * G_SAMPLE0), 11), 17 ) + 
+					          resize( shift_right((GTBL(to_integer("1" & not GTBL_POS)) * G_SAMPLE1), 11), 17 ) + 
+					          resize( shift_right((GTBL(to_integer("1" &     GTBL_POS)) * G_SAMPLE2), 11), 17 );
+					SUM3   := resize( shift_right((GTBL(to_integer("0" &     GTBL_POS)) * BRR_BUF(G_VOICE)(to_integer(BB_POS0))), 11), 17 );
+					GSUM := CLAMP16( resize(SUM012(15)&SUM012(15 downto 0) + SUM3, 17) );
+
+					if TNON(G_VOICE) = '0' then
+						OUT_TEMP := GSUM and x"FFFE";
+					else
+						OUT_TEMP := NOISE & "0";
+					end if;
+
+					--env apply
+					TOUT <= resize( shift_right(OUT_TEMP * LAST_ENV, 11), TOUT'length ) and x"FFFE";
+
+					--envelope
+					if KON_CNT(G_VOICE) = 0 then
+						if ENV_MODE(G_VOICE) = EM_RELEASE then
+							ENV_TEMP2 := resize(ENV(G_VOICE), ENV_TEMP2'length) - 8;
+							if ENV_TEMP2 < 0 then
+								ENV_TEMP2 := (others => '0');
+							end if;
+							ENV(G_VOICE) <= resize(ENV_TEMP2, ENV(G_VOICE)'length);
+							ENV_RATE := (others => '1');
+						else
+							if TADSR1(7) = '1' then
+								if ENV_MODE(G_VOICE) = EM_DECAY or ENV_MODE(G_VOICE) = EM_SUSTAIN then
+									ENV_TEMP := resize(ENV(G_VOICE), ENV_TEMP'length) - shift_right(ENV(G_VOICE) - 1, 8) - 1;
+									if ENV_MODE(G_VOICE) = EM_DECAY then
+										ENV_RATE := ("1" & unsigned(TADSR1(6 downto 4)) & "0") ;
+									else
+										ENV_RATE := unsigned(TADSR2(4 downto 0));
+									end if;
+								else
+									ENV_RATE := (unsigned(TADSR1(3 downto 0)) & "1");
+									if ENV_RATE /= 31 then
+										ENV_TEMP := resize(ENV(G_VOICE), ENV_TEMP'length) + x"020";
+									else
+										ENV_TEMP := resize(ENV(G_VOICE), ENV_TEMP'length) + x"400";
+									end if;
+								end if;
+							else
+								GAIN_MODE := unsigned(TADSR2(7 downto 5));
+								if GAIN_MODE(2) = '0' then
+									ENV_TEMP := signed(resize(unsigned(TADSR2(6 downto 0)) & "0000", ENV_TEMP'length));
+									ENV_RATE := (others => '1');
+								else
+									ENV_RATE := unsigned(TADSR2(4 downto 0));
+									if GAIN_MODE(1 downto 0) = "00" then
+										ENV_TEMP := resize(ENV(G_VOICE), ENV_TEMP'length) - x"020";
+									elsif GAIN_MODE(1 downto 0) = "01" then
+										ENV_TEMP := resize(ENV(G_VOICE), ENV_TEMP'length) - shift_right(ENV(G_VOICE) - 1, 8) - 1;
+									elsif GAIN_MODE(1 downto 0) = "10" then
+										ENV_TEMP := resize(ENV(G_VOICE), ENV_TEMP'length) + x"020";
+									else 
+										if BENT_INC_MODE(G_VOICE) = '0' then
+											ENV_TEMP := resize(ENV(G_VOICE), ENV_TEMP'length) + x"020";
+										else
+											ENV_TEMP := resize(ENV(G_VOICE), ENV_TEMP'length) + x"008";
+										end if;
+									end if;
+								end if;
+							end if;
+
+							if unsigned(ENV_TEMP(10 downto 0)) >= x"600" or ENV_TEMP(12 downto 11) /= "00" then
+								BENT_INC_MODE(G_VOICE) <= '1';
+							else
+								BENT_INC_MODE(G_VOICE) <= '0';
+							end if;
+
+							if unsigned(ENV_TEMP(10 downto 8)) = unsigned(TADSR2(7 downto 5)) and ENV_MODE(G_VOICE) = EM_DECAY then
+								ENV_MODE(G_VOICE) <= EM_SUSTAIN;
+							end if;
+
+							if ENV_TEMP(12 downto 11) /= "00" then
+								if ENV_TEMP < 0 then
+									ENV_TEMP2 := (others => '0');
+								else
+									ENV_TEMP2 := "0011111111111";
+								end if;
+								if ENV_MODE(G_VOICE) = EM_ATTACK then
+									ENV_MODE(G_VOICE) <= EM_DECAY;
+								end if;
+							else
+								ENV_TEMP2 := ENV_TEMP;
+							end if;
+
+							if GCOUNT_TRIGGER(to_integer(ENV_RATE)) = '1' then
+								ENV(G_VOICE) <= resize(ENV_TEMP2, ENV(G_VOICE)'length);
+							end if;
+						end if;
+					else
+						ENV(G_VOICE) <= (others => '0');
+						BENT_INC_MODE(G_VOICE) <= '0';
+					end if;
+					GS_STATE <= GS_IDLE;
+				when others => null;
+			end case;
 		end if;
 	end process;
 	

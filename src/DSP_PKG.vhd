@@ -393,7 +393,16 @@ package DSP_PKG is
 	((IS_IDLE, 0),    (IS_IDLE, 0),    (IS_ENV,  0),    (IS_ENV2, 0)),
 	((IS_IDLE, 0),    (IS_IDLE, 0),    (IS_IDLE, 0),    (IS_IDLE, 0))
 	);
-	
+
+	type GaussStep_t is (
+		GS_IDLE,
+		GS_WAIT,
+		GS_BRR0,
+		GS_BRR1,
+		GS_BRR2,
+		GS_BRR3
+	);
+
 	--Envelope Modes
 	type EnvMode_t is (
 		EM_RELEASE,

@@ -489,8 +489,6 @@ package DSP_PKG is
 	type KonCnt_t is array (0 to 7) of unsigned(2 downto 0);
 	type BrrAddr_t is array (0 to 7) of std_logic_vector(15 downto 0);
 	type BrrOffs_t is array (0 to 7) of unsigned(2 downto 0);
-	type BrrBuf_t is array (0 to 11) of signed(15 downto 0);
-	type VoiceBrrBuf_t is array (0 to 7) of BrrBuf_t;
 	type VoiceBrrBufAddr_t is array(0 to 7) of unsigned(3 downto 0);
 	type Out_t is array (0 to 1) of signed(15 downto 0);
 	type EchoBuf_t is array (0 to 7) of std_logic_vector(14 downto 0);

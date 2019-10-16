@@ -106,21 +106,27 @@ architecture rtl of DSP is
 	signal BRR_OFFS 		: BrrOffs_t;
 	signal TBRRDAT 		: std_logic_vector(15 downto 0);
 	signal TBRRHDR 		: std_logic_vector(7 downto 0);
-	signal BRR_BUF 		: VoiceBrrBuf_t;
 	signal BRR_END 		: std_logic_vector(7 downto 0);
-	signal BRR_BUF_ADDR 	: VoiceBrrBufAddr_t;
+	signal BRR_BUF_ADDR 	: VoiceBrrBufAddr_t; -- last written pos in the ring buffer
 
-	signal BB_POS0 		: unsigned(4 downto 0);
+	signal BRR_BUF_ADDR_A 		: std_logic_vector(6 downto 0) := (others => '0');
+	signal BRR_BUF_WE 		: std_logic;
+	signal BRR_BUF_DI 		: signed(15 downto 0);
+	signal BRR_BUF_DO 		: signed(15 downto 0);
+	signal BRR_BUF_ADDR_B 		: std_logic_vector(6 downto 0) := (others => '0');
+	signal BRR_BUF_GAUSS_DO		: signed(15 downto 0);
+	signal BRR_BUF_ADDR_B_NEXT 	: std_logic_vector(3 downto 0);
+
 	signal GS_STATE 	: GaussStep_t;
 	signal GTBL_POS 	: unsigned(7 downto 0);
-	signal G_VOICE  	: integer range 0 to 7;
+	signal G_VOICE  	: unsigned(2 downto 0);
 	signal G_SAMPLE0 	: signed(15 downto 0);
 	signal G_SAMPLE1 	: signed(15 downto 0);
 	signal G_SAMPLE2 	: signed(15 downto 0);
 
 	signal BD_STATE 	: BrrDecState_t;
 	signal SR 		: signed(15 downto 0);
-	signal BD_VOICE 	: integer range 0 to 7;
+	signal BD_VOICE 	: unsigned(2 downto 0);
 	signal P0 		: signed(15 downto 0);
 
 	signal ECHO_POS 		: unsigned(14 downto 0);
@@ -270,7 +276,6 @@ begin
 		q_b			=> REGS_DO
 	);
 
-	
 	process(CLK, RST_N)
 	begin
 		if RST_N = '0' then
@@ -497,7 +502,18 @@ begin
 	RAM_WE_N <= not RAM_WE;
 	RAM_OE_N <= not RAM_OE;
 	RAM_CE_N <= not RAM_CE;
-	
+
+	BRR_BUF : entity work.dpram generic map(7,16)
+	port map(
+		clock			=> CLK,
+		address_a	=> BRR_BUF_ADDR_A,
+		wren_a		=> BRR_BUF_WE,
+		data_a		=> std_logic_vector(BRR_BUF_DI),
+		signed(q_a)	=> BRR_BUF_DO,
+		address_b	=> BRR_BUF_ADDR_B,
+		signed(q_b)	=> BRR_BUF_GAUSS_DO
+	);
+
 	process(CLK, RST_N)
 		variable FILTER : std_logic_vector(1 downto 0);
 		variable SCALE : unsigned(3 downto 0);
@@ -509,10 +525,11 @@ begin
 		variable BRR_BUF_ADDR_NEXT: unsigned(3 downto 0);
 	begin
 		if RST_N = '0' then
-			BRR_BUF <= (others => (others => (others => '0')));
 			BRR_BUF_ADDR <= (others => (others => '0'));
+			BRR_BUF_WE <= '0';
 			BD_STATE <= BD_IDLE;
 		elsif rising_edge(CLK) then
+			BRR_BUF_WE <= '0';
 			if ENABLE = '1' and CE = '1' then
 				if BDS.S /= BDS_IDLE and BRR_DECODE_EN = '1' then
 					FILTER := TBRRHDR(3 downto 2);
@@ -535,7 +552,9 @@ begin
 					else
 						SR <= signed(S and x"F800");
 					end if;
-					BD_VOICE <= BDS.V;
+					BD_VOICE <= to_unsigned(BDS.V, 3);
+					BRR_BUF_ADDR_A(6 downto 4) <= std_logic_vector(to_unsigned(BDS.V, 3));
+					BRR_BUF_ADDR_A(3 downto 0) <= std_logic_vector(BRR_BUF_ADDR(BDS.V));
 					BD_STATE <= BD_WAIT;
 				end if;
 			end if;
@@ -543,17 +562,18 @@ begin
 			case BD_STATE is
 				when BD_WAIT =>
 					BD_STATE <= BD_P0;
-				when BD_P0 =>
-					BD_STATE <= BD_P1;
-					P0 <= BRR_BUF(BD_VOICE)(to_integer(BRR_BUF_ADDR(BD_VOICE)));
-				when BD_P1 =>
-					BRR_BUF_ADDR_PREV := BRR_BUF_ADDR(BD_VOICE);
+					BRR_BUF_ADDR_PREV := BRR_BUF_ADDR(to_integer(BD_VOICE));
 					if BRR_BUF_ADDR_PREV = 0 then
 						BRR_BUF_ADDR_PREV := to_unsigned(11, 4);
 					else
 						BRR_BUF_ADDR_PREV := BRR_BUF_ADDR_PREV - 1;
 					end if;
-					P1 := shift_right(BRR_BUF(BD_VOICE)(to_integer(BRR_BUF_ADDR_PREV)), 1);
+					BRR_BUF_ADDR_A(3 downto 0) <= std_logic_vector(BRR_BUF_ADDR_PREV);
+				when BD_P0 =>
+					BD_STATE <= BD_P1;
+					P0 <= BRR_BUF_DO;
+				when BD_P1 =>
+					P1 := shift_right(BRR_BUF_DO, 1);
 
 					case FILTER is
 						when "00" => 
@@ -568,13 +588,15 @@ begin
 
 					SOUT := shift_left(CLAMP16(SF), 1);
 					
-					if BRR_BUF_ADDR(BD_VOICE) = 11 then
+					if BRR_BUF_ADDR(to_integer(BD_VOICE)) = 11 then
 						BRR_BUF_ADDR_NEXT := (others => '0');
 					else
-						BRR_BUF_ADDR_NEXT := BRR_BUF_ADDR(BD_VOICE) + 1;
+						BRR_BUF_ADDR_NEXT := BRR_BUF_ADDR(to_integer(BD_VOICE)) + 1;
 					end if;
-					BRR_BUF(BD_VOICE)(to_integer(BRR_BUF_ADDR_NEXT)) <= SOUT;
-					BRR_BUF_ADDR(BD_VOICE) <= BRR_BUF_ADDR_NEXT;
+					BRR_BUF_ADDR_A(3 downto 0) <= std_logic_vector(BRR_BUF_ADDR_NEXT);
+					BRR_BUF_DI <= SOUT;
+					BRR_BUF_WE <= '1';
+					BRR_BUF_ADDR(to_integer(BD_VOICE)) <= BRR_BUF_ADDR_NEXT;
 
 					BD_STATE <= BD_IDLE;
 				when others => null;
@@ -582,13 +604,14 @@ begin
 		end if;
 	end process;
 
+	BRR_BUF_ADDR_B_NEXT <= "0000" when BRR_BUF_ADDR_B(3 downto 0) = "1011" else std_logic_vector(unsigned(BRR_BUF_ADDR_B(3 downto 0)) + 1);
 
 	process(CLK, RST_N)
 		variable GSUM, OUT_TEMP : signed(15 downto 0);
 		variable SUM012, SUM3 : signed(16 downto 0);
 		variable VOL_TEMP : signed(16 downto 0);
 		variable BB_POS : unsigned(3 downto 0);
-		variable BB_POS0_TEMP : unsigned(4 downto 0);
+		variable BB_POS0 : unsigned(4 downto 0);
 		variable NEW_INTERP_POS : unsigned(15 downto 0);
 		variable ENV_TEMP, ENV_TEMP2 : signed(12 downto 0);
 		variable ENV_RATE : unsigned(4 downto 0);
@@ -722,11 +745,12 @@ begin
 						
 					when IS_ENV2 =>
 						BB_POS := "0" & unsigned(INTERP_POS(INS.V)(14 downto 12));
-						BB_POS0_TEMP := '0' & BB_POS + BRR_BUF_ADDR(INS.V) + 1;
-						if BB_POS0_TEMP > 11 then BB_POS0_TEMP := BB_POS0_TEMP - 12; end if;
-						BB_POS0 <= BB_POS0_TEMP;
+						BB_POS0 := '0' & BB_POS + BRR_BUF_ADDR(INS.V) + 1;
+						if BB_POS0 > 11 then BB_POS0 := BB_POS0 - 12; end if;
 						GTBL_POS <= unsigned(INTERP_POS(INS.V)(11 downto 4));
-						G_VOICE <= INS.V;
+						G_VOICE <= to_unsigned(INS.V, 3);
+						BRR_BUF_ADDR_B(6 downto 4) <= std_logic_vector(to_unsigned(INS.V, 3));
+						BRR_BUF_ADDR_B(3 downto 0) <= std_logic_vector(BB_POS0(3 downto 0));
 						GS_STATE <= GS_WAIT;
 					when others => null;
 				end case;
@@ -900,26 +924,29 @@ begin
 			case GS_STATE is
 				when GS_WAIT =>
 					GS_STATE <= GS_BRR0;
+					BRR_BUF_ADDR_B(3 downto 0) <= BRR_BUF_ADDR_B_NEXT;
 				when GS_BRR0 =>
-					G_SAMPLE0 <= BRR_BUF(G_VOICE)(to_integer(BB_POS0));
-					if BB_POS0 = 11 then BB_POS0 <= "00000"; else BB_POS0 <= BB_POS0 + to_unsigned(1,1); end if;
+
+					BRR_BUF_ADDR_B(3 downto 0) <= BRR_BUF_ADDR_B_NEXT;
+					G_SAMPLE0 <= BRR_BUF_GAUSS_DO;
 					GS_STATE <= GS_BRR1;
 				when GS_BRR1 =>
-					G_SAMPLE1 <= BRR_BUF(G_VOICE)(to_integer(BB_POS0));
-					if BB_POS0 = 11 then BB_POS0 <= "00000"; else BB_POS0 <= BB_POS0 + to_unsigned(1,1); end if;
+
+					BRR_BUF_ADDR_B(3 downto 0) <= BRR_BUF_ADDR_B_NEXT;
+					G_SAMPLE1 <= BRR_BUF_GAUSS_DO;
 					GS_STATE <= GS_BRR2;
 				when GS_BRR2 =>
-					G_SAMPLE2 <= BRR_BUF(G_VOICE)(to_integer(BB_POS0));
-					if BB_POS0 = 11 then BB_POS0 <= "00000"; else BB_POS0 <= BB_POS0 + to_unsigned(1,1); end if;
+
+					G_SAMPLE2 <= BRR_BUF_GAUSS_DO;
 					GS_STATE <= GS_BRR3;
 				when GS_BRR3 =>
 					SUM012 := resize( shift_right((GTBL(to_integer("0" & not GTBL_POS)) * G_SAMPLE0), 11), 17 ) + 
 					          resize( shift_right((GTBL(to_integer("1" & not GTBL_POS)) * G_SAMPLE1), 11), 17 ) + 
 					          resize( shift_right((GTBL(to_integer("1" &     GTBL_POS)) * G_SAMPLE2), 11), 17 );
-					SUM3   := resize( shift_right((GTBL(to_integer("0" &     GTBL_POS)) * BRR_BUF(G_VOICE)(to_integer(BB_POS0))), 11), 17 );
+					SUM3   := resize( shift_right((GTBL(to_integer("0" &     GTBL_POS)) * BRR_BUF_GAUSS_DO), 11), 17 );
 					GSUM := CLAMP16( resize(SUM012(15)&SUM012(15 downto 0) + SUM3, 17) );
 
-					if TNON(G_VOICE) = '0' then
+					if TNON(to_integer(G_VOICE)) = '0' then
 						OUT_TEMP := GSUM and x"FFFE";
 					else
 						OUT_TEMP := NOISE & "0";
@@ -929,19 +956,19 @@ begin
 					TOUT <= resize( shift_right(OUT_TEMP * LAST_ENV, 11), TOUT'length ) and x"FFFE";
 
 					--envelope
-					if KON_CNT(G_VOICE) = 0 then
-						if ENV_MODE(G_VOICE) = EM_RELEASE then
-							ENV_TEMP2 := resize(ENV(G_VOICE), ENV_TEMP2'length) - 8;
+					if KON_CNT(to_integer(G_VOICE)) = 0 then
+						if ENV_MODE(to_integer(G_VOICE)) = EM_RELEASE then
+							ENV_TEMP2 := resize(ENV(to_integer(G_VOICE)), ENV_TEMP2'length) - 8;
 							if ENV_TEMP2 < 0 then
 								ENV_TEMP2 := (others => '0');
 							end if;
-							ENV(G_VOICE) <= resize(ENV_TEMP2, ENV(G_VOICE)'length);
+							ENV(to_integer(G_VOICE)) <= resize(ENV_TEMP2, ENV(to_integer(G_VOICE))'length);
 							ENV_RATE := (others => '1');
 						else
 							if TADSR1(7) = '1' then
-								if ENV_MODE(G_VOICE) = EM_DECAY or ENV_MODE(G_VOICE) = EM_SUSTAIN then
-									ENV_TEMP := resize(ENV(G_VOICE), ENV_TEMP'length) - shift_right(ENV(G_VOICE) - 1, 8) - 1;
-									if ENV_MODE(G_VOICE) = EM_DECAY then
+								if ENV_MODE(to_integer(G_VOICE)) = EM_DECAY or ENV_MODE(to_integer(G_VOICE)) = EM_SUSTAIN then
+									ENV_TEMP := resize(ENV(to_integer(G_VOICE)), ENV_TEMP'length) - shift_right(ENV(to_integer(G_VOICE)) - 1, 8) - 1;
+									if ENV_MODE(to_integer(G_VOICE)) = EM_DECAY then
 										ENV_RATE := ("1" & unsigned(TADSR1(6 downto 4)) & "0") ;
 									else
 										ENV_RATE := unsigned(TADSR2(4 downto 0));
@@ -949,9 +976,9 @@ begin
 								else
 									ENV_RATE := (unsigned(TADSR1(3 downto 0)) & "1");
 									if ENV_RATE /= 31 then
-										ENV_TEMP := resize(ENV(G_VOICE), ENV_TEMP'length) + x"020";
+										ENV_TEMP := resize(ENV(to_integer(G_VOICE)), ENV_TEMP'length) + x"020";
 									else
-										ENV_TEMP := resize(ENV(G_VOICE), ENV_TEMP'length) + x"400";
+										ENV_TEMP := resize(ENV(to_integer(G_VOICE)), ENV_TEMP'length) + x"400";
 									end if;
 								end if;
 							else
@@ -962,29 +989,29 @@ begin
 								else
 									ENV_RATE := unsigned(TADSR2(4 downto 0));
 									if GAIN_MODE(1 downto 0) = "00" then
-										ENV_TEMP := resize(ENV(G_VOICE), ENV_TEMP'length) - x"020";
+										ENV_TEMP := resize(ENV(to_integer(G_VOICE)), ENV_TEMP'length) - x"020";
 									elsif GAIN_MODE(1 downto 0) = "01" then
-										ENV_TEMP := resize(ENV(G_VOICE), ENV_TEMP'length) - shift_right(ENV(G_VOICE) - 1, 8) - 1;
+										ENV_TEMP := resize(ENV(to_integer(G_VOICE)), ENV_TEMP'length) - shift_right(ENV(to_integer(G_VOICE)) - 1, 8) - 1;
 									elsif GAIN_MODE(1 downto 0) = "10" then
-										ENV_TEMP := resize(ENV(G_VOICE), ENV_TEMP'length) + x"020";
+										ENV_TEMP := resize(ENV(to_integer(G_VOICE)), ENV_TEMP'length) + x"020";
 									else 
-										if BENT_INC_MODE(G_VOICE) = '0' then
-											ENV_TEMP := resize(ENV(G_VOICE), ENV_TEMP'length) + x"020";
+										if BENT_INC_MODE(to_integer(G_VOICE)) = '0' then
+											ENV_TEMP := resize(ENV(to_integer(G_VOICE)), ENV_TEMP'length) + x"020";
 										else
-											ENV_TEMP := resize(ENV(G_VOICE), ENV_TEMP'length) + x"008";
+											ENV_TEMP := resize(ENV(to_integer(G_VOICE)), ENV_TEMP'length) + x"008";
 										end if;
 									end if;
 								end if;
 							end if;
 
 							if unsigned(ENV_TEMP(10 downto 0)) >= x"600" or ENV_TEMP(12 downto 11) /= "00" then
-								BENT_INC_MODE(G_VOICE) <= '1';
+								BENT_INC_MODE(to_integer(G_VOICE)) <= '1';
 							else
-								BENT_INC_MODE(G_VOICE) <= '0';
+								BENT_INC_MODE(to_integer(G_VOICE)) <= '0';
 							end if;
 
-							if unsigned(ENV_TEMP(10 downto 8)) = unsigned(TADSR2(7 downto 5)) and ENV_MODE(G_VOICE) = EM_DECAY then
-								ENV_MODE(G_VOICE) <= EM_SUSTAIN;
+							if unsigned(ENV_TEMP(10 downto 8)) = unsigned(TADSR2(7 downto 5)) and ENV_MODE(to_integer(G_VOICE)) = EM_DECAY then
+								ENV_MODE(to_integer(G_VOICE)) <= EM_SUSTAIN;
 							end if;
 
 							if ENV_TEMP(12 downto 11) /= "00" then
@@ -993,20 +1020,20 @@ begin
 								else
 									ENV_TEMP2 := "0011111111111";
 								end if;
-								if ENV_MODE(G_VOICE) = EM_ATTACK then
-									ENV_MODE(G_VOICE) <= EM_DECAY;
+								if ENV_MODE(to_integer(G_VOICE)) = EM_ATTACK then
+									ENV_MODE(to_integer(G_VOICE)) <= EM_DECAY;
 								end if;
 							else
 								ENV_TEMP2 := ENV_TEMP;
 							end if;
 
 							if GCOUNT_TRIGGER(to_integer(ENV_RATE)) = '1' then
-								ENV(G_VOICE) <= resize(ENV_TEMP2, ENV(G_VOICE)'length);
+								ENV(to_integer(G_VOICE)) <= resize(ENV_TEMP2, ENV(to_integer(G_VOICE))'length);
 							end if;
 						end if;
 					else
-						ENV(G_VOICE) <= (others => '0');
-						BENT_INC_MODE(G_VOICE) <= '0';
+						ENV(to_integer(G_VOICE)) <= (others => '0');
+						BENT_INC_MODE(to_integer(G_VOICE)) <= '0';
 					end if;
 					GS_STATE <= GS_IDLE;
 				when others => null;

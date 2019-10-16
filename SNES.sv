@@ -281,7 +281,12 @@ wire  [7:0] joy0_x,joy0_y,joy1_x,joy1_y;
 
 wire [64:0] RTC;
 
-hps_io #(.STRLEN($size(CONF_STR)>>3), .WIDE(1)) hps_io
+wire        gamma_en;
+wire        gamma_wr;
+wire  [9:0] gamma_wr_addr;
+wire  [7:0] gamma_value;
+
+hps_io #(.STRLEN($size(CONF_STR)>>3), .WIDE(1), .GAMMA(1)) hps_io
 (
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
@@ -324,7 +329,12 @@ hps_io #(.STRLEN($size(CONF_STR)>>3), .WIDE(1)) hps_io
 	.img_readonly(img_readonly),
 	.img_size(img_size),
 	
-	.RTC(RTC)
+	.RTC(RTC),
+
+	.gamma_en(gamma_en),
+	.gamma_wr(gamma_wr),
+	.gamma_wr_addr(gamma_wr_addr),
+	.gamma_value(gamma_value)
 );
 
 wire       GUN_BTN = status[27];
@@ -684,16 +694,22 @@ wire [2:0] scale = status[11:9];
 wire [2:0] sl = scale ? scale - 1'd1 : 3'd0;
 wire       scandoubler = ~interlace && (scale || forced_scandoubler);
 
-video_mixer #(.LINE_LENGTH(520)) video_mixer
+video_mixer #(.LINE_LENGTH(520), .GAMMA(1)) video_mixer
 (
 	.*,
 
-	.clk_sys(CLK_VIDEO),
+	.clk_vid(CLK_VIDEO),
 	.ce_pix_out(CE_PIXEL),
 
+	.clk_sys(clk_sys),
 	.scanlines(0),
 	.hq2x(scale==1),
 	.mono(0),
+
+	.gamma_en(gamma_en),
+	.gamma_wr(gamma_wr),
+	.gamma_wr_addr(gamma_wr_addr),
+	.gamma_value(gamma_value),
 
 	.HBlank(~HBlank_n),
 	.VBlank(~VBlank_n),

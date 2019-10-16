@@ -118,11 +118,11 @@ architecture rtl of DSP is
 	signal BRR_BUF_ADDR_B_NEXT 	: std_logic_vector(3 downto 0);
 
 	signal GS_STATE 	: GaussStep_t;
+	signal GTBL_ADDR 	: unsigned(8 downto 0);
+	signal GTBL_DO 		: signed(11 downto 0);
 	signal GTBL_POS 	: unsigned(7 downto 0);
 	signal G_VOICE  	: unsigned(2 downto 0);
-	signal G_SAMPLE0 	: signed(15 downto 0);
-	signal G_SAMPLE1 	: signed(15 downto 0);
-	signal G_SAMPLE2 	: signed(15 downto 0);
+	signal SUM012 		: signed(16 downto 0);
 
 	signal BD_STATE 	: BrrDecState_t;
 	signal SR 		: signed(15 downto 0);
@@ -608,7 +608,7 @@ begin
 
 	process(CLK, RST_N)
 		variable GSUM, OUT_TEMP : signed(15 downto 0);
-		variable SUM012, SUM3 : signed(16 downto 0);
+		variable SUM3 : signed(16 downto 0);
 		variable VOL_TEMP : signed(16 downto 0);
 		variable BB_POS : unsigned(3 downto 0);
 		variable BB_POS0 : unsigned(4 downto 0);
@@ -621,6 +621,7 @@ begin
 		variable NEW_NOISE : unsigned(14 downto 0);
 	begin
 		if RST_N = '0' then
+			GTBL_ADDR <= (others => '0');
 			BRR_ADDR <= (others => (others => '0'));
 			BRR_OFFS <= (others => (others => '0'));
 			INTERP_POS <= (others => (others => '0'));
@@ -665,6 +666,7 @@ begin
 			BRR_END <= (others => '0');
 			GS_STATE <= GS_IDLE;
 		elsif rising_edge(CLK) then
+			GTBL_DO <= GTBL(to_integer(GTBL_ADDR));
 			if ENABLE = '0' then 
 				if DBG_DAT_WR = '1' and DBG_REG(7) = '0' then 
 					if DBG_REG(6 downto 0) = "1101100" then		--5C FLG
@@ -747,14 +749,13 @@ begin
 						BB_POS := "0" & unsigned(INTERP_POS(INS.V)(14 downto 12));
 						BB_POS0 := '0' & BB_POS + BRR_BUF_ADDR(INS.V) + 1;
 						if BB_POS0 > 11 then BB_POS0 := BB_POS0 - 12; end if;
-						GTBL_POS <= unsigned(INTERP_POS(INS.V)(11 downto 4));
+						GTBL_ADDR <= '0' & not (INTERP_POS(INS.V)(11 downto 4));
 						G_VOICE <= to_unsigned(INS.V, 3);
 						BRR_BUF_ADDR_B(6 downto 4) <= std_logic_vector(to_unsigned(INS.V, 3));
 						BRR_BUF_ADDR_B(3 downto 0) <= std_logic_vector(BB_POS0(3 downto 0));
 						GS_STATE <= GS_WAIT;
 					when others => null;
 				end case;
-				
 				case VS.S is
 					when VS_ADSR1 =>
 						TADSR1 <= REGS_DO;
@@ -925,25 +926,26 @@ begin
 				when GS_WAIT =>
 					GS_STATE <= GS_BRR0;
 					BRR_BUF_ADDR_B(3 downto 0) <= BRR_BUF_ADDR_B_NEXT;
+					GTBL_ADDR(8) <= '1';
+
 				when GS_BRR0 =>
-
+					SUM012 <= resize( shift_right(GTBL_DO * BRR_BUF_GAUSS_DO, 11), 17 );
 					BRR_BUF_ADDR_B(3 downto 0) <= BRR_BUF_ADDR_B_NEXT;
-					G_SAMPLE0 <= BRR_BUF_GAUSS_DO;
+					GTBL_ADDR(7 downto 0) <= not GTBL_ADDR(7 downto 0);
 					GS_STATE <= GS_BRR1;
+
 				when GS_BRR1 =>
-
+			        SUM012 <= SUM012 + resize( shift_right(GTBL_DO * BRR_BUF_GAUSS_DO, 11), 17 );
 					BRR_BUF_ADDR_B(3 downto 0) <= BRR_BUF_ADDR_B_NEXT;
-					G_SAMPLE1 <= BRR_BUF_GAUSS_DO;
+					GTBL_ADDR(8) <= '0';
 					GS_STATE <= GS_BRR2;
-				when GS_BRR2 =>
 
-					G_SAMPLE2 <= BRR_BUF_GAUSS_DO;
+				when GS_BRR2 =>
+					SUM012 <= SUM012 + resize( shift_right(GTBL_DO * BRR_BUF_GAUSS_DO, 11), 17 );
 					GS_STATE <= GS_BRR3;
+
 				when GS_BRR3 =>
-					SUM012 := resize( shift_right((GTBL(to_integer("0" & not GTBL_POS)) * G_SAMPLE0), 11), 17 ) + 
-					          resize( shift_right((GTBL(to_integer("1" & not GTBL_POS)) * G_SAMPLE1), 11), 17 ) + 
-					          resize( shift_right((GTBL(to_integer("1" &     GTBL_POS)) * G_SAMPLE2), 11), 17 );
-					SUM3   := resize( shift_right((GTBL(to_integer("0" &     GTBL_POS)) * BRR_BUF_GAUSS_DO), 11), 17 );
+					SUM3   := resize( shift_right(GTBL_DO * BRR_BUF_GAUSS_DO, 11), 17 );
 					GSUM := CLAMP16( resize(SUM012(15)&SUM012(15 downto 0) + SUM3, 17) );
 
 					if TNON(to_integer(G_VOICE)) = '0' then

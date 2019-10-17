@@ -28,7 +28,7 @@
 
 // WIDE=1 for 16 bit file I/O
 // VDNUM 1-4
-module hps_io #(parameter STRLEN=0, PS2DIV=0, WIDE=0, VDNUM=1, PS2WE=0)
+module hps_io #(parameter STRLEN=0, PS2DIV=0, WIDE=0, VDNUM=1, PS2WE=0, GAMMA=0)
 (
 	input             clk_sys,
 	inout      [45:0] HPS_BUS,
@@ -126,7 +126,12 @@ module hps_io #(parameter STRLEN=0, PS2DIV=0, WIDE=0, VDNUM=1, PS2WE=0)
 
 	// [24] - toggles with every event
 	output reg [24:0] ps2_mouse = 0,
-	output reg [15:0] ps2_mouse_ext = 0 // 15:8 - reserved(additional buttons), 7:0 - wheel movements
+	output reg [15:0] ps2_mouse_ext = 0, // 15:8 - reserved(additional buttons), 7:0 - wheel movements
+
+	output reg        gamma_en,
+	output reg        gamma_wr,
+	output reg  [9:0] gamma_wr_addr,
+	output reg  [7:0] gamma_value
 );
 
 localparam DW = (WIDE) ? 15 : 7;
@@ -217,6 +222,8 @@ always@(posedge clk_sys) begin
 
 	if(PS2DIV) {kbd_rd,kbd_we,mouse_rd,mouse_we} <= 0;
 
+	gamma_wr <= 0;
+
 	if(~io_enable) begin
 		if(cmd == 4 && !ps2skip) ps2_mouse[24] <= ~ps2_mouse[24];
 		if(cmd == 5 && !ps2skip) begin
@@ -249,6 +256,7 @@ always@(posedge clk_sys) begin
 					'h29: io_dout <= {4'hA, stflg};
 					'h2B: io_dout <= 1;
 					'h2F: io_dout <= 1;
+					'h32: io_dout <= GAMMA ? 1 : 0;
 				endcase
 
 				sd_buff_addr <= 0;
@@ -397,6 +405,14 @@ always@(posedge clk_sys) begin
 
 					//sdram size set
 					'h31: if(byte_cnt == 1) sdram_sz <= io_din;
+
+					// Gamma
+					'h32: gamma_en <= io_din[0];
+					'h33: begin
+						gamma_wr_addr <= {(byte_cnt[1:0]-1'b1),io_din[15:8]};
+						{gamma_wr, gamma_value} <= {1'b1,io_din[7:0]};
+						if (byte_cnt[1:0] == 3) byte_cnt <= 1;
+					end
 				endcase
 			end
 		end

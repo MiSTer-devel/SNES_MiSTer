@@ -80,6 +80,7 @@ architecture rtl of SCPU is
 	signal P65_VPA, P65_VDA : std_logic;
 	signal P65_BRK : std_logic;
 	signal P65_BANK: std_logic_vector(7 downto 0);
+	signal P65_A_HIGH: std_logic_vector(7 downto 0);
 
 	type speed_t is (
 		XSLOW,
@@ -237,6 +238,9 @@ architecture rtl of SCPU is
 	signal JOY_POLL_RUN: std_logic;
 	signal JOY_VBLANK_OLD: std_logic;
 
+	-- Counter to determine the number of clock cycles since the p65 last accessed a peripheral
+	signal P65_ACCESSED_PERIPHERAL_CNT : unsigned(7 downto 0);
+
 	--debug
 	signal FRAME_CNT: unsigned(15 downto 0);
 	signal P65_RDY: std_logic;
@@ -245,18 +249,16 @@ begin
 
 	DMA_ACTIVE <= DMA_RUN or HDMA_RUN;
 	P65_BANK <= P65_A(23 downto 16);
+	P65_A_HIGH <= P65_A(15 downto 8);
 
-	process( SPEED, MEMSEL, REFRESHED, CPU_ACTIVEr, TURBO, P65_A, P65_BANK )
+	process( SPEED, MEMSEL, REFRESHED, CPU_ACTIVEr, TURBO, DMA_ACTIVE, P65_ACCESSED_PERIPHERAL_CNT, VBLANK, HBLANK, NMI_EN, NMI_FLAG)
 	begin
 		CPU_MID_CLOCK <= x"2";
 		DMA_MID_CLOCK <= "011";
 		DMA_LAST_CLOCK <= "111";
-		-- No turbo while accessing APU ports $2140-$2143 in banks $00-$3F and their mirrors at $80-$BF
-		if TURBO = '1' and not (P65_A(15 downto 4) = x"214" and (P65_BANK < x"40" or (P65_BANK > x"7F" and P65_BANK < x"C0"))) then
-			CPU_LAST_CLOCK <= x"3";
-			CPU_MID_CLOCK <= x"1";
-			DMA_LAST_CLOCK <= "011";
-			DMA_MID_CLOCK <= "001";
+		-- Turbo should only occur when the cpu is ONLY accessing ram/rom, in otherwords during the main game loop
+		if TURBO = '1' and not (DMA_ACTIVE = '1' or NMI_EN = '0'  or NMI_FLAG = '1' or VBLANK = '1' or HBLANK = '1' or P65_ACCESSED_PERIPHERAL_CNT /= x"0") then
+			CPU_LAST_CLOCK <= x"4";
 		elsif REFRESHED = '1' and CPU_ACTIVEr = '1' then
 			CPU_LAST_CLOCK <= x"7";
 		elsif SPEED = FAST or (SPEED = SLOWFAST and MEMSEL = '1') then
@@ -272,6 +274,7 @@ begin
 	begin
 		if RST_N = '0' then
 			P65_CLK_CNT <= (others => '0');
+			P65_ACCESSED_PERIPHERAL_CNT <= (others => '0');
 			DMA_CLK_CNT <= (others => '0');
 			INT_CLK <= '1';
 			CPU_ACTIVEr <= '1';
@@ -282,8 +285,14 @@ begin
 				DMA_CLK_CNT <= (others => '0');
 			end if;
 			
+			if ((P65_A_HIGH > x"1F" and P65_A_HIGH < x"80") and (P65_BANK < x"40" or (P65_BANK > x"7F" and P65_BANK < x"C0"))) then
+				P65_ACCESSED_PERIPHERAL_CNT <= x"1F";
+			elsif P65_ACCESSED_PERIPHERAL_CNT /= x"0" then
+				P65_ACCESSED_PERIPHERAL_CNT <= P65_ACCESSED_PERIPHERAL_CNT - 1;
+			end if;
+
 			P65_CLK_CNT <= P65_CLK_CNT + 1;
-			if P65_CLK_CNT = CPU_LAST_CLOCK  then
+			if P65_CLK_CNT >= CPU_LAST_CLOCK  then
 				P65_CLK_CNT <= (others => '0');
 			end if;
 
@@ -295,7 +304,7 @@ begin
 			
 			if CPU_ACTIVEr = '1' and DMA_ACTIVE = '1' and DMA_ACTIVEr = '0' and REFRESHED = '0' then
 				CPU_ACTIVEr <= '0';
-			elsif CPU_ACTIVEr = '0' and DMA_ACTIVE = '0' and P65_CLK_CNT = CPU_LAST_CLOCK and REFRESHED = '0' then
+			elsif CPU_ACTIVEr = '0' and DMA_ACTIVE = '0' and P65_CLK_CNT >= CPU_LAST_CLOCK and REFRESHED = '0' then
 				CPU_ACTIVEr <= '1';
 			end if;
 
@@ -308,7 +317,7 @@ begin
 			elsif CPU_ACTIVEr = '1' then
 				if P65_CLK_CNT = CPU_MID_CLOCK then
 					INT_CLK <= '1';
-				elsif P65_CLK_CNT = CPU_LAST_CLOCK then
+				elsif P65_CLK_CNT >= CPU_LAST_CLOCK then
 					INT_CLK <= '0';
 				end if;
 			end if;
@@ -332,7 +341,7 @@ begin
 			elsif CPU_ACTIVEr = '1' then
 				if P65_CLK_CNT = CPU_MID_CLOCK then
 					INT_CLKR_CE <= '1';
-				elsif P65_CLK_CNT = CPU_LAST_CLOCK  then
+				elsif P65_CLK_CNT >= CPU_LAST_CLOCK  then
 					INT_CLKF_CE <= '1';
 				end if;
 			end if;

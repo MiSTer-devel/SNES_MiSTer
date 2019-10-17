@@ -133,6 +133,8 @@ signal OPVCT 				: std_logic_vector(8 downto 0);
 
 signal OPHCT_latch 		: std_logic;
 signal OPVCT_latch 		: std_logic;
+signal EXTLATCHr 			: std_logic;
+signal F_LATCH 			: std_logic;
 signal CGRAM_Lsb 			: std_logic_vector(7 downto 0);
 signal BGOFS_latch 		: std_logic_vector(7 downto 0);
 signal M7_latch 			: std_logic_vector(7 downto 0);
@@ -140,16 +142,15 @@ signal BGHOFS_latch 		: std_logic_vector(2 downto 0);
 signal OAM_latch 			: std_logic_vector(7 downto 0);
 signal VRAMDATA_Prefetch: std_logic_vector(15 downto 0);
 signal VMADD_INC 			: unsigned(7 downto 0);
-signal F_LATCH 			: std_logic;
 signal OBJ_TIME_OFL 		: std_logic;
 signal OBJ_RANGE_OFL 	: std_logic;
+signal PARD_Nr 			: std_logic;
 
 signal BG_FORCE_BLANK	: std_logic;
 signal VMADD_TRANS 		: std_logic_vector(15 downto 0);
 signal VRAM1_WRITE 		: std_logic;
 signal VRAM2_WRITE 		: std_logic;
 signal VRAM_ADDR_INC 	: std_logic;
-signal EXTLATCHr 			: std_logic;
 signal OAM_ADDR_REQ 		: std_logic;
 signal OAM_PRIO_REQ 		: std_logic;
 signal VRAMPRERD_REQ 	: std_logic;
@@ -169,6 +170,7 @@ signal IN_VBL 				: std_logic;
 signal BG_VRAM_ADDRA 	: std_logic_vector(15 downto 0);
 signal BG_VRAM_ADDRB 	: std_logic_vector(15 downto 0);
 signal BG_FETCH 			: std_logic;
+signal M7_FETCH 			: std_logic;
 signal SPR_GET_PIXEL 	: std_logic;
 signal BG_GET_PIXEL 		: std_logic;
 signal BG_MATH 			: std_logic;
@@ -189,10 +191,12 @@ signal BG1_PIX_DATA 		: std_logic_vector(11 downto 0);
 signal BG2_PIX_DATA 		: std_logic_vector(7 downto 0);
 signal BG3_PIX_DATA 		: std_logic_vector(5 downto 0);
 signal BG4_PIX_DATA 		: std_logic_vector(5 downto 0);
+signal M7_PIX_DATA 		: std_logic_vector(7 downto 0);
 
+signal MPY 					: signed(23 downto 0);
+signal M7_SCREEN_X  		: unsigned(7 downto 0);
 signal M7_TEMP_X 			: signed(23 downto 0);
 signal M7_TEMP_Y 			: signed(23 downto 0);
-signal MPY 					: signed(23 downto 0);
 signal M7_TILE_N 			: unsigned(7 downto 0);
 signal M7_TILE_ROW 		: unsigned(2 downto 0);
 signal M7_TILE_COL 		: unsigned(2 downto 0);
@@ -261,7 +265,7 @@ signal CGRAM_ADDR 		: std_logic_vector(7 downto 0);
 signal CGRAM_ADDR_INC	: std_logic;
 
 -- COLOR MATH
-signal SUB_COLOR 			: std_logic_vector(14 downto 0);
+signal PREV_COLOR			: std_logic_vector(14 downto 0);
 signal SUB_BD 				: std_logic;
 signal MAIN_R				: unsigned(4 downto 0);
 signal MAIN_G				: unsigned(4 downto 0);
@@ -269,6 +273,9 @@ signal MAIN_B				: unsigned(4 downto 0);
 signal SUB_R				: unsigned(4 downto 0);
 signal SUB_G				: unsigned(4 downto 0);
 signal SUB_B				: unsigned(4 downto 0);
+signal SUB_MATH_R			: unsigned(4 downto 0);
+signal SUB_MATH_G			: unsigned(4 downto 0);
+signal SUB_MATH_B			: unsigned(4 downto 0);
 signal HIRES 				: std_logic;
 
 --debug
@@ -408,6 +415,7 @@ begin
 		BGOFS_latch <= (others => '0');
 		BGHOFS_latch <= (others => '0');
 		EXTLATCHr <= '1';
+		PARD_Nr <= '1';
 		
 		OAM_ADDR <= (others => '0');
 		OAM_PRIO <= '0';
@@ -639,19 +647,13 @@ begin
 						BGINTERLACE <= DI(0);
 						OBJINTERLACE <= DI(1);
 						OVERSCAN <= DI(2);
-						PSEUDOHIRES <= DI(3);		--Always out H512
+						PSEUDOHIRES <= DI(3);
 						M7EXTBG <= DI(6);
 					when others => null;
 				end case;
 	
 			elsif PARD_N = '0' and SYSCLK_CE = '1' then
 				case PA is
-					when x"37" =>						--SLHV
-						if EXTLATCH = '1' then
-							OPHCT <= std_logic_vector(H_CNT);
-							OPVCT <= std_logic_vector(V_CNT);	
-							F_LATCH <= '1';
-						end if;
 					when x"38" =>			--RDOAM
 						OAM_ADDR <= std_logic_vector(unsigned(OAM_ADDR) + 1);
 						OAM_PRIO_REQ <= '1';
@@ -695,7 +697,9 @@ begin
 			end if;
 			
 			EXTLATCHr <= EXTLATCH;
-			if EXTLATCH = '0' and EXTLATCHr = '1' then
+			PARD_Nr <= PARD_N;
+			if (EXTLATCH = '0' and EXTLATCHr = '1') or 
+				(PARD_N = '0' and PARD_Nr = '1' and PA = x"37") then	--SLHV 
 				OPHCT <= std_logic_vector(H_CNT);
 				OPVCT <= std_logic_vector(V_CNT);	
 				F_LATCH <= '1';
@@ -710,7 +714,7 @@ begin
 		MDR1 <= (others => '1');
 		MDR2 <= (others => '1');
 	elsif rising_edge(CLK) then
-		if PARD_N = '0' then
+		if PARD_N = '0' and SYSCLK_CE = '1' then
 			if PA = x"34" or PA = x"35" or PA = x"36" or PA = x"38" or PA = x"39" or PA = x"3A" or PA = x"3E" then
 				MDR1 <= D_OUT;
 			end if;
@@ -721,59 +725,62 @@ begin
 	end if;
 end process;
 
-process( PA, MPY, OAM_ADDR, OAMIO_Q, HOAM_Q, VRAMDATA_Prefetch, OBJ_TIME_OFL, OBJ_RANGE_OFL, 
-			CGADD, CGRAM_Q, OPHCT_latch, OPHCT, OPVCT_latch, OPVCT, FIELD, F_LATCH, EXTLATCH, PAL, MDR1, MDR2, DI)
+process( RST_N, CLK)
 begin 
-	case PA is
-		when x"04" | x"05" | x"06" | x"08" | x"09" | x"0A" | 
-			  x"14" | x"15" | x"16" | x"18" | x"19" | x"1A" | 
-			  x"24" | x"25" | x"26" | x"28" | x"29" =>	
-			D_OUT <= MDR1;
-		when x"34" =>						--MPYL
-			D_OUT <= std_logic_vector(MPY(7 downto 0));
-		when x"35" =>						--MPYM
-			D_OUT <= std_logic_vector(MPY(15 downto 8));
-		when x"36" =>						--MPYH
-			D_OUT <= std_logic_vector(MPY(23 downto 16));
-		when x"38" =>						--RDOAM
-			if OAM_ADDR(9) = '0' then
-				if OAM_ADDR(0) = '0' then
-					D_OUT <= OAMIO_Q(7 downto 0);
+	if RST_N = '0' then
+		D_OUT <= (others => '0');
+	elsif rising_edge(CLK) then
+		case PA is
+			when x"04" | x"05" | x"06" | x"08" | x"09" | x"0A" | 
+				  x"14" | x"15" | x"16" | x"18" | x"19" | x"1A" | 
+				  x"24" | x"25" | x"26" | x"28" | x"29" =>	
+				D_OUT <= MDR1;
+			when x"34" =>						--MPYL
+				D_OUT <= std_logic_vector(MPY(7 downto 0));
+			when x"35" =>						--MPYM
+				D_OUT <= std_logic_vector(MPY(15 downto 8));
+			when x"36" =>						--MPYH
+				D_OUT <= std_logic_vector(MPY(23 downto 16));
+			when x"38" =>						--RDOAM
+				if OAM_ADDR(9) = '0' then
+					if OAM_ADDR(0) = '0' then
+						D_OUT <= OAMIO_Q(7 downto 0);
+					else
+						D_OUT <= OAMIO_Q(15 downto 8);
+					end if;
 				else
-					D_OUT <= OAMIO_Q(15 downto 8);
+					D_OUT <= HOAM_Q;
 				end if;
-			else
-				D_OUT <= HOAM_Q;
-			end if;
-		when x"39" =>						--RDVRAML
-			D_OUT <= VRAMDATA_Prefetch(7 downto 0);
-		when x"3A" =>						--RDVRAMH
-			D_OUT <= VRAMDATA_Prefetch(15 downto 8);
-		when x"3E" =>						--STAT77
-			D_OUT <= OBJ_TIME_OFL & OBJ_RANGE_OFL & "0" & MDR1(4) & x"1";
-		when x"3B" =>						--RDCGRAM
-			if CGADD(0) = '0' then
-				D_OUT <= CGRAM_Q(7 downto 0);
-			else
-				D_OUT <= MDR2(7) & CGRAM_Q(14 downto 8);
-			end if;
-		when x"3C" =>						--OPHCT
-			if OPHCT_latch = '0' then
-				D_OUT <= OPHCT(7 downto 0);
-			else
-				D_OUT <= MDR2(7 downto 1) & OPHCT(8);
-			end if;
-		when x"3D" =>						--OPVCT
-			if OPVCT_latch = '0' then
-				D_OUT <= OPVCT(7 downto 0);
-			else
-				D_OUT <= MDR2(7 downto 1) & OPVCT(8);
-			end if;
-		when x"3F" =>						--STAT78
-			D_OUT <= FIELD & ((not EXTLATCH) or F_LATCH) & MDR2(5) & PAL & x"3";
-		when others =>
-			D_OUT <= DI;
-	end case;
+			when x"39" =>						--RDVRAML
+				D_OUT <= VRAMDATA_Prefetch(7 downto 0);
+			when x"3A" =>						--RDVRAMH
+				D_OUT <= VRAMDATA_Prefetch(15 downto 8);
+			when x"3E" =>						--STAT77
+				D_OUT <= OBJ_TIME_OFL & OBJ_RANGE_OFL & "0" & MDR1(4) & x"1";
+			when x"3B" =>						--RDCGRAM
+				if CGADD(0) = '0' then
+					D_OUT <= CGRAM_Q(7 downto 0);
+				else
+					D_OUT <= MDR2(7) & CGRAM_Q(14 downto 8);
+				end if;
+			when x"3C" =>						--OPHCT
+				if OPHCT_latch = '0' then
+					D_OUT <= OPHCT(7 downto 0);
+				else
+					D_OUT <= MDR2(7 downto 1) & OPHCT(8);
+				end if;
+			when x"3D" =>						--OPVCT
+				if OPVCT_latch = '0' then
+					D_OUT <= OPVCT(7 downto 0);
+				else
+					D_OUT <= MDR2(7 downto 1) & OPVCT(8);
+				end if;
+			when x"3F" =>						--STAT78
+				D_OUT <= FIELD & ((not EXTLATCH) or F_LATCH) & MDR2(5) & PAL & x"3";
+			when others =>
+				D_OUT <= DI;
+		end case;
+	end if;
 end process;
 
 DO <= D_OUT;
@@ -800,7 +807,11 @@ VRAM_ADDRB <= DBG_VRAM_ADDR(16 downto 1) when ENABLE = '0' else
 
 VRAM_DAO <= DI;
 VRAM_DBO <= DI;
-VRAM_RD_N <= '0' when ENABLE = '0' else VRAM1_WRITE or VRAM2_WRITE;
+
+VRAM_RD_N <= '0' when ENABLE = '0' else 
+             '0' when BG_FORCE_BLANK = '0' and IN_VBL = '0' else
+			 '0' when PA /= x"18" and PA /= x"19" else
+			 '1';
 VRAM_WRA_N <= '1' when ENABLE = '0' else not VRAM1_WRITE;
 VRAM_WRB_N <= '1' when ENABLE = '0' else not VRAM2_WRITE;
 
@@ -853,8 +864,9 @@ begin
 			
 			if BGINTERLACE = '1' and FIELD = '0' then
 				VSYNC_HSTART := VSYNC_I_HSTART;
+				VSYNC_LINE := VSYNC_LINE + 1;
 			else
-				VSYNC_HSTART := (others => '0');
+				VSYNC_HSTART := HSYNC_START;
 			end if;
 
 			if OVERSCAN = '1' then
@@ -887,8 +899,8 @@ begin
 			if H_CNT = 19-1  then HDE <= '1'; end if;
 			if H_CNT = 275-1 then HDE <= '0'; end if;
 
-			if H_CNT = 297-1 then HSYNC <= '1'; end if;
-			if H_CNT = 320-1 then HSYNC <= '0'; end if;
+			if H_CNT = HSYNC_START then HSYNC <= '1'; end if;
+			if H_CNT = HSYNC_START+23 then HSYNC <= '0'; end if;
 
 			if V_CNT = 1               then VDE <= '1'; end if;
 			if V_CNT = LAST_VIS_LINE+1 then VDE <= '0'; end if;
@@ -911,6 +923,12 @@ begin
 		BG_FETCH <= '0';
 	end if;
 	
+	if H_CNT >= M7_FETCH_START and H_CNT <= M7_FETCH_END and V_CNT >= 0 and V_CNT <= LAST_VIS_LINE then
+		M7_FETCH <= '1';
+	else
+		M7_FETCH <= '0';
+	end if;
+
 	if H_CNT >= SPR_GET_PIX_START and H_CNT <= SPR_GET_PIX_END and V_CNT >= 1 and V_CNT <= LAST_VIS_LINE then
 		SPR_GET_PIXEL <= '1';
 	else
@@ -962,7 +980,7 @@ BF <= BF_TBL(to_integer(unsigned(BG_MODE)), to_integer(H_CNT(2 downto 0)));
 
 process( RST_N, CLK, BF, BG_MODE, BG_SIZE, BG_SC_ADDR, BG_SC_SIZE, BG_NBA, BG_HOFS, BG_VOFS, H_CNT, V_CNT, IN_VBL, FORCE_BLANK,
 			BG_DATA, BG_TILE_INFO, BG3_OPT_DATA0, BG3_OPT_DATA1, BG_MOSAIC_Y, BG_MOSAIC_EN, FIELD, HIRES, BGINTERLACE, VRAM_DAI,
-			M7_TILE_N, M7_TILE_COL, M7_TILE_ROW, M7SEL, M7HOFS, M7VOFS, M7X, M7Y, M7A, M7B, M7C, M7D)
+			M7_SCREEN_X, M7_TEMP_X, M7_TEMP_Y, M7_TILE_N, M7_TILE_COL, M7_TILE_ROW, M7SEL, M7HOFS, M7VOFS, M7X, M7Y, M7A, M7B, M7C, M7D)
 variable SCREEN_X : unsigned(8 downto 0);
 variable SCREEN_Y : unsigned(7 downto 0);
 variable OPTH_EN, OPTV_EN : std_logic;
@@ -984,7 +1002,7 @@ variable TILE_OFFS : unsigned(14 downto 0);
 variable TILEPOS_INC : unsigned(4 downto 0);
 variable M7_VRAM_X, M7_VRAM_Y : signed(23 downto 0);
 variable ORG_X, ORG_Y  : signed(10 downto 0);
-variable M7_SCREEN_X, M7_SCREEN_Y  : signed(8 downto 0);
+variable M7_X, M7_Y : signed(8 downto 0);
 variable M7_TILE : unsigned(7 downto 0);
 variable BG_TILEMAP_ADDR, BG_TILEDATA_ADDR : unsigned(15 downto 0);
 variable M7_VRAM_ADDRA, M7_VRAM_ADDRB : unsigned(13 downto 0);
@@ -1158,29 +1176,21 @@ begin
 	ORG_Y := resize(signed(M7VOFS) - signed(M7Y), ORG_Y'length);
 	
 	if M7SEL(0) = '0' then
-		M7_SCREEN_X := signed(resize(SCREEN_X(7 downto 0), 9));
+		M7_X := signed(resize(M7_SCREEN_X, 9));
 	else
-		M7_SCREEN_X := signed(resize(not SCREEN_X(7 downto 0), 9));
+		M7_X := signed(resize(not M7_SCREEN_X, 9));
 	end if;
 	
 	if M7SEL(1) = '0' then
-		M7_SCREEN_Y := signed(resize(MOSAIC_Y, 9));
+		M7_Y := signed(resize(MOSAIC_Y, 9));
 	else
-		M7_SCREEN_Y := signed(resize(not MOSAIC_Y, 9));
+		M7_Y := signed(resize(not MOSAIC_Y, 9));
 	end if;
 				
 	MPY <= resize(signed(M7A) * signed(M7B(15 downto 8)), MPY'length);
 	
-	M7_VRAM_X := (resize(signed(M7X), M7_VRAM_X'length) sll 8) + 
-					 (resize(signed(M7A) * signed(ORG_X), M7_VRAM_X'length) and x"FFFFC0") + 
-					 (resize(signed(M7B) * signed(ORG_Y), M7_VRAM_X'length) and x"FFFFC0") + 
-					 (resize(signed(M7B) * M7_SCREEN_Y, M7_VRAM_X'length) and x"FFFFC0") + 
-					 resize(signed(M7A) * M7_SCREEN_X, M7_VRAM_X'length);
-	M7_VRAM_Y := (resize(signed(M7Y), M7_VRAM_Y'length) sll 8) + 
-					 (resize(signed(M7C) * signed(ORG_X), M7_VRAM_Y'length) and x"FFFFC0") + 
-					 (resize(signed(M7D) * signed(ORG_Y), M7_VRAM_Y'length) and x"FFFFC0") + 
-					 (resize(signed(M7D) * M7_SCREEN_Y, M7_VRAM_Y'length) and x"FFFFC0") + 
-					 resize(signed(M7C) * M7_SCREEN_X, M7_VRAM_Y'length);
+	M7_VRAM_X := M7_TEMP_X + resize(signed(M7A) * M7_X, M7_VRAM_X'length);
+	M7_VRAM_Y := M7_TEMP_Y + resize(signed(M7C) * M7_X, M7_VRAM_Y'length);
 					 
 	if M7_VRAM_X(23 downto 18) = "000000" and M7_VRAM_Y(23 downto 18) = "000000" then
 		M7_IS_OUTSIDE := '0';
@@ -1210,12 +1220,31 @@ begin
 	end case;
 	
 	if RST_N = '0' then
+		M7_SCREEN_X <= (others => '0');
+
 		M7_TILE_N <= (others => '0');
 		M7_TILE_ROW <= (others => '0');
 		M7_TILE_COL <= (others => '0');
 		M7_TILE_OUTSIDE <= '0';
 	elsif rising_edge(CLK) then 
-		if DOT_CLKR_CE = '1' then
+		if ENABLE = '1' and DOT_CLKR_CE = '1' then
+			if M7_FETCH = '1' then
+				M7_SCREEN_X <= M7_SCREEN_X + 1;
+			elsif H_CNT = LAST_DOT then
+				M7_SCREEN_X <= (others => '0');
+			end if;
+			
+			if H_CNT = LAST_DOT then
+				M7_TEMP_X <= (resize(signed(M7X), M7_TEMP_X'length) sll 8) + 
+								 (resize(signed(M7A) * signed(ORG_X), M7_TEMP_X'length) and x"FFFFC0") + 
+								 (resize(signed(M7B) * signed(ORG_Y), M7_TEMP_X'length) and x"FFFFC0") + 
+								 (resize(signed(M7B) * M7_Y, M7_TEMP_X'length) and x"FFFFC0");
+				M7_TEMP_Y <= (resize(signed(M7Y), M7_TEMP_Y'length) sll 8) + 
+								 (resize(signed(M7C) * signed(ORG_X), M7_TEMP_Y'length) and x"FFFFC0") + 
+								 (resize(signed(M7D) * signed(ORG_Y), M7_TEMP_Y'length) and x"FFFFC0") + 
+								 (resize(signed(M7D) * M7_Y, M7_TEMP_Y'length) and x"FFFFC0");
+			end if;
+
 			M7_TILE_N <= M7_TILE;
 			M7_TILE_COL <= unsigned(M7_VRAM_X(10 downto 8));
 			M7_TILE_ROW <= unsigned(M7_VRAM_Y(10 downto 8));
@@ -1260,13 +1289,6 @@ begin
 			if BG_FETCH = '1' and BG_FORCE_BLANK = '0' then
 				if BG_MODE /= "111" then 
 					BG_DATA(to_integer(H_CNT(2 downto 0))) <= VRAM_DBI & VRAM_DAI;
-				else
-					if M7SEL(7 downto 6) = "10" and M7_TILE_OUTSIDE = '1' then 
-						M7_PIX := (others => '0');
-					else  
-						M7_PIX := VRAM_DBI;
-					end if;
-					BG_DATA(to_integer(H_CNT(2 downto 0)))(15 downto 8) <= M7_PIX;
 				end if;
 				
 				if H_CNT(2 downto 0) = 0 then
@@ -1362,15 +1384,7 @@ begin
 							BG_TILES(0).PLANES( 6) <= FlipBGPlaneHR(BG_DATA(5)( 7 downto 0) & BG_DATA(7)( 7 downto 0), BG_TILE_INFO(BG1)(14), '1');
 							BG_TILES(0).PLANES( 7) <= FlipBGPlaneHR(BG_DATA(5)(15 downto 8) & BG_DATA(7)(15 downto 8), BG_TILE_INFO(BG1)(14), '1');
 							
-						when others =>
-							BG_TILES(0).PLANES( 0) <= BG_DATA(1)( 8) & BG_DATA(2)( 8) & BG_DATA(3)( 8) & BG_DATA(4)( 8) & BG_DATA(5)( 8) & BG_DATA(6)( 8) & BG_DATA(7)( 8) & M7_PIX(0);
-							BG_TILES(0).PLANES( 1) <= BG_DATA(1)( 9) & BG_DATA(2)( 9) & BG_DATA(3)( 9) & BG_DATA(4)( 9) & BG_DATA(5)( 9) & BG_DATA(6)( 9) & BG_DATA(7)( 9) & M7_PIX(1);
-							BG_TILES(0).PLANES( 2) <= BG_DATA(1)(10) & BG_DATA(2)(10) & BG_DATA(3)(10) & BG_DATA(4)(10) & BG_DATA(5)(10) & BG_DATA(6)(10) & BG_DATA(7)(10) & M7_PIX(2);
-							BG_TILES(0).PLANES( 3) <= BG_DATA(1)(11) & BG_DATA(2)(11) & BG_DATA(3)(11) & BG_DATA(4)(11) & BG_DATA(5)(11) & BG_DATA(6)(11) & BG_DATA(7)(11) & M7_PIX(3);
-							BG_TILES(0).PLANES( 4) <= BG_DATA(1)(12) & BG_DATA(2)(12) & BG_DATA(3)(12) & BG_DATA(4)(12) & BG_DATA(5)(12) & BG_DATA(6)(12) & BG_DATA(7)(12) & M7_PIX(4);
-							BG_TILES(0).PLANES( 5) <= BG_DATA(1)(13) & BG_DATA(2)(13) & BG_DATA(3)(13) & BG_DATA(4)(13) & BG_DATA(5)(13) & BG_DATA(6)(13) & BG_DATA(7)(13) & M7_PIX(5);
-							BG_TILES(0).PLANES( 6) <= BG_DATA(1)(14) & BG_DATA(2)(14) & BG_DATA(3)(14) & BG_DATA(4)(14) & BG_DATA(5)(14) & BG_DATA(6)(14) & BG_DATA(7)(14) & M7_PIX(6);
-							BG_TILES(0).PLANES( 7) <= BG_DATA(1)(15) & BG_DATA(2)(15) & BG_DATA(3)(15) & BG_DATA(4)(15) & BG_DATA(5)(15) & BG_DATA(6)(15) & BG_DATA(7)(15) & M7_PIX(7);
+						when others => null;
 					end case;
 
 					BG_TILES(0).ATR(0) <= BG_TILE_INFO(BG1)(13 downto 10);
@@ -1478,7 +1492,7 @@ begin
 				OBJ_RANGE_DONE <= '0';
 			end if;
 			
-			if H_CNT = LAST_DOT and V_CNT = LAST_LINE and FORCE_BLANK = '0' then
+			if H_CNT = LAST_DOT and V_CNT = LAST_LINE then
 				OBJ_RANGE_OFL <= '0';
 				OBJ_TIME_OFL <= '0';
 			end if;
@@ -1674,6 +1688,12 @@ begin
 
 			if SPR_GET_PIXEL = '1' then
 				SPR_PIX_DATA_BUF <= SPR_PIX_Q;
+				
+				if M7SEL(7 downto 6) = "10" and M7_TILE_OUTSIDE = '1' then 
+					M7_PIX_DATA <= (others => '0');
+				else  
+					M7_PIX_DATA <= VRAM_DBI;
+				end if;
 			
 				SPR_PIXEL_X <= SPR_PIXEL_X + 1;
 			end if;
@@ -1713,16 +1733,7 @@ begin
 											 BG_TILES(to_integer(N1(3 downto 3))).PLANES(1)(to_integer(N1(2 downto 0))) &
 											 BG_TILES(to_integer(N1(3 downto 3))).PLANES(0)(to_integer(N1(2 downto 0)));
 					else
-						N1 := not ("0"&GET_PIXEL_X(2 downto 0));
-						BG1_PIX_DATA <= "0000" &
-											 BG_TILES(to_integer(N1(3 downto 3))).PLANES(7)(to_integer(N1(2 downto 0))) &
-											 BG_TILES(to_integer(N1(3 downto 3))).PLANES(6)(to_integer(N1(2 downto 0))) &
-											 BG_TILES(to_integer(N1(3 downto 3))).PLANES(5)(to_integer(N1(2 downto 0))) &
-											 BG_TILES(to_integer(N1(3 downto 3))).PLANES(4)(to_integer(N1(2 downto 0))) &
-											 BG_TILES(to_integer(N1(3 downto 3))).PLANES(3)(to_integer(N1(2 downto 0))) &
-											 BG_TILES(to_integer(N1(3 downto 3))).PLANES(2)(to_integer(N1(2 downto 0))) &
-											 BG_TILES(to_integer(N1(3 downto 3))).PLANES(1)(to_integer(N1(2 downto 0))) &
-											 BG_TILES(to_integer(N1(3 downto 3))).PLANES(0)(to_integer(N1(2 downto 0)));
+						BG1_PIX_DATA <= "0000" & M7_PIX_DATA;
 					end if;
 				end if;
 				
@@ -1735,15 +1746,7 @@ begin
 											 BG_TILES(to_integer(N2(3 downto 3))).PLANES( 9)(to_integer(N2(2 downto 0))) &
 											 BG_TILES(to_integer(N2(3 downto 3))).PLANES( 8)(to_integer(N2(2 downto 0)));
 					else
-						N2 := not ("0"&GET_PIXEL_X(2 downto 0));
-						BG2_PIX_DATA <= BG_TILES(to_integer(N2(3 downto 3))).PLANES(7)(to_integer(N2(2 downto 0))) &
-											 BG_TILES(to_integer(N2(3 downto 3))).PLANES(6)(to_integer(N2(2 downto 0))) &
-											 BG_TILES(to_integer(N2(3 downto 3))).PLANES(5)(to_integer(N2(2 downto 0))) &
-											 BG_TILES(to_integer(N2(3 downto 3))).PLANES(4)(to_integer(N2(2 downto 0))) &
-											 BG_TILES(to_integer(N2(3 downto 3))).PLANES(3)(to_integer(N2(2 downto 0))) &
-											 BG_TILES(to_integer(N2(3 downto 3))).PLANES(2)(to_integer(N2(2 downto 0))) &
-											 BG_TILES(to_integer(N2(3 downto 3))).PLANES(1)(to_integer(N2(2 downto 0))) &
-											 BG_TILES(to_integer(N2(3 downto 3))).PLANES(0)(to_integer(N2(2 downto 0)));
+						BG2_PIX_DATA <= M7_PIX_DATA;
 					end if;
 				end if;
 				
@@ -1786,9 +1789,9 @@ variable OBJPR0EN,OBJPR1EN,OBJPR2EN,OBJPR3EN : std_logic;
 variable OBJ_PRIO : std_logic_vector(1 downto 0);
 variable win1, win2, win1en, win2en, bglog0, bglog1, winres : std_logic_vector(5 downto 0);
 variable main_dis, sub_dis : std_logic_vector(4 downto 0);
-variable MAIN_EN, SUB_EN, SUB_MATH_EN : std_logic;
+variable MAIN_EN, SUB_EN, SUB_MATH_EN, MATH_EN : std_logic;
 variable DCM, BD, MATH : std_logic;
-variable MAIN_COLOR	: std_logic_vector(14 downto 0);
+variable COLOR	: std_logic_vector(14 downto 0);
 variable COLOR_MASK : std_logic_vector(4 downto 0);
 variable MATH_R, MATH_G, MATH_B	: unsigned(4 downto 0);
 variable HALF : std_logic;
@@ -2173,28 +2176,27 @@ begin
 		MAIN_G <= (others => '0');
 		MAIN_B <= (others => '0');
 		SUB_BD <= '0';
-		SUB_COLOR <= (others => '0');
+		PREV_COLOR <= (others => '0');
+		SUB_MATH_R <= (others => '0');
+		SUB_MATH_G <= (others => '0');
+		SUB_MATH_B <= (others => '0');
 	elsif rising_edge(CLK) then 
 		if ENABLE = '1' then
 			if BG_GET_PIXEL = '1' and DOT_CLKR_CE = '1' then
 				WINDOW_X <= GET_PIXEL_X;
 			end if;
-			
+
+			if H_CNT = LAST_DOT and DOT_CLKR_CE = '1' then
+				PREV_COLOR <= (others => '0');
+			end if;
+
 			if BG_MATH = '1' then
 				if DOT_CLKF_CE = '1' then
-					if DCM = '1' then
-						SUB_COLOR <= GetDCM(BG1_PIX_DATA(10 downto 0));
-					else
-						SUB_COLOR <= CGRAM_Q;
-					end if;
 					SUB_BD <= BD;
-				elsif DOT_CLKR_CE = '1' then
-					if DCM = '1' then
-						MAIN_COLOR := GetDCM(BG1_PIX_DATA(10 downto 0));
-					else
-						MAIN_COLOR := CGRAM_Q;
-					end if;
-				
+				end if;
+
+				if DOT_CLKR_CE = '1' then
+					MATH_EN := MATH;
 					HALF := CGADSUB(6) and MAIN_EN and not (SUB_BD and CGWSEL(1));
 					SUB_MATH_EN := CGWSEL(1) and not SUB_BD;
 
@@ -2203,58 +2205,62 @@ begin
 					else
 						COLOR_MASK := "11111";
 					end if;
-				
+				end if;
+
+				if DOT_CLKF_CE = '1' or DOT_CLKR_CE = '1' then
+
+					if DCM = '1' then
+						COLOR := GetDCM(BG1_PIX_DATA(10 downto 0));
+					else
+						COLOR := CGRAM_Q;
+					end if;
+					PREV_COLOR <= COLOR;
+
 					if FORCE_BLANK = '1' then
 						MATH_R := (others => '0');
 						MATH_G := (others => '0');
 						MATH_B := (others => '0');
 					elsif PSEUDOHIRES = '1' and BLEND = '1' then
-						MATH_R := AddSub(unsigned(MAIN_COLOR(4 downto 0) and COLOR_MASK), unsigned(SUB_COLOR(4 downto 0) and COLOR_MASK),  '1', '1');
-						MATH_G := AddSub(unsigned(MAIN_COLOR(9 downto 5) and COLOR_MASK), unsigned(SUB_COLOR(9 downto 5) and COLOR_MASK), '1', '1');
-						MATH_B := AddSub(unsigned(MAIN_COLOR(14 downto 10) and COLOR_MASK), unsigned(SUB_COLOR(14 downto 10) and COLOR_MASK), '1', '1');
-					elsif MATH = '1' and SUB_EN = '1' then
+						MATH_R := AddSub(unsigned(COLOR(4 downto 0) and COLOR_MASK), unsigned(PREV_COLOR(4 downto 0) and COLOR_MASK),  '1', '1');
+						MATH_G := AddSub(unsigned(COLOR(9 downto 5) and COLOR_MASK), unsigned(PREV_COLOR(9 downto 5) and COLOR_MASK), '1', '1');
+						MATH_B := AddSub(unsigned(COLOR(14 downto 10) and COLOR_MASK), unsigned(PREV_COLOR(14 downto 10) and COLOR_MASK), '1', '1');
+					elsif MATH_EN = '1' and SUB_EN = '1' then
 						if SUB_MATH_EN = '1' then
-							MATH_R := AddSub(unsigned(MAIN_COLOR(4 downto 0) and COLOR_MASK), unsigned(SUB_COLOR(4 downto 0)), not CGADSUB(7), HALF);
-							MATH_G := AddSub(unsigned(MAIN_COLOR(9 downto 5) and COLOR_MASK), unsigned(SUB_COLOR(9 downto 5)), not CGADSUB(7), HALF);
-							MATH_B := AddSub(unsigned(MAIN_COLOR(14 downto 10) and COLOR_MASK), unsigned(SUB_COLOR(14 downto 10)), not CGADSUB(7), HALF);
+							MATH_R := AddSub(unsigned(COLOR(4 downto 0) and COLOR_MASK), unsigned(PREV_COLOR(4 downto 0)), not CGADSUB(7), HALF);
+							MATH_G := AddSub(unsigned(COLOR(9 downto 5) and COLOR_MASK), unsigned(PREV_COLOR(9 downto 5)), not CGADSUB(7), HALF);
+							MATH_B := AddSub(unsigned(COLOR(14 downto 10) and COLOR_MASK), unsigned(PREV_COLOR(14 downto 10)), not CGADSUB(7), HALF);
 						else
-							MATH_R := AddSub(unsigned(MAIN_COLOR(4 downto 0) and COLOR_MASK), unsigned(SUBCOLBD(4 downto 0)), not CGADSUB(7), HALF);
-							MATH_G := AddSub(unsigned(MAIN_COLOR(9 downto 5) and COLOR_MASK), unsigned(SUBCOLBD(9 downto 5)), not CGADSUB(7), HALF);
-							MATH_B := AddSub(unsigned(MAIN_COLOR(14 downto 10) and COLOR_MASK), unsigned(SUBCOLBD(14 downto 10)), not CGADSUB(7), HALF);
+							MATH_R := AddSub(unsigned(COLOR(4 downto 0) and COLOR_MASK), unsigned(SUBCOLBD(4 downto 0)), not CGADSUB(7), HALF);
+							MATH_G := AddSub(unsigned(COLOR(9 downto 5) and COLOR_MASK), unsigned(SUBCOLBD(9 downto 5)), not CGADSUB(7), HALF);
+							MATH_B := AddSub(unsigned(COLOR(14 downto 10) and COLOR_MASK), unsigned(SUBCOLBD(14 downto 10)), not CGADSUB(7), HALF);
 						end if;
 					else
-						MATH_R := unsigned(MAIN_COLOR(4 downto 0) and COLOR_MASK);
-						MATH_G := unsigned(MAIN_COLOR(9 downto 5) and COLOR_MASK);
-						MATH_B := unsigned(MAIN_COLOR(14 downto 10) and COLOR_MASK);
+						MATH_R := unsigned(COLOR(4 downto 0) and COLOR_MASK);
+						MATH_G := unsigned(COLOR(9 downto 5) and COLOR_MASK);
+						MATH_B := unsigned(COLOR(14 downto 10) and COLOR_MASK);
 					end if;
-	
-					if FORCE_BLANK = '1' then
-						SUB_R <= (others => '0');
-						SUB_G <= (others => '0');
-						SUB_B <= (others => '0');
-					elsif HIRES = '0' and (PSEUDOHIRES = '0' or BLEND = '1') then
-						SUB_R <= MATH_R;
-						SUB_G <= MATH_G;
-						SUB_B <= MATH_B;
-					elsif MATH = '1' and SUB_EN = '1' then
-						if SUB_MATH_EN = '1' then
-							SUB_R <= AddSub(unsigned(SUB_COLOR(4 downto 0) and COLOR_MASK), unsigned(MAIN_COLOR(4 downto 0)), not CGADSUB(7), HALF);
-							SUB_G <= AddSub(unsigned(SUB_COLOR(9 downto 5) and COLOR_MASK), unsigned(MAIN_COLOR(9 downto 5)), not CGADSUB(7), HALF);
-							SUB_B <= AddSub(unsigned(SUB_COLOR(14 downto 10) and COLOR_MASK), unsigned(MAIN_COLOR(14 downto 10)), not CGADSUB(7), HALF);
-						else
-							SUB_R <= AddSub(unsigned(SUB_COLOR(4 downto 0) and COLOR_MASK), unsigned(SUBCOLBD(4 downto 0)), not CGADSUB(7), HALF);
-							SUB_G <= AddSub(unsigned(SUB_COLOR(9 downto 5) and COLOR_MASK), unsigned(SUBCOLBD(9 downto 5)), not CGADSUB(7), HALF);
-							SUB_B <= AddSub(unsigned(SUB_COLOR(14 downto 10) and COLOR_MASK), unsigned(SUBCOLBD(14 downto 10)), not CGADSUB(7), HALF);
+
+					if DOT_CLKF_CE = '1' then
+						SUB_MATH_R <= MATH_R;
+						SUB_MATH_G <= MATH_G;
+						SUB_MATH_B <= MATH_B;
+					end if;
+
+					if DOT_CLKR_CE = '1' then
+						MAIN_R <= MATH_R;
+						MAIN_G <= MATH_G;
+						MAIN_B <= MATH_B;
+
+						if HIRES = '1' or (PSEUDOHIRES = '1' and BLEND = '0') then
+							SUB_R <= SUB_MATH_R;
+							SUB_G <= SUB_MATH_G;
+							SUB_B <= SUB_MATH_B;
+						else 
+							SUB_R <= MATH_R;
+							SUB_G <= MATH_G;
+							SUB_B <= MATH_B;
 						end if;
-					else
-						SUB_R <= unsigned(SUB_COLOR(4 downto 0) and COLOR_MASK);
-						SUB_G <= unsigned(SUB_COLOR(9 downto 5) and COLOR_MASK);
-						SUB_B <= unsigned(SUB_COLOR(14 downto 10) and COLOR_MASK);
-					end if;
-	
-					MAIN_R <= MATH_R;
-					MAIN_G <= MATH_G;
-					MAIN_B <= MATH_B;
+					end if; 
 				end if;
 			end if;
 		end if;

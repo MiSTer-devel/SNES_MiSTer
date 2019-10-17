@@ -1,12 +1,5 @@
 
-`define USE_DLH
-`define USE_CX4
-`define USE_SDD1
-`define USE_GSU
-`define USE_SA1
-
-module main
-(
+module main (
    input             RESET_N,
 
    input             MCLK,
@@ -78,6 +71,8 @@ module main
    output            JOY1_P6,
    output            JOY2_P6,
    input             JOY2_P6_in,
+	
+	input      [64:0] EXT_RTC,
 
    input             GG_EN,
    input     [128:0] GG_CODE,
@@ -90,6 +85,14 @@ module main
    output     [15:0] AUDIO_L,
    output     [15:0] AUDIO_R
 );
+
+parameter USE_DLH = 1'b1;
+parameter USE_CX4 = 1'b1;
+parameter USE_SDD1 = 1'b1;
+parameter USE_GSU = 1'b1;
+parameter USE_SA1 = 1'b1;
+parameter USE_DSPn = 1'b1;
+parameter USE_SPC7110 = 1'b1;
 
 wire [23:0] CA;
 wire        CPURD_N;
@@ -106,7 +109,7 @@ wire        SYSCLKF_CE;
 wire        SYSCLKR_CE;
 wire        REFRESH;
 
-wire  [3:0] MAP_ACTIVE;
+wire  [4:0] MAP_ACTIVE;
 
 SNES SNES
 (
@@ -193,7 +196,6 @@ SNES SNES
 	.audio_r(AUDIO_R)
 );
 
-`ifdef USE_DLH
 wire  [7:0] DLH_DO;
 wire        DLH_IRQ_N;
 wire [23:0] DLH_ROM_ADDR;
@@ -206,7 +208,10 @@ wire        DLH_BSRAM_CE_N;
 wire        DLH_BSRAM_OE_N;
 wire        DLH_BSRAM_WE_N;
 
-DSP_LHRomMap DSP_LHRomMap
+generate
+if (USE_DLH == 1'b1) begin
+
+DSP_LHRomMap #(.USE_DSPn(USE_DSPn)) DSP_LHRomMap
 (
 	.mclk(MCLK),
 	.rst_n(RESET_N),
@@ -245,11 +250,25 @@ DSP_LHRomMap DSP_LHRomMap
 
 	.map_ctrl(ROM_TYPE),
 	.rom_mask(ROM_MASK),
-	.bsram_mask(RAM_MASK)
+	.bsram_mask(RAM_MASK),
+	
+	.ext_rtc(EXT_RTC)
 );
-`endif
+end else begin
+	assign DLH_DO = 0;
+	assign DLH_IRQ_N = 1;
+	assign DLH_ROM_ADDR = 0;
+	assign DLH_ROM_CE_N = 1;
+	assign DLH_ROM_OE_N = 1;
+	assign DLH_BSRAM_ADDR = 0;
+	assign DLH_BSRAM_D = 0;
+	assign DLH_BSRAM_CE_N = 1;
+	assign DLH_BSRAM_OE_N = 1;
+	assign DLH_BSRAM_WE_N = 1;
+	assign DLH_ROM_WORD = 0;
+end
+endgenerate
 
-`ifdef USE_CX4
 wire [7:0]  CX4_DO;
 wire        CX4_IRQ_N;
 wire [22:0] CX4_ROM_ADDR;
@@ -261,6 +280,9 @@ wire [7:0]  CX4_BSRAM_D;
 wire        CX4_BSRAM_CE_N;
 wire        CX4_BSRAM_OE_N;
 wire        CX4_BSRAM_WE_N;
+
+generate
+if (USE_CX4 == 1'b1) begin
 
 CX4Map CX4Map
 (
@@ -304,11 +326,10 @@ CX4Map CX4Map
 	.rom_mask(ROM_MASK),
 	.bsram_mask(RAM_MASK)
 );
-`else
+end else
 assign MAP_ACTIVE[0] = 0;
-`endif
+endgenerate
 
-`ifdef USE_SDD1
 wire [7:0]  SDD_DO;
 wire        SDD_IRQ_N;
 wire [22:0] SDD_ROM_ADDR;
@@ -320,6 +341,9 @@ wire [7:0]  SDD_BSRAM_D;
 wire        SDD_BSRAM_CE_N;
 wire        SDD_BSRAM_OE_N;
 wire        SDD_BSRAM_WE_N;
+
+generate
+if (USE_SDD1 == 1'b1) begin
 
 SDD1Map SDD1Map
 (
@@ -363,11 +387,10 @@ SDD1Map SDD1Map
 	.rom_mask(ROM_MASK),
 	.bsram_mask(RAM_MASK)
 );
-`else
+end else
 assign MAP_ACTIVE[1] = 0;
-`endif
+endgenerate
 
-`ifdef USE_GSU
 wire [7:0]  GSU_DO;
 wire        GSU_IRQ_N;
 wire [22:0] GSU_ROM_ADDR;
@@ -379,6 +402,9 @@ wire [7:0]  GSU_BSRAM_D;
 wire        GSU_BSRAM_CE_N;
 wire        GSU_BSRAM_OE_N;
 wire        GSU_BSRAM_WE_N;
+
+generate
+if (USE_GSU == 1'b1) begin
 
 GSUMap GSUMap
 (
@@ -424,14 +450,12 @@ GSUMap GSUMap
 
 	.turbo(GSU_TURBO)
 );
-`else
+end else
 assign MAP_ACTIVE[2] = 0;
-`endif
+endgenerate
 
 assign GSU_ACTIVE = MAP_ACTIVE[2];
 
-
-`ifdef USE_SA1
 wire [7:0]  SA1_DO;
 wire        SA1_IRQ_N;
 wire [22:0] SA1_ROM_ADDR;
@@ -443,6 +467,9 @@ wire [7:0]  SA1_BSRAM_D;
 wire        SA1_BSRAM_CE_N;
 wire        SA1_BSRAM_OE_N;
 wire        SA1_BSRAM_WE_N;
+
+generate
+if (USE_SA1 == 1'b1) begin
 
 SA1Map SA1Map
 (
@@ -488,16 +515,77 @@ SA1Map SA1Map
 	.rom_mask(ROM_MASK),
 	.bsram_mask(RAM_MASK)
 );
-`else
+end else
 assign MAP_ACTIVE[3] = 0;
-`endif
+endgenerate
+
+wire [7:0]  SPC7110_DO;
+wire        SPC7110_IRQ_N;
+wire [22:0] SPC7110_ROM_ADDR;
+wire        SPC7110_ROM_CE_N;
+wire        SPC7110_ROM_OE_N;
+wire        SPC7110_ROM_WORD;
+wire [19:0] SPC7110_BSRAM_ADDR;
+wire [7:0]  SPC7110_BSRAM_D;
+wire        SPC7110_BSRAM_CE_N;
+wire        SPC7110_BSRAM_OE_N;
+wire        SPC7110_BSRAM_WE_N;
+
+generate
+if (USE_SPC7110 == 1'b1) begin
+SPC7110Map SPC7110Map
+(
+	.mclk(MCLK),
+	.rst_n(RESET_N),
+
+	.ca(CA),
+	.di(DO),
+	.do(SPC7110_DO),
+	.cpurd_n(CPURD_N),
+	.cpuwr_n(CPUWR_N),
+
+	.pa(PA),
+	.pard_n(PARD_N),
+	.pawr_n(PAWR_N),
+
+	.romsel_n(ROMSEL_N),
+	.ramsel_n(RAMSEL_N),
+
+	.sysclkf_ce(SYSCLKF_CE),
+	.sysclkr_ce(SYSCLKR_CE),
+	.refresh(REFRESH),
+
+	.irq_n(SPC7110_IRQ_N),
+
+	.rom_addr(SPC7110_ROM_ADDR),
+	.rom_q(ROM_Q),
+	.rom_ce_n(SPC7110_ROM_CE_N),
+	.rom_oe_n(SPC7110_ROM_OE_N),
+	.rom_word(SPC7110_ROM_WORD),
+
+	.bsram_addr(SPC7110_BSRAM_ADDR),
+	.bsram_d(SPC7110_BSRAM_D),
+	.bsram_q(BSRAM_Q),
+	.bsram_ce_n(SPC7110_BSRAM_CE_N),
+	.bsram_oe_n(SPC7110_BSRAM_OE_N),
+	.bsram_we_n(SPC7110_BSRAM_WE_N),
+
+	.map_active(MAP_ACTIVE[4]),
+	.map_ctrl(ROM_TYPE),
+	.rom_mask(ROM_MASK),
+	.bsram_mask(RAM_MASK),
+	
+	.ext_rtc(EXT_RTC)
+);
+end else
+assign MAP_ACTIVE[4] = 0;
+endgenerate
 
 assign TURBO_ALLOW = ~(MAP_ACTIVE[3] | MAP_ACTIVE[1]);
 
 always @(*) begin
 	case (MAP_ACTIVE)
-`ifdef USE_CX4
-	'b0001:
+	'b00001:
 		begin
 			DI         = CX4_DO;
 			IRQ_N      = CX4_IRQ_N;
@@ -511,9 +599,8 @@ always @(*) begin
 			BSRAM_WE_N = CX4_BSRAM_WE_N;
 			ROM_WORD   = CX4_ROM_WORD;
 		end
-`endif
-`ifdef USE_SDD1
-	'b0010:
+
+	'b00010:
 		begin
 			DI         = SDD_DO;
 			IRQ_N      = SDD_IRQ_N;
@@ -527,9 +614,8 @@ always @(*) begin
 			BSRAM_WE_N = SDD_BSRAM_WE_N;
 			ROM_WORD   = SDD_ROM_WORD;
 		end
-`endif
-`ifdef USE_GSU
-	'b0100:
+
+	'b00100:
 		begin
 			DI         = GSU_DO;
 			IRQ_N      = GSU_IRQ_N;
@@ -543,9 +629,8 @@ always @(*) begin
 			BSRAM_WE_N = GSU_BSRAM_WE_N;
 			ROM_WORD   = GSU_ROM_WORD;
 		end
-`endif
-`ifdef USE_SA1
-	'b1000:
+
+	'b01000:
 		begin
 			DI         = SA1_DO;
 			IRQ_N      = SA1_IRQ_N;
@@ -559,8 +644,22 @@ always @(*) begin
 			BSRAM_WE_N = SA1_BSRAM_WE_N;
 			ROM_WORD   = SA1_ROM_WORD;
 		end
-`endif
-`ifdef USE_DLH
+
+	'b10000:
+		begin
+			DI         = SPC7110_DO;
+			IRQ_N      = SPC7110_IRQ_N;
+			ROM_ADDR   = {1'b0,SPC7110_ROM_ADDR};
+			ROM_CE_N   = SPC7110_ROM_CE_N;
+			ROM_OE_N   = SPC7110_ROM_OE_N;
+			BSRAM_ADDR = SPC7110_BSRAM_ADDR;
+			BSRAM_D    = SPC7110_BSRAM_D;
+			BSRAM_CE_N = SPC7110_BSRAM_CE_N;
+			BSRAM_OE_N = SPC7110_BSRAM_OE_N;
+			BSRAM_WE_N = SPC7110_BSRAM_WE_N;
+			ROM_WORD   = SPC7110_ROM_WORD;
+		end
+
 	default:
 		begin
 			DI         = DLH_DO;
@@ -575,22 +674,6 @@ always @(*) begin
 			BSRAM_WE_N = DLH_BSRAM_WE_N;
 			ROM_WORD   = DLH_ROM_WORD;
 		end
-`else
-	default:
-		begin
-			DI         = 0;
-			IRQ_N      = 1;
-			ROM_ADDR   = 0;
-			ROM_CE_N   = 1;
-			ROM_OE_N   = 1;
-			BSRAM_ADDR = 0;
-			BSRAM_D    = 0;
-			BSRAM_CE_N = 1;
-			BSRAM_OE_N = 1;
-			BSRAM_WE_N = 1;
-			ROM_WORD   = 0;
-		end
-`endif
 	endcase
 end
 

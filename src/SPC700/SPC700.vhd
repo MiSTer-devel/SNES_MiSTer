@@ -439,8 +439,8 @@ begin
 					end if;
 				end if;
 				
-				if STATE = "0000" then 
-					if D_IN = x"EF" or D_IN = x"FF" then				-- SLEEP, STP
+				if STATE = "0001" then 
+					if IR = x"EF" or IR = x"FF" then				-- SLEEP, STP
 						STPExec <= '1';
 					end if;
 				end if;

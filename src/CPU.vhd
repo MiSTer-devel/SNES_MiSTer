@@ -65,6 +65,7 @@ architecture rtl of SCPU is
 	signal CPU_LAST_CLOCK : unsigned(3 downto 0);
 	signal CPU_MID_CLOCK : unsigned(3 downto 0);
 	signal CPU_ACTIVEr, DMA_ACTIVEr : std_logic;
+	signal DOT_CLK_CNT : unsigned(1 downto 0); 
 	signal H_CNT : unsigned(8 downto 0);
 	signal V_CNT : unsigned(8 downto 0);
 	signal FIELD : std_logic;
@@ -119,12 +120,21 @@ architecture rtl of SCPU is
 
 	signal NMI_FLAG, IRQ_FLAG : std_logic;
 	signal MUL_REQ, DIV_REQ : std_logic;
-	signal REFRESHED : std_logic;
 	signal MATH_CLK_CNT	: unsigned(3 downto 0);
 	signal MATH_TEMP	: std_logic_vector(22 downto 0);
 	signal HBLANK_OLD, VBLANK_OLD, VBLANK_OLD2 : std_logic;
 	signal HIRQ_VALID, IRQ_VALID : std_logic;
 	signal IRQ_LOCK, IRQ_VALID_OLD : std_logic;
+	
+	type refresh_t is (
+		REFS_IDLE,
+		REFS_EXEC,
+		REFS_END
+	);
+	signal REFS	: refresh_t;  
+	signal REFRESH_CNT : unsigned(2 downto 0); 
+	signal REFRESHED : std_logic;
+	signal HBLANK_REF_OLD : std_logic;
 
 	-- DMA registers
 	type DmaReg8 is array (0 to 7) of std_logic_vector(7 downto 0);
@@ -143,6 +153,7 @@ architecture rtl of SCPU is
 	signal DMA_RUN, HDMA_RUN : std_logic;
 	signal DMA_ACTIVE : std_logic;
 	signal HDMA_CH_WORK, HDMA_CH_RUN, HDMA_CH_DO: std_logic_vector(7 downto 0);
+	signal HDMA_CH_EN: std_logic_vector(7 downto 0);
 	signal HDMA_INIT_EXEC, HDMA_RUN_EXEC : std_logic;
 
 	type ds_t is (
@@ -163,7 +174,7 @@ architecture rtl of SCPU is
 	);
 	signal HDS	: hds_t; 
 
-	signal HDMA_INIT_STEP: unsigned(1 downto 0);
+	signal HDMA_INIT_STEP: std_logic;
 	signal DMA_TRMODE_STEP, HDMA_TRMODE_STEP: unsigned(1 downto 0);
 	signal HDMA_FIRST_INIT : std_logic;
 	type DmaTransMode is array (0 to 7, 0 to 3) of unsigned(1 downto 0);
@@ -224,18 +235,18 @@ architecture rtl of SCPU is
 	signal JOY_POLL_STRB : std_logic;
 	signal JOYRD_BUSY : std_logic;
 	signal JOY_POLL_RUN: std_logic;
+	signal JOY_VBLANK_OLD: std_logic;
 
 	--debug
 	signal FRAME_CNT: unsigned(15 downto 0);
 	signal P65_RDY: std_logic;
-	signal DBG_HDMA_CNT: unsigned(7 downto 0);
 
 begin
 
 	DMA_ACTIVE <= DMA_RUN or HDMA_RUN;
 	P65_BANK <= P65_A(23 downto 16);
 
-	process( SPEED, MEMSEL, REFRESHED, CPU_ACTIVEr, TURBO )
+	process( SPEED, MEMSEL, REFRESHED, CPU_ACTIVEr, TURBO, P65_A, P65_BANK )
 	begin
 		CPU_MID_CLOCK <= x"2";
 		DMA_MID_CLOCK <= "011";
@@ -309,13 +320,7 @@ begin
 		if RST_N = '0' then
 			INT_CLKF_CE <= '0';
 			INT_CLKR_CE <= '0';
-			DOT_CLK_CE <= '0';
 		elsif falling_edge(CLK) then
-			DOT_CLK_CE <= '0';
-			if DMA_CLK_CNT(1 downto 0) = 4-1 then
-				DOT_CLK_CE <= '1';
-			end if;
-
 			INT_CLKF_CE <= '0';
 			INT_CLKR_CE <= '0';
 			if DMA_ACTIVEr = '1' or ENABLE = '0' then
@@ -581,7 +586,7 @@ begin
 					
 			if ENABLE = '1' then 
 				if DOT_CLK_CE = '1' then
-					if H_CNT = unsigned(HTIME) then
+					if H_CNT = unsigned(HTIME)+1 then
 						HIRQ_VALID <= '1';
 					else
 						HIRQ_VALID <= '0'; 
@@ -807,6 +812,8 @@ begin
 	process( RST_N, CLK )
 	begin
 		if RST_N = '0' then
+			DOT_CLK_CE <= '0';
+			DOT_CLK_CNT <= (others => '0');
 			H_CNT <= (others => '0');
 			V_CNT <= (others => '0');
 			FIELD <= '0';
@@ -815,6 +822,13 @@ begin
 			VBLANK_OLD <= '0';
 		elsif rising_edge(CLK) then
 			if ENABLE = '1' then
+				DOT_CLK_CNT <= DOT_CLK_CNT + 1;
+				
+				DOT_CLK_CE <= '0';
+				if DOT_CLK_CNT = 4-1-1 then
+					DOT_CLK_CE <= '1';
+				end if;
+
 				HBLANK_OLD <= HBLANK;
 				VBLANK_OLD <= VBLANK;
 				if HBLANK = '0' and HBLANK_OLD = '1' then
@@ -840,14 +854,35 @@ begin
 	begin
 		if RST_N = '0' then
 			REFRESHED <= '0';
+			REFS <= REFS_IDLE;
+			REFRESH_CNT <= (others => '0'); 
+			HBLANK_REF_OLD <= '0';
 		elsif rising_edge(CLK) then
-			if ENABLE = '1' and (INT_CLKF_CE = '1' or INT_CLKR_CE = '1') then
-				if REFRESHED = '0' and H_CNT >= 133 and H_CNT < 133 + 10 then
-					REFRESHED <= '1';
-				elsif REFRESHED = '1' and H_CNT >= 133 + 10 then
-					REFRESHED <= '0';
-				end if;
-			end if;
+			if ENABLE = '1' and INT_CLKF_CE = '1' then
+				HBLANK_REF_OLD <= HBLANK;
+				case REFS is
+					when REFS_IDLE =>
+						if H_CNT >= 133 then
+							REFRESHED <= '1';
+							REFS <= REFS_EXEC;
+						end if;
+						
+					when REFS_EXEC =>
+						REFRESH_CNT <= REFRESH_CNT + 1;
+						if REFRESH_CNT = 4 then
+							REFRESHED <= '0';
+							REFRESH_CNT <= (others => '0');
+							REFS <= REFS_END;
+						end if;
+					
+					when REFS_END =>
+						if HBLANK = '0' and HBLANK_REF_OLD = '1' then
+							REFS <= REFS_IDLE;
+						end if;
+					
+					when others => null;
+				end case;
+			end if; 
 		end if;
 	end process;
 
@@ -878,9 +913,10 @@ begin
 			HDMA_CH_RUN <= (others => '0');
 			HDMA_CH_DO <= (others => '0');
 			HDMA_CH_WORK <= (others => '0');
+			HDMA_CH_EN <= (others => '0');
 			DMA_TRMODE_STEP <= (others => '0');
 			HDMA_TRMODE_STEP <= (others => '0');
-			HDMA_INIT_STEP <= (others => '0');
+			HDMA_INIT_STEP <= '0';
 			HDMA_FIRST_INIT <= '0';
 			DS <= DS_IDLE;
 			HDS <= HDS_IDLE;
@@ -950,12 +986,15 @@ begin
 							end if;
 							
 						when DS_TRANSFER =>
-							case DMAP(DCH)(4 downto 3) is
-								when "00" => A1T(DCH) <= std_logic_vector(unsigned(A1T(DCH)) + 1);
-								when "10" => A1T(DCH) <= std_logic_vector(unsigned(A1T(DCH)) - 1);
-								when others => null;
-							end case;
-							if DAS(DCH) /= x"0000" then
+							if MDMAEN(DCH) = '1' then
+								case DMAP(DCH)(4 downto 3) is
+									when "00" => A1T(DCH) <= std_logic_vector(unsigned(A1T(DCH)) + 1);
+									when "10" => A1T(DCH) <= std_logic_vector(unsigned(A1T(DCH)) - 1);
+									when others => null;
+								end case;
+							end if;
+							
+							if DAS(DCH) /= x"0000" and MDMAEN(DCH) = '1' then
 								DAS(DCH) <= std_logic_vector(unsigned(DAS(DCH)) - 1);
 								DMA_TRMODE_STEP <= DMA_TRMODE_STEP + 1;
 							else
@@ -970,38 +1009,39 @@ begin
 				--HDMA
 				case HDS is
 					when HDS_IDLE =>
-						if H_CNT >= 4 and V_CNT = 0 and HDMA_INIT_EXEC = '0' then
+						if H_CNT >= 6 and V_CNT = 0 and HDMA_INIT_EXEC = '0' then
 							HDMA_CH_RUN <= (others => '1');
 							HDMA_CH_DO <= (others => '0'); 
 							if HDMAEN /= x"00" then
 								HDMA_RUN <= '1';
 								HDS <= HDS_PRE_INIT;
 							end if;
+							HDMA_CH_EN <= HDMAEN;
 							HDMA_INIT_EXEC <= '1';
 						elsif V_CNT /= 0 and HDMA_INIT_EXEC = '1' then
 							HDMA_INIT_EXEC <= '0';
 						end if;
 						
-						if H_CNT >= 276 and VBLANK = '0' and HDMA_RUN_EXEC = '0' then
+						if H_CNT >= 277 and VBLANK = '0' and HDMA_RUN_EXEC = '0' then
 							if (HDMA_CH_RUN and HDMAEN) /= x"00" then
 								HDMA_RUN <= '1';
 								HDS <= HDS_PRE_TRANSFER;
-								DBG_HDMA_CNT <= (others => '0'); 
 							end if;
+							HDMA_CH_EN <= HDMAEN;
 							HDMA_RUN_EXEC <= '1';
-						elsif H_CNT < 276 and VBLANK = '0' and HDMA_RUN_EXEC = '1' then
+						elsif H_CNT < 277 and VBLANK = '0' and HDMA_RUN_EXEC = '1' then
 							HDMA_RUN_EXEC <= '0';
 						end if;
 
 					when HDS_PRE_INIT =>
 						for i in 0 to 7 loop
-							if HDMAEN(i) = '1' then
+							if HDMA_CH_EN(i) = '1' then
 								A2A(i) <= A1T(i);
 								NTLR(i) <= (others => '0'); 
 								MDMAEN(i) <= '0';
 							end if;
 						end loop;
-						HDMA_CH_WORK <= HDMAEN;
+						HDMA_CH_WORK <= HDMA_CH_EN;
 						HDMA_FIRST_INIT <= '1';
 						HDS <= HDS_INIT;
 						
@@ -1024,7 +1064,8 @@ begin
 									HDS <= HDS_IDLE;
 								end if;
 							else
-								HDMA_INIT_STEP <= (others => '0');
+								DAS(HCH) <= (others => '0'); 
+								HDMA_INIT_STEP <= '0';
 								HDS <= HDS_INIT_IND;
 							end if;
 							A2A(HCH) <= std_logic_vector(unsigned(A2A(HCH)) + 1);
@@ -1037,14 +1078,17 @@ begin
 								HDMA_RUN <= '0';
 								HDS <= HDS_IDLE;
 							end if;
-						end if;	
-						DBG_HDMA_CNT <= DBG_HDMA_CNT + 1; 
+						end if;
 				
 					when HDS_INIT_IND =>
 						DAS(HCH) <= DI & DAS(HCH)(15 downto 8);
-						HDMA_INIT_STEP <= HDMA_INIT_STEP + 1;
+						
 						A2A(HCH) <= std_logic_vector(unsigned(A2A(HCH)) + 1);
-						if HDMA_INIT_STEP(0) = '1' then
+						if HDMA_INIT_STEP = '0' and IsLastHDMACh(HDMA_CH_WORK, HCH) = '1' and HDMA_CH_RUN(HCH) = '0' then
+							HDMA_CH_WORK(HCH) <= '0';
+							HDMA_RUN <= '0';
+							HDS <= HDS_IDLE;
+						elsif HDMA_INIT_STEP = '1' then
 							HDMA_CH_WORK(HCH) <= '0';
 							if IsLastHDMACh(HDMA_CH_WORK, HCH) = '1' then
 								HDMA_RUN <= '0';
@@ -1053,26 +1097,25 @@ begin
 								HDS <= HDS_INIT;
 							end if;
 						end if;
-						DBG_HDMA_CNT <= DBG_HDMA_CNT + 1; 
+						HDMA_INIT_STEP <= not HDMA_INIT_STEP;
 						
 					when HDS_PRE_TRANSFER =>
 						for i in 0 to 7 loop
-							if HDMA_CH_RUN(i) = '1' and HDMAEN(i) = '1' then
+							if HDMA_CH_RUN(i) = '1' and HDMA_CH_EN(i) = '1' then
 								MDMAEN(i) <= '0';
 							end if;
 						end loop;
 
 						HDMA_FIRST_INIT <= '0';
 						
-						if (HDMA_CH_DO and HDMAEN) /= x"00" then
-							HDMA_CH_WORK <= HDMA_CH_DO and HDMAEN;
+						if (HDMA_CH_DO and HDMA_CH_EN) /= x"00" then
+							HDMA_CH_WORK <= HDMA_CH_DO and HDMA_CH_EN;
 							HDMA_TRMODE_STEP <= (others => '0');
 							HDS <= HDS_TRANSFER;
 						else
-							HDMA_CH_WORK <= HDMA_CH_RUN and HDMAEN;
+							HDMA_CH_WORK <= HDMA_CH_RUN and HDMA_CH_EN;
 							HDS <= HDS_INIT;
 						end if;
-						DBG_HDMA_CNT <= DBG_HDMA_CNT + 1; 
 						
 					when HDS_TRANSFER =>
 						HDMA_TRMODE_STEP <= HDMA_TRMODE_STEP + 1;
@@ -1086,12 +1129,11 @@ begin
 							HDMA_TRMODE_STEP <= (others => '0');
 							HDMA_CH_WORK(HCH) <= '0';
 							if IsLastHDMACh(HDMA_CH_WORK, HCH) = '1' then
-								HDMA_CH_WORK <= HDMA_CH_RUN and HDMAEN;
-								HDMA_INIT_STEP <= (others => '0');
+								HDMA_CH_WORK <= HDMA_CH_RUN and HDMA_CH_EN;
+								HDMA_INIT_STEP <= '0';
 								HDS <= HDS_INIT;
 							end if;
 						end if;
-						DBG_HDMA_CNT <= DBG_HDMA_CNT + 1; 
 						
 					when others => null;
 				end case;
@@ -1204,36 +1246,36 @@ begin
 			AUTO_JOY_CLK <= '0';
 		elsif rising_edge(CLK) then
 			if ENABLE = '1' and DOT_CLK_CE = '1' then
-				if V_CNT = 0 then
-					JOY_POLL_CNT <= (others => '0');
-				end if;
-				
 				JOY_POLL_CLK <= JOY_POLL_CLK + 1;
-				if JOY_POLL_CLK = 63 and VBLANK = '1' and JOY_POLL_RUN = '0' and JOY_POLL_CNT = 0 and AUTO_JOY_EN = '1' then
-					JOY_POLL_RUN <= '1';
-				elsif JOY_POLL_CLK(4 downto 0) = 31 and JOY_POLL_RUN = '1' then
-					if JOY_POLL_STRB = '0' then
-						if JOY_POLL_CLK(5) = '0' then
-							AUTO_JOY_STRB <= '1';
-							JOYRD_BUSY <= '1';
+				if JOY_POLL_CLK(4 downto 0) = 31 then
+					if JOY_POLL_CLK(5) = '1' and VBLANK = '1' and JOY_POLL_RUN = '0' and AUTO_JOY_EN = '1' then
+						JOY_POLL_RUN <= '1';
+						JOY_POLL_CNT <= (others => '0');
+					elsif JOY_POLL_CLK(5) = '1' and VBLANK = '0' and JOY_POLL_RUN = '1' and JOY_POLL_CNT = 16 then
+						JOY_POLL_RUN <= '0';
+					elsif JOY_POLL_RUN = '1' and JOY_POLL_CNT <= 15 then
+						if JOY_POLL_STRB = '0' then
+							if JOY_POLL_CLK(5) = '0' then
+								AUTO_JOY_STRB <= '1';
+								JOYRD_BUSY <= '1';
+							else
+								AUTO_JOY_STRB <= '0';
+								JOY_POLL_STRB <= '1';
+							end if;
 						else
-							AUTO_JOY_STRB <= '0';
-							JOY_POLL_STRB <= '1';
-						end if;
-					else
-						if JOY_POLL_CLK(5) = '0' then
-							JOY1_DATA(15 downto 0) <= JOY1_DATA(14 downto 0) & not JOY1_DI(0);
-							JOY2_DATA(15 downto 0) <= JOY2_DATA(14 downto 0) & not JOY2_DI(0);
-							JOY3_DATA(15 downto 0) <= JOY3_DATA(14 downto 0) & not JOY1_DI(1);
-							JOY4_DATA(15 downto 0) <= JOY4_DATA(14 downto 0) & not JOY2_DI(1);
-							AUTO_JOY_CLK <= '1';
-						else
-							AUTO_JOY_CLK <= '0';
-							JOY_POLL_CNT <= JOY_POLL_CNT + 1;
-							if JOY_POLL_CNT = 15 then
-								JOYRD_BUSY <= '0';
-								JOY_POLL_RUN <= '0';
-								JOY_POLL_STRB <= '0';
+							if JOY_POLL_CLK(5) = '0' then
+								JOY1_DATA(15 downto 0) <= JOY1_DATA(14 downto 0) & not JOY1_DI(0);
+								JOY2_DATA(15 downto 0) <= JOY2_DATA(14 downto 0) & not JOY2_DI(0);
+								JOY3_DATA(15 downto 0) <= JOY3_DATA(14 downto 0) & not JOY1_DI(1);
+								JOY4_DATA(15 downto 0) <= JOY4_DATA(14 downto 0) & not JOY2_DI(1);
+								AUTO_JOY_CLK <= '1';
+							else
+								AUTO_JOY_CLK <= '0';
+								JOY_POLL_CNT <= JOY_POLL_CNT + 1;
+								if JOY_POLL_CNT = 15 then
+									JOYRD_BUSY <= '0';
+									JOY_POLL_STRB <= '0';
+								end if;
 							end if;
 						end if;
 					end if;
@@ -1245,7 +1287,7 @@ begin
 	JOY_STRB <= OLD_JOY_STRB or AUTO_JOY_STRB;
 	JOY1_CLK <= OLD_JOY1_CLK or AUTO_JOY_CLK;
 	JOY2_CLK <= OLD_JOY2_CLK or AUTO_JOY_CLK;
-
+	
 	--debug
 	process( CLK )
 		variable i : integer range 0 to 7;
@@ -1287,7 +1329,6 @@ begin
 					when x"1F" => DBG_DAT <= std_logic_vector(FRAME_CNT(7 downto 0));
 					when x"20" => DBG_DAT <= std_logic_vector(FRAME_CNT(15 downto 8));
 					when x"21" => DBG_DAT <= ENABLE & CPU_ACTIVEr & DMA_ACTIVEr & P65_RDY & REFRESHED & DMA_RUN & HDMA_RUN & P65_EN;
-					when x"22" => DBG_DAT <= std_logic_vector(DBG_HDMA_CNT);
 					when others => DBG_DAT <= x"00";
 				end case;
 			else

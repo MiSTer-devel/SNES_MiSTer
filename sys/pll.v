@@ -6,23 +6,27 @@
 
 `timescale 1 ps / 1 ps
 module pll (
-		input  wire  refclk,   //  refclk.clk
-		input  wire  rst,      //   reset.reset
-		output wire  outclk_0, // outclk0.clk
-		output wire  outclk_1, // outclk1.clk
-		output wire  outclk_2, // outclk2.clk
-		output wire  outclk_3, // outclk3.clk
-		output wire  locked    //  locked.export
+		input  wire        refclk,            //            refclk.clk
+		input  wire        rst,               //             reset.reset
+		output wire        outclk_0,          //           outclk0.clk
+		output wire        outclk_1,          //           outclk1.clk
+		output wire        outclk_2,          //           outclk2.clk
+		output wire        outclk_3,          //           outclk3.clk
+		output wire        locked,            //            locked.export
+		input  wire [63:0] reconfig_to_pll,   //   reconfig_to_pll.reconfig_to_pll
+		output wire [63:0] reconfig_from_pll  // reconfig_from_pll.reconfig_from_pll
 	);
 
 	pll_0002 pll_inst (
-		.refclk   (refclk),   //  refclk.clk
-		.rst      (rst),      //   reset.reset
-		.outclk_0 (outclk_0), // outclk0.clk
-		.outclk_1 (outclk_1), // outclk1.clk
-		.outclk_2 (outclk_2), // outclk2.clk
-		.outclk_3 (outclk_3), // outclk3.clk
-		.locked   (locked)    //  locked.export
+		.refclk            (refclk),            //            refclk.clk
+		.rst               (rst),               //             reset.reset
+		.outclk_0          (outclk_0),          //           outclk0.clk
+		.outclk_1          (outclk_1),          //           outclk1.clk
+		.outclk_2          (outclk_2),          //           outclk2.clk
+		.outclk_3          (outclk_3),          //           outclk3.clk
+		.locked            (locked),            //            locked.export
+		.reconfig_to_pll   (reconfig_to_pll),   //   reconfig_to_pll.reconfig_to_pll
+		.reconfig_from_pll (reconfig_from_pll)  // reconfig_from_pll.reconfig_from_pll
 	);
 
 endmodule
@@ -235,7 +239,7 @@ endmodule
 // Retrieval info: 	<generic name="gui_duty_cycle17" value="50" />
 // Retrieval info: 	<generic name="gui_pll_auto_reset" value="On" />
 // Retrieval info: 	<generic name="gui_pll_bandwidth_preset" value="Auto" />
-// Retrieval info: 	<generic name="gui_en_reconf" value="false" />
+// Retrieval info: 	<generic name="gui_en_reconf" value="true" />
 // Retrieval info: 	<generic name="gui_en_dps_ports" value="false" />
 // Retrieval info: 	<generic name="gui_en_phout_ports" value="false" />
 // Retrieval info: 	<generic name="gui_phout_division" value="1" />

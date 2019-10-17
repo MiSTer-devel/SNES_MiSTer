@@ -107,7 +107,6 @@ signal SA1_ROM_EN				: std_logic;
 signal SA1_BWRAM_EN			: std_logic;
 signal SA1_IRAM_EN			: std_logic;
 signal SA1_INT_EN				: std_logic;
-signal CPU_ROM_DAT			: std_logic_vector(7 downto 0);
 signal SA1_BWRAM_VALID		: std_logic;
 signal OPENBUS					: std_logic_vector(7 downto 0);
 
@@ -372,15 +371,6 @@ SA1_IRAM_EN <= SA1_IRAM_SEL and not SA1_IRAM_WAIT and not SNES_IRAM_SEL;
 SA1_INT_EN <= SA1_INT_SEL;
 SA1_EN <= SA1_INT_EN or SA1_ROM_EN or SA1_BWRAM_EN or SA1_IRAM_EN;
 
-process( P65_A, ROM_DI)
-begin
-	if P65_A(0) = '0' then
-		CPU_ROM_DAT <= ROM_DI(7 downto 0);
-	else
-		CPU_ROM_DAT <= ROM_DI(15 downto 8);
-	end if;
-end process;
-
 process( SNES_A, P65_A, SDA, VDA, SNES_ROM_SEL, SA1_ROM_SEL, DMA_SRC_ROM_SEL, VBP_RUN)
 begin
 	if SNES_ROM_SEL = '1' then
@@ -414,10 +404,36 @@ begin
 	end if;
 end process;
 
-process( P65_A, P65_VPB, CPU_ROM_DAT, SA1_MMIO_READ_ACCESS, SA1_BWRAM_ACCESS, SA1_BBF_ACCESS, SA1_IRAM_ACCESS, SA1_ROM_ACCESS, IRAM_DO, BWRAM_DI, SBW46, 
+process( P65_A, P65_VPB, ROM_DI, SA1_MMIO_READ_ACCESS, SA1_BWRAM_ACCESS, SA1_BBF_ACCESS, SA1_IRAM_ACCESS, SA1_ROM_ACCESS, IRAM_DO, BWRAM_DI, SBW46, 
 			CRV, CIV, CNV, SA1_IRQ_FLAG, TM_IRQ_FLAG, DMA_IRQ_FLAG, SA1_NMI_FLAG, SMSG, MR, MOF, VDP, BBF, HCR, VCR, H_CNT, MDR)
 begin
-	if SA1_MMIO_READ_ACCESS = '1' then	--SA1 Port Read
+	if SA1_ROM_ACCESS = '1' then												--ROM 00h-3Fh/80h-BFh:8000h-FFFFh, C0h-FFh:0000h-FFFFh 
+		if P65_A(3 downto 1) = "110" and P65_VPB = '0' then	--00FFEC/D, 00FFFC/D
+			if P65_A(0) = '0' then
+				P65_DI <= CRV(7 downto 0);
+			else
+				P65_DI <= CRV(15 downto 8);
+			end if;
+		elsif P65_A(3 downto 1) = "111" and P65_VPB = '0' then	--00FFEE/F, 00FFFE/F
+			if P65_A(0) = '0' then
+				P65_DI <= CIV(7 downto 0);
+			else
+				P65_DI <= CIV(15 downto 8);
+			end if;
+		elsif P65_A(3 downto 1) = "101" and P65_VPB = '0' then	--00FFEA/B, 00FFFA/B
+			if P65_A(0) = '0' then
+				P65_DI <= CNV(7 downto 0);
+			else
+				P65_DI <= CNV(15 downto 8);
+			end if;
+		else
+			if P65_A(0) = '0' then
+				P65_DI <= ROM_DI(7 downto 0);
+			else
+				P65_DI <= ROM_DI(15 downto 8);
+			end if;
+		end if;
+	elsif SA1_MMIO_READ_ACCESS = '1' then	--SA1 Port Read
 		case P65_A(7 downto 0) is
 			when x"01" =>
 				P65_DI <= SA1_IRQ_FLAG & TM_IRQ_FLAG & DMA_IRQ_FLAG & SA1_NMI_FLAG & SMSG;
@@ -465,28 +481,6 @@ begin
 				when "10" => P65_DI <= "000000" & BWRAM_DI(5 downto 4);
 				when others => P65_DI <= "000000" & BWRAM_DI(7 downto 6);
 			end case;
-		end if;
-	elsif SA1_ROM_ACCESS = '1' then												--ROM 00h-3Fh/80h-BFh:8000h-FFFFh, C0h-FFh:0000h-FFFFh 
-		if P65_A(3 downto 1) = "110" and P65_VPB = '0' then	--00FFEC/D, 00FFFC/D
-			if P65_A(0) = '0' then
-				P65_DI <= CRV(7 downto 0);
-			else
-				P65_DI <= CRV(15 downto 8);
-			end if;
-		elsif P65_A(3 downto 1) = "111" and P65_VPB = '0' then	--00FFEE/F, 00FFFE/F
-			if P65_A(0) = '0' then
-				P65_DI <= CIV(7 downto 0);
-			else
-				P65_DI <= CIV(15 downto 8);
-			end if;
-		elsif P65_A(3 downto 1) = "101" and P65_VPB = '0' then	--00FFEA/B, 00FFFA/B
-			if P65_A(0) = '0' then
-				P65_DI <= CNV(7 downto 0);
-			else
-				P65_DI <= CNV(15 downto 8);
-			end if;
-		else
-			P65_DI <= CPU_ROM_DAT;
 		end if;
 	else
 		P65_DI <= MDR;
@@ -1340,19 +1334,7 @@ end process;
 process( SNES_A, SNES_IRAM_ACCESS, SNES_CCDMA_IRAM_ACCESS, SNES_BWRAM_ACCESS, SNES_MMIO_READ_ACCESS, SNES_ROM_ACCESS, 
 			SNES_BWRAM_A, ROM_DI, IRAM_DO, BWRAM_DI, SIV, SNV, NMISEL, IRQSEL, SNES_IRQ_FLAG, CDMA_IRQ_FLAG, CMSG, OPENBUS )
 begin
-	if SNES_MMIO_READ_ACCESS = '1' then												--SNES Port Read
-		case SNES_A(7 downto 0) is
-			when x"00" =>						--CCNT
-				SNES_DO <= SNES_IRQ_FLAG & IRQSEL & CDMA_IRQ_FLAG & NMISEL & CMSG;
-			when others => 
-				SNES_DO <= OPENBUS;
-		end case;
-	elsif SNES_IRAM_ACCESS = '1' or 													--I-RAM 00h-3Fh/80h-BFh:3000h-37FFh
-			SNES_CCDMA_IRAM_ACCESS = '1' then										--CC1 SNES DMA BW-RAM 40h-4Fh:0000h-FFFFh
-		SNES_DO <= IRAM_DO;
-	elsif SNES_BWRAM_ACCESS = '1' then												--BW-RAM 40h-4Fh:0000h-FFFFh
-		SNES_DO <= BWRAM_DI;
-	elsif SNES_ROM_ACCESS = '1' then													--ROM 00h-3Fh/80h-BFh:8000h-FFFFh, C0h-FFh:0000h-FFFFh 
+	if SNES_ROM_ACCESS = '1' then													--ROM 00h-3Fh/80h-BFh:8000h-FFFFh, C0h-FFh:0000h-FFFFh 
 		if SNES_A(23 downto 1) = x"00FFE" & "101" and NMISEL = '1' then	--00FFEA/B
 			if SNES_A(0) = '0' then
 				SNES_DO <= SNV(7 downto 0);
@@ -1372,6 +1354,18 @@ begin
 				SNES_DO <= ROM_DI(15 downto 8);
 			end if;
 		end if;
+	elsif SNES_MMIO_READ_ACCESS = '1' then												--SNES Port Read
+		case SNES_A(7 downto 0) is
+			when x"00" =>						--CCNT
+				SNES_DO <= SNES_IRQ_FLAG & IRQSEL & CDMA_IRQ_FLAG & NMISEL & CMSG;
+			when others => 
+				SNES_DO <= OPENBUS;
+		end case;
+	elsif SNES_IRAM_ACCESS = '1' or 													--I-RAM 00h-3Fh/80h-BFh:3000h-37FFh
+			SNES_CCDMA_IRAM_ACCESS = '1' then										--CC1 SNES DMA BW-RAM 40h-4Fh:0000h-FFFFh
+		SNES_DO <= IRAM_DO;
+	elsif SNES_BWRAM_ACCESS = '1' then												--BW-RAM 40h-4Fh:0000h-FFFFh
+		SNES_DO <= BWRAM_DI;
 	else
 		SNES_DO <= OPENBUS;
 	end if;

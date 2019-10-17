@@ -7,6 +7,9 @@ use IEEE.STD_LOGIC_UNSIGNED.ALL;
 use IEEE.STD_LOGIC_TEXTIO.all;
 
 entity DSP_LHRomMap is
+	generic (
+		USE_DSPn	: in std_logic := '1'
+	);
 	port(
 		MCLK			: in std_logic;
 		RST_N			: in std_logic;
@@ -49,6 +52,8 @@ entity DSP_LHRomMap is
 		ROM_MASK		: in std_logic_vector(23 downto 0);
 		BSRAM_MASK	: in std_logic_vector(23 downto 0);
 		
+		EXT_RTC		: in std_logic_vector(64 downto 0);
+		
 		BRK_OUT		: out std_logic;
 		DBG_REG		: in std_logic_vector(7 downto 0) := (others => '0');
 		DBG_DAT_IN	: in std_logic_vector(7 downto 0) := (others => '0');
@@ -60,6 +65,7 @@ end DSP_LHRomMap;
 architecture rtl of DSP_LHRomMap is
 
 	signal CART_ADDR 		: std_logic_vector(23 downto 0);
+	signal ROM_SEL 		: std_logic;
 	signal BRAM_ADDR 		: std_logic_vector(19 downto 0);
 	signal BSRAM_SEL 		: std_logic;
 	signal DP_SEL    		: std_logic;
@@ -74,14 +80,21 @@ architecture rtl of DSP_LHRomMap is
 	signal OBC1_SRAM_A 	: std_logic_vector(12 downto 0);
 	signal OBC1_SRAM_DO 	: std_logic_vector(7 downto 0);
 	
+	signal SRTC_DO 		: std_logic_vector(7 downto 0);
+	signal SRTC_SEL		: std_logic;
+	
 	signal OPENBUS   		: std_logic_vector(7 downto 0);
 
 	signal MAP_DSP_SEL 	: std_logic;
 	signal MAP_OBC1_SEL 	: std_logic;
 	signal DSP_CLK	  		: integer;
 	signal ROM_RD	  		: std_logic;
-	
+		
 begin
+	
+	MAP_DSP_SEL <= not MAP_CTRL(6) and (MAP_CTRL(7) or not (MAP_CTRL(5) or MAP_CTRL(4)));	--8..B
+	MAP_OBC1_SEL <= MAP_CTRL(7) and MAP_CTRL(6) and not MAP_CTRL(5) and not MAP_CTRL(4);	--C
+	MAP_ACTIVE <= MAP_DSP_SEL or MAP_OBC1_SEL;
 	
 	CEGen : entity work.CEGen
 	port map(
@@ -102,12 +115,17 @@ begin
 		BSRAM_SEL <= '0';
 		if ROM_MASK(23) = '0' then
 			case MAP_CTRL(2 downto 0) is
-				when "000" =>							-- LoROM
-					CART_ADDR <= "00" & CA(22 downto 16) & CA(14 downto 0);
+				when "000" =>							-- LoROM/ExLoROM
+					CART_ADDR <= '0' & not CA(23) & CA(22 downto 16) & CA(14 downto 0);
 					BRAM_ADDR <= CA(20 downto 16) & CA(14 downto 0);
 					if MAP_CTRL(3) = '0' then
-						if CA(22 downto 20) = "111" and CA(15) = '0' and ROMSEL_N = '0' and BSRAM_MASK(10) = '1' then
-							BSRAM_SEL <= '1';
+						if CA(22 downto 20) = "111" and ROMSEL_N = '0' and BSRAM_MASK(10) = '1' then
+							if ROM_MASK(20) = '1' or BSRAM_MASK(15) = '1' or MAP_CTRL(7) = '1' then
+								BSRAM_SEL <= not CA(15);
+							else
+								BRAM_ADDR <= CA(19 downto 0);
+								BSRAM_SEL <= '1';
+							end if;
 						end if;
 						if (CA(22 downto 21) = "01" and CA(15) = '1' and ROM_MASK(20) = '0') or		--20-3F/A0-BF:8000-FFFF
 							(CA(22 downto 20) = "110" and CA(15) = '0' and ROM_MASK(20) = '1') then	--60-6F/E0-EF:0000-7FFF
@@ -118,11 +136,11 @@ begin
 							OBC1_SEL <= MAP_CTRL(7) and MAP_CTRL(6);
 						end if;
 					else
-						BSRAM_SEL <= '0';
 						if CA(22 downto 19) = "1101" and ROMSEL_N = '0' then 								--68-6F/E8-EF:0000-0FFF
-							DP_SEL <= '1';
+							DP_SEL <= not CA(11);
+							BSRAM_SEL <= CA(11);
 						end if;
-						
+
 						if CA(22 downto 19) = "1100" then														--60-67/E0-E7:0000-0001
 							DSP_SEL <= MAP_CTRL(7) and not MAP_CTRL(6);
 						end if;
@@ -140,7 +158,7 @@ begin
 					DSP_A0 <= CA(12);
 				when "101"|"010" =>					-- ExHiROM
 					CART_ADDR <= "0" & (not CA(23)) & CA(21 downto 0);
-					BRAM_ADDR <= CA(19 downto 0);
+					BRAM_ADDR <= "0" & CA(21 downto 16) & CA(12 downto 0);
 					if CA(22 downto 21) = "01" and CA(15 downto 13) = "011" and BSRAM_MASK(10) = '1' then
 						BSRAM_SEL <= '1';
 					end if;
@@ -168,13 +186,13 @@ begin
 		end if;
 	end process;
 	
-	MAP_DSP_SEL <= not MAP_CTRL(6) and (MAP_CTRL(7) or not (MAP_CTRL(5) or MAP_CTRL(4)));	--8..B
-	MAP_OBC1_SEL <= MAP_CTRL(7) and MAP_CTRL(6) and not MAP_CTRL(5) and not MAP_CTRL(4);	--C
-	MAP_ACTIVE <= MAP_DSP_SEL or MAP_OBC1_SEL;
-
+	SRTC_SEL <= '1' when CA(22) = '0' and CA(15 downto 1) = x"280"&"000" else '0';
+	ROM_SEL <= not ROMSEL_N and not DSP_SEL and not DP_SEL and not SRTC_SEL and not BSRAM_SEL and not OBC1_SEL;
+	
 
 	DSP_CS_N <= not DSP_SEL;
-	
+
+	DSPn_BLOCK: if USE_DSPn = '1' generate
 	DSPn : entity work.DSPn
 	port map(
 		CLK			=> MCLK,
@@ -199,7 +217,8 @@ begin
 		DBG_DAT_OUT	=> DBG_DAT_OUT,
 		DBG_DAT_WR	=> DBG_DAT_WR
 	);
-	
+	end generate;
+
 	OBC1 : entity work.OBC1
 	port map(
 		CLK			=> MCLK,
@@ -218,6 +237,22 @@ begin
 		SRAM_A		=> OBC1_SRAM_A,
 		SRAM_DI  	=> BSRAM_Q,
 		SRAM_DO		=> OBC1_SRAM_DO
+	);
+	
+	SRTC : entity work.SRTC
+	port map(
+		CLK			=> MCLK,
+
+		A0				=> CA(0),
+		DI				=> DI,
+		DO				=> SRTC_DO,
+		CS				=> SRTC_SEL,
+		CPURD_N		=> CPURD_N,
+		CPUWR_N		=> CPUWR_N,
+		
+		SYSCLKF_CE	=> SYSCLKF_CE,
+		
+		EXT_RTC		=> EXT_RTC
 	);
 	
 	ROM_RD <= (SYSCLKF_CE or SYSCLKR_CE) when rising_edge(MCLK);
@@ -244,9 +279,10 @@ begin
 		end if;
 	end process;
 	
-	DO <= DSP_DO when DSP_SEL = '1' or DP_SEL = '1' else
+	DO <= ROM_Q(7 downto 0) when ROM_SEL = '1' else
+			DSP_DO when DSP_SEL = '1' or DP_SEL = '1' else
+			SRTC_DO when SRTC_SEL = '1' else
 			BSRAM_Q when BSRAM_SEL = '1' or OBC1_SEL = '1' else
-			ROM_Q(7 downto 0) when ROMSEL_N = '0' else
 			OPENBUS;
 
 	IRQ_N <= '1';

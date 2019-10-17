@@ -58,6 +58,11 @@ module emu
 	output  [1:0] LED_POWER,
 	output  [1:0] LED_DISK,
 
+	// I/O board button press simulation (active high)
+	// b[1]: user button
+	// b[0]: osd button
+	output  [1:0] BUTTONS,
+
 	output [15:0] AUDIO_L,
 	output [15:0] AUDIO_R,
 	output        AUDIO_S, // 1 - signed audio samples, 0 - unsigned
@@ -66,7 +71,7 @@ module emu
 	//ADC
 	inout   [3:0] ADC_BUS,
 
-	// SD-SPI
+	//SD-SPI
 	output        SD_SCK,
 	output        SD_MOSI,
 	input         SD_MISO,
@@ -109,16 +114,15 @@ module emu
 	// Open-drain User port.
 	// 0 - D+/RX
 	// 1 - D-/TX
-	// 2..5 - USR1..USR4
+	// 2..6 - USR2..USR6
 	// Set USER_OUT to 1 to read from USER_IN.
-	input   [5:0] USER_IN,
-	output  [5:0] USER_OUT,
+	input   [6:0] USER_IN,
+	output  [6:0] USER_OUT,
 
 	input         OSD_STATUS
 );
 
 assign ADC_BUS  = 'Z;
-assign USER_OUT = '1;
 assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 
 assign AUDIO_S   = 1;
@@ -127,6 +131,7 @@ assign AUDIO_MIX = status[20:19];
 assign LED_USER  = cart_download | (status[23] & bk_pending);
 assign LED_DISK  = 0;
 assign LED_POWER = 0;
+assign BUTTONS   = 0;
 
 assign VIDEO_ARX = status[31:30] == 2 ? 8'd16 : (status[30] ? 8'd8 : 8'd64);
 assign VIDEO_ARY = status[31:30] == 2 ? 8'd9  : (status[30] ? 8'd7 : 8'd49);
@@ -148,50 +153,105 @@ pll pll
 	.outclk_1(SDRAM_CLK),
 	.outclk_2(CLK_VIDEO),
 	.outclk_3(clk_sys),
+	.reconfig_to_pll(reconfig_to_pll),
+	.reconfig_from_pll(reconfig_from_pll),
 	.locked(clock_locked)
 );
 
-wire reset = RESET | buttons[1] | status[0] | cart_download | bk_loading;
+wire [63:0] reconfig_to_pll;
+wire [63:0] reconfig_from_pll;
+wire        cfg_waitrequest;
+reg         cfg_write;
+reg   [5:0] cfg_address;
+reg  [31:0] cfg_data;
 
+pll_cfg pll_cfg
+(
+	.mgmt_clk(CLK_50M),
+	.mgmt_reset(0),
+	.mgmt_waitrequest(cfg_waitrequest),
+	.mgmt_read(0),
+	.mgmt_readdata(),
+	.mgmt_write(cfg_write),
+	.mgmt_address(cfg_address),
+	.mgmt_writedata(cfg_data),
+	.reconfig_to_pll(reconfig_to_pll),
+	.reconfig_from_pll(reconfig_from_pll)
+);
+
+always @(posedge CLK_50M) begin
+	reg pald = 0, pald2 = 0;
+	reg [2:0] state = 0;
+
+	pald  <= PAL;
+	pald2 <= pald;
+
+	cfg_write <= 0;
+	if(pald2 != pald) state <= 1;
+
+	if(!cfg_waitrequest) begin
+		if(state) state<=state+1'd1;
+		case(state)
+			1: begin
+					cfg_address <= 0;
+					cfg_data <= 0;
+					cfg_write <= 1;
+				end
+			3: begin
+					cfg_address <= 7;
+					cfg_data <= pald2 ? 2201376898 : 2537930535;
+					cfg_write <= 1;
+				end
+			5: begin
+					cfg_address <= 2;
+					cfg_data <= 0;
+					cfg_write <= 1;
+				end
+		endcase
+	end
+end
+
+wire reset = RESET | buttons[1] | status[0] | cart_download | bk_loading;
 
 ////////////////////////////  HPS I/O  //////////////////////////////////
 
 `include "build_id.v"
 parameter CONF_STR = {
-	"SNES;;",
-	"FS,SFCSMCBIN;",
-	"-;",
-	"O13,ROM Header,Auto,No Header,LoROM,HiROM,ExHiROM;",
-	"-;",
-	"C,Cheats;",
-	"H2OO,Cheats Enabled,Yes,No;",
-	"-;",
-	"D0RC,Load Backup RAM;",
-	"D0RD,Save Backup RAM;",
-	"D0ON,Autosave,OFF,ON;",
-	"D0-;",
-	"D1OI,SuperFX speed,Original,Turbo;",
-	"OEF,Video Region,Auto,NTSC,PAL;",
-	"OUV,Aspect ratio,4:3,8:7,16:9;",
-	"O9B,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
-	"OG,Pseudo-transparency,Blend,Stripes;",
-	"OJK,Stereo mix,none,25%,50%,100%;", 
-	"-;",
-	"O56,Mouse,None,Port1,Port2;",
-	"O7,Swap Joysticks,No,Yes;",
-	"OH,Multitap,Disabled,Port2;",
-	"-;",
-	"OPQ,Super Scope,Disabled,Joy1,Joy2,Mouse;",
-	"D4OR,Super Scope Btn,Joy,Mouse;",
-	"D4OST,Cross,Small,Big,None;",
-	"-;",
-	"D3O4,Turbo,Disable,Enable;",
-	"-;",
-	"R0,Reset;",
-	"J1,A(SS Fire),B(SS Cursor),X(SS TurboSw),Y(SS Pause),LT(SS Cursor),RT(SS Fire),Select,Start;",
-	"V,v",`BUILD_DATE
+    "SNES;;",
+    "FS,SFCSMCBIN;",
+    "-;",
+    "OEF,Video Region,Auto,NTSC,PAL;",
+    "O13,ROM Header,Auto,No Header,LoROM,HiROM,ExHiROM;",
+    "-;",
+    "C,Cheats;",
+    "H2OO,Cheats Enabled,Yes,No;",
+    "-;",
+    "D0RC,Load Backup RAM;",
+    "D0RD,Save Backup RAM;",
+    "D0ON,Autosave,Off,On;",
+    "D0-;",
+    "OUV,Aspect Ratio,4:3,8:7,16:9;",
+    "O9B,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
+    "OG,Pseudo Transparency,Blend,Off;",
+    "OJK,Stereo Mix,None,25%,50%,100%;", 
+    "-;",
+    "O56,Mouse,None,Port1,Port2;",
+    "O7,Swap Joysticks,No,Yes;",
+    "OH,Multitap,Disabled,Port2;",
+    "O8,Serial,OFF,SNAC;",
+    "-;",
+    "OPQ,Super Scope,Disabled,Joy1,Joy2,Mouse;",
+    "D4OR,Super Scope Btn,Joy,Mouse;",
+    "D4OST,Cross,Small,Big,None;",
+    "-;",
+    "D1OI,SuperFX Speed,Normal,Turbo;",
+    "D3O4,CPU Speed,Normal,Turbo;",
+    "-;",
+    "R0,Reset;",
+    "J1,A(SS Fire),B(SS Cursor),X(SS TurboSw),Y(SS Pause),LT(SS Cursor),RT(SS Fire),Select,Start;",
+    "V,v",`BUILD_DATE
 };
-// free bits: L,M,U,V
+// free bits: 8,L,M
 
 wire  [1:0] buttons;
 wire [31:0] status;
@@ -219,6 +279,8 @@ wire [24:0] ps2_mouse;
 
 wire  [7:0] joy0_x,joy0_y,joy1_x,joy1_y;
 
+wire [64:0] RTC;
+
 hps_io #(.STRLEN($size(CONF_STR)>>3), .WIDE(1)) hps_io
 (
 	.clk_sys(clk_sys),
@@ -240,6 +302,8 @@ hps_io #(.STRLEN($size(CONF_STR)>>3), .WIDE(1)) hps_io
 
 	.status(status),
 	.status_menumask(status_menumask),
+	.status_in({status[31:5],1'b0,status[3:0]}),
+	.status_set(cart_download),
 
 	.ioctl_addr(ioctl_addr),
 	.ioctl_dout(ioctl_dout),
@@ -258,14 +322,15 @@ hps_io #(.STRLEN($size(CONF_STR)>>3), .WIDE(1)) hps_io
 
 	.img_mounted(img_mounted),
 	.img_readonly(img_readonly),
-	.img_size(img_size)
+	.img_size(img_size),
+	
+	.RTC(RTC)
 );
 
 wire       GUN_BTN = status[27];
 wire [1:0] GUN_MODE = status[26:25];
 wire       GSU_TURBO = status[18];
 wire       BLEND = ~status[16];
-wire       PAL = (!status[15:14]) ? rom_region : status[15];
 wire [1:0] mouse_mode = status[6:5];
 wire       joy_swap = status[7];
 wire [2:0] LHRom_type = status[3:1];
@@ -292,12 +357,13 @@ end
 
 //////////////////////////  ROM DETECT  /////////////////////////////////
 
-reg        rom_region = 0;
+reg        PAL;
 reg  [7:0] rom_type;
 reg [23:0] rom_mask, ram_mask;
 always @(posedge clk_sys) begin
 	reg [3:0] rom_size;
 	reg [3:0] ram_size;
+	reg       rom_region = 0;
 
 	if (cart_download) begin
 		if(ioctl_wr) begin
@@ -335,6 +401,9 @@ always @(posedge clk_sys) begin
 			rom_mask <= (24'd1024 << rom_size) - 1'd1;
 			ram_mask <= ram_size ? (24'd1024 << ram_size) - 1'd1 : 24'd0;
 		end
+	end
+	else begin
+		PAL <= (!status[15:14]) ? rom_region : status[15];
 	end
 end
 
@@ -407,14 +476,16 @@ main main
 	.HSYNC(HSYNC),
 	.VSYNC(VSYNC),
 
-	.JOY1_DI(JOY1_DO),
-	.JOY2_DI(GUN_MODE ? LG_DO : JOY2_DO),
+	.JOY1_DI(JOY1_DI),
+	.JOY2_DI(GUN_MODE ? LG_DO : JOY2_DI),
 	.JOY_STRB(JOY_STRB),
 	.JOY1_CLK(JOY1_CLK),
 	.JOY2_CLK(JOY2_CLK),
 	.JOY1_P6(JOY1_P6),
 	.JOY2_P6(JOY2_P6),
-	.JOY2_P6_in(LG_P6_out | !GUN_MODE),
+	.JOY2_P6_in(JOY2_P6_DI),
+	
+	.EXT_RTC(RTC),
 
 	.GG_EN(status[24]),
 	.GG_CODE(gg_code),
@@ -470,7 +541,7 @@ wire[15:0] ROM_Q;
 sdram sdram
 (
 	.*,
-	.init(~clock_locked),
+	.init(0), //~clock_locked),
 	.clk(clk_mem),
 	
 	.addr(cart_download ? ioctl_addr-10'd512 : ROM_ADDR),
@@ -647,7 +718,7 @@ ioport port1
 	.PORT_P6(JOY1_P6),
 	.PORT_DO(JOY1_DO),
 
-	.JOYSTICK1(joy_swap ? joy1 : joy0),
+	.JOYSTICK1((joy_swap ^ raw_serial) ? joy1 : joy0),
 
 	.MOUSE(ps2_mouse),
 	.MOUSE_EN(mouse_mode[0])
@@ -667,7 +738,7 @@ ioport port2
 	.PORT_P6(JOY2_P6),
 	.PORT_DO(JOY2_DO),
 
-	.JOYSTICK1(joy_swap ? joy0 : joy1),
+	.JOYSTICK1((joy_swap ^ raw_serial) ? joy0 : joy1),
 	.JOYSTICK2(joy2),
 	.JOYSTICK3(joy3),
 	.JOYSTICK4(joy4),
@@ -709,6 +780,45 @@ lightgun lightgun
 	.PORT_P6(LG_P6_out),
 	.PORT_DO(LG_DO)
 );
+
+// Indexes:
+// 0 = D+    = Latch
+// 1 = D-    = CLK
+// 2 = TX-   = P5
+// 3 = GND_d
+// 4 = RX+   = P6
+// 5 = RX-   = P4
+
+wire raw_serial = status[8];
+
+assign USER_OUT[2] = 1'b1;
+assign USER_OUT[3] = 1'b1;
+assign USER_OUT[5] = 1'b1;
+assign USER_OUT[6] = 1'b1;
+
+// JOYX_DO[0] is P4, JOYX_DO[1] is P5
+wire [1:0] JOY1_DI;
+wire [1:0] JOY2_DI;
+wire JOY2_P6_DI;
+
+always_comb begin
+	if (raw_serial) begin
+		USER_OUT[0] = JOY_STRB;
+		USER_OUT[1] = joy_swap ? ~JOY2_CLK : ~JOY1_CLK;
+		USER_OUT[4] = joy_swap ? JOY2_P6 : JOY1_P6;
+		JOY1_DI = joy_swap ? JOY1_DO : {USER_IN[2], USER_IN[5]};
+		JOY2_DI = joy_swap ? {USER_IN[2], USER_IN[5]} : JOY2_DO;
+		JOY2_P6_DI = joy_swap ? USER_IN[4] : (LG_P6_out | !GUN_MODE);
+	end else begin
+		USER_OUT[0] = 1'b1;
+		USER_OUT[1] = 1'b1;
+		USER_OUT[4] = 1'b1;
+		JOY1_DI = JOY1_DO;
+		JOY2_DI = JOY2_DO;
+		JOY2_P6_DI = (LG_P6_out | !GUN_MODE);
+	end
+end
+
 
 /////////////////////////  STATE SAVE/LOAD  /////////////////////////////
 

@@ -387,6 +387,7 @@ ARCHITECTURE rtl OF ascal IS
   SIGNAL o_format : unsigned(5 DOWNTO 0);
   SIGNAL o_fb_pal_dr : unsigned(23 DOWNTO 0);
   SIGNAL pal_mem : arr_uv24(0 TO 255);
+  ATTRIBUTE ramstyle of pal_mem : signal is "no_rw_check";
   SIGNAL o_htotal,o_hsstart,o_hsend : uint12;
   SIGNAL o_hmin,o_hmax,o_hdisp : uint12;
   SIGNAL o_hsize,o_vsize : uint12;

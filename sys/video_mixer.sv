@@ -17,6 +17,9 @@
 // HALF_DEPTH:  If =1 then color dept is 4 bits per component
 //              For half depth 8 bits monochrome is available with
 //              mono signal enabled and color = {G, R}
+//
+// altera message_off 10720 
+// altera message_off 12161
 
 module video_mixer
 #(
@@ -28,7 +31,7 @@ module video_mixer
 	// video clock
 	// it should be multiple by (ce_pix*4).
 	input            clk_vid,
-	
+
 	// Pixel clock or clock_enable (both are accepted).
 	input            ce_pix,
 	output           ce_pix_out,
@@ -51,10 +54,7 @@ module video_mixer
 	// Monochrome mode (for HALF_DEPTH only)
 	input            mono,
 
-	input            gamma_en,
-	input            gamma_wr,
-	input      [9:0] gamma_wr_addr,
-	input      [7:0] gamma_value,
+	inout     [21:0] gamma_bus,
 
 	// Positive pulses.
 	input            HSync,
@@ -94,15 +94,16 @@ wire [DWIDTH_SD:0] R_gamma, G_gamma, B_gamma;
 
 generate
 	if(GAMMA) begin
+		assign gamma_bus[21] = 1;
 		gamma_corr gamma(
-			.clk_sys(clk_sys),
+			.clk_sys(gamma_bus[20]),
 			.clk_vid(clk_vid),
 			.ce_pix(ce_pix),
 
-			.gamma_en(gamma_en),
-			.gamma_wr(gamma_wr),
-			.gamma_wr_addr(gamma_wr_addr),
-			.gamma_value(gamma_value),
+			.gamma_en(gamma_bus[19]),
+			.gamma_wr(gamma_bus[18]),
+			.gamma_wr_addr(gamma_bus[17:8]),
+			.gamma_value(gamma_bus[7:0]),
 
 			.HSync(HSync),
 			.VSync(VSync),
@@ -117,6 +118,7 @@ generate
 			.RGB_out({R_gamma,G_gamma,B_gamma})
 		);
 	end else begin
+		assign gamma_bus[21] = 0;
 		assign {R_gamma,G_gamma,B_gamma} = {R_in,G_in,B_in};
 		assign {hs_g, vs_g, hb_g, vb_g} = {HSync, VSync, HBlank, VBlank};
 	end

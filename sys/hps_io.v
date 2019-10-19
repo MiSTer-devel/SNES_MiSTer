@@ -28,7 +28,7 @@
 
 // WIDE=1 for 16 bit file I/O
 // VDNUM 1-4
-module hps_io #(parameter STRLEN=0, PS2DIV=0, WIDE=0, VDNUM=1, PS2WE=0, GAMMA=0)
+module hps_io #(parameter STRLEN=0, PS2DIV=0, WIDE=0, VDNUM=1, PS2WE=0)
 (
 	input             clk_sys,
 	inout      [45:0] HPS_BUS,
@@ -128,10 +128,7 @@ module hps_io #(parameter STRLEN=0, PS2DIV=0, WIDE=0, VDNUM=1, PS2WE=0, GAMMA=0)
 	output reg [24:0] ps2_mouse = 0,
 	output reg [15:0] ps2_mouse_ext = 0, // 15:8 - reserved(additional buttons), 7:0 - wheel movements
 
-	output reg        gamma_en,
-	output reg        gamma_wr,
-	output reg  [9:0] gamma_wr_addr,
-	output reg  [7:0] gamma_value
+	inout      [21:0] gamma_bus
 );
 
 localparam DW = (WIDE) ? 15 : 7;
@@ -195,6 +192,12 @@ video_calc video_calc
 
 /////////////////////////////////////////////////////////
 
+assign     gamma_bus[20:0] = {clk_sys, gamma_en, gamma_wr, gamma_wr_addr, gamma_value};
+reg        gamma_en;
+reg        gamma_wr;
+reg  [9:0] gamma_wr_addr;
+reg  [7:0] gamma_value;
+
 reg [31:0] ps2_key_raw = 0;
 wire       pressed  = (ps2_key_raw[15:8] != 8'hf0);
 wire       extended = (~pressed ? (ps2_key_raw[23:16] == 8'he0) : (ps2_key_raw[15:8] == 8'he0));
@@ -256,7 +259,7 @@ always@(posedge clk_sys) begin
 					'h29: io_dout <= {4'hA, stflg};
 					'h2B: io_dout <= 1;
 					'h2F: io_dout <= 1;
-					'h32: io_dout <= GAMMA ? 1 : 0;
+					'h32: io_dout <= gamma_bus[21];
 				endcase
 
 				sd_buff_addr <= 0;

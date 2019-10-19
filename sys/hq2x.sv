@@ -70,7 +70,7 @@ wire [7:0] new_pattern = {diff1, diff0, pattern[7:2]};
 
 wire [23:0] X = (cyc == 0) ? A : (cyc == 1) ? Prev1 : (cyc == 2) ? Next1 : G;
 wire [23:0] blend_result_pre;
-Blend blender(hqTable[nextpatt], disable_hq2x, Curr0, X, B, D, F, H, blend_result_pre);
+Blend blender(clk, ce_in, hqTable[nextpatt], disable_hq2x, Curr0, X, B, D, F, H, blend_result_pre);
 
 wire [DWIDTH:0] Curr20tmp;
 wire     [23:0] Curr20 = HALF_DEPTH ? h2rgb(Curr20tmp) : Curr20tmp;
@@ -146,6 +146,7 @@ reg [AWIDTH:0] offs;
 always @(posedge clk) begin
 	reg old_reset_line;
 	reg old_reset_frame;
+	reg wrdata_finished;
 
 	wrout_en <= 0;
 	wrin_en  <= 0;
@@ -162,17 +163,32 @@ always @(posedge clk) begin
 				wrin_en <= 1;
 			end
 
-			case({cyc[1],^cyc})
+			/*
+			case(cyc)
 				0: wrdata[DWIDTH:0]                   <= blend_result;
 				1: wrdata[DWIDTH1+DWIDTH:DWIDTH1]     <= blend_result;
-				2: wrdata[DWIDTH1*2+DWIDTH:DWIDTH1*2] <= blend_result;
+				2: wrdata[DWIDTH1*3+DWIDTH:DWIDTH1*3] <= blend_result;
+				3: wrdata[DWIDTH1*2+DWIDTH:DWIDTH1*2] <= blend_result;
+			endcase
+			*/
+
+			// blend_result has been delayed by 1 cycle
+			case(cyc)
+				1: wrdata[DWIDTH:0]                   <= blend_result;
+				2: wrdata[DWIDTH1+DWIDTH:DWIDTH1]     <= blend_result;
 				3: wrdata[DWIDTH1*3+DWIDTH:DWIDTH1*3] <= blend_result;
+				0: wrdata[DWIDTH1*2+DWIDTH:DWIDTH1*2] <= blend_result;
 			endcase
 
 			if(cyc==3) begin
 				offs <= offs + 1'd1;
 				wrout_addr <= {offs, curbuf};
+				wrdata_finished <= 1;
+			end
+
+			if(wrdata_finished) begin
 				wrout_en <= 1;
+				wrdata_finished <= 0;
 			end
 		end
 
@@ -284,11 +300,13 @@ endmodule
 
 module InnerBlend
 (
+	input clk,
+	input clk_en,
 	input  [8:0] Op,
 	input  [7:0] A,
 	input  [7:0] B,
 	input  [7:0] C,
-	output [7:0] O
+	output reg [7:0] O
 );
 
 	function  [10:0] mul8x3;
@@ -310,11 +328,17 @@ module InnerBlend
 	wire [10:0] Bt = (OpOnes == 0) ? Bmul : {3'b0, B};
 	wire [10:0] Ct = (OpOnes == 0) ? Cmul : {3'b0, C};
 	wire [11:0] Res = {At, 1'b0} + Bt + Ct;
-	assign O = Op[8] ? A : Res[11:4];
+
+	always @(posedge clk) if (clk_en) begin
+		O <= Op[8] ? A : Res[11:4];
+	end
+
 endmodule
 
 module Blend
 (
+	input clk,
+	input clk_en,
 	input   [5:0] rule,
 	input         disable_hq2x,
 	input  [23:0] E,
@@ -385,7 +409,7 @@ module Blend
                         !input_ctrl[0] ? D : B;
 
 	wire [23:0] Input3 = !input_ctrl[0] ? B : D;
-	InnerBlend inner_blend1(op, Input1[7:0],   Input2[7:0],   Input3[7:0],   Result[7:0]);
-	InnerBlend inner_blend2(op, Input1[15:8],  Input2[15:8],  Input3[15:8],  Result[15:8]);
-	InnerBlend inner_blend3(op, Input1[23:16], Input2[23:16], Input3[23:16], Result[23:16]);
+	InnerBlend inner_blend1(clk, clk_en, op, Input1[7:0],   Input2[7:0],   Input3[7:0],   Result[7:0]);
+	InnerBlend inner_blend2(clk, clk_en, op, Input1[15:8],  Input2[15:8],  Input3[15:8],  Result[15:8]);
+	InnerBlend inner_blend3(clk, clk_en, op, Input1[23:16], Input2[23:16], Input3[23:16], Result[23:16]);
 endmodule

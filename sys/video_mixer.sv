@@ -36,8 +36,6 @@ module video_mixer
 	input            ce_pix,
 	output           ce_pix_out,
 
-	input            clk_sys,
-
 	input            scandoubler,
 
 	// scanlines (00-none 01-25% 10-50% 11-75%)

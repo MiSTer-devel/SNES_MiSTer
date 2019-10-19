@@ -393,7 +393,23 @@ package DSP_PKG is
 	((IS_IDLE, 0),    (IS_IDLE, 0),    (IS_ENV,  0),    (IS_ENV2, 0)),
 	((IS_IDLE, 0),    (IS_IDLE, 0),    (IS_IDLE, 0),    (IS_IDLE, 0))
 	);
-	
+
+	type GaussStep_t is (
+		GS_IDLE,
+		GS_WAIT,
+		GS_BRR0,
+		GS_BRR1,
+		GS_BRR2,
+		GS_BRR3
+	);
+
+	type BrrDecState_t is (
+		BD_IDLE,
+		BD_WAIT,
+		BD_P0,
+		BD_P1
+	);
+
 	--Envelope Modes
 	type EnvMode_t is (
 		EM_RELEASE,
@@ -473,8 +489,7 @@ package DSP_PKG is
 	type KonCnt_t is array (0 to 7) of unsigned(2 downto 0);
 	type BrrAddr_t is array (0 to 7) of std_logic_vector(15 downto 0);
 	type BrrOffs_t is array (0 to 7) of unsigned(2 downto 0);
-	type BrrBuf_t is array (0 to 11) of signed(15 downto 0);
-	type VoiceBrrBuf_t is array (0 to 7) of BrrBuf_t;
+	type VoiceBrrBufAddr_t is array(0 to 7) of unsigned(3 downto 0);
 	type Out_t is array (0 to 1) of signed(15 downto 0);
 	type EchoBuf_t is array (0 to 7) of std_logic_vector(14 downto 0);
 	type ChEchoBuf_t is array (0 to 1) of EchoBuf_t;

@@ -33,7 +33,7 @@ localparam OSD_HDR      = 12'd0;
 `endif
 
 reg        osd_enable;
-reg  [7:0] osd_buffer[OSD_HDR ? (4096+1024) : 4096];
+(* ramstyle="no_rw_check" *) reg  [7:0] osd_buffer[OSD_HDR ? (4096+1024) : 4096];
 
 reg        info = 0;
 reg  [8:0] infoh;

@@ -251,22 +251,24 @@ begin
 	P65_BANK <= P65_A(23 downto 16);
 	P65_A_HIGH <= P65_A(15 downto 8);
 
-	process( SPEED, MEMSEL, REFRESHED, CPU_ACTIVEr, TURBO, DMA_ACTIVE, P65_ACCESSED_PERIPHERAL_CNT, VBLANK, HBLANK, NMI_EN, NMI_FLAG)
+	process( SPEED, MEMSEL, REFRESHED, CPU_ACTIVEr, TURBO, P65_CLK_CNT, P65_ACCESSED_PERIPHERAL_CNT)
 	begin
 		CPU_MID_CLOCK <= x"2";
 		DMA_MID_CLOCK <= "011";
 		DMA_LAST_CLOCK <= "111";
-		-- Turbo should only occur when the cpu is ONLY accessing ram/rom, in otherwords during the main game loop
-		if TURBO = '1' and not (DMA_ACTIVE = '1' or NMI_EN = '0'  or NMI_FLAG = '1' or VBLANK = '1' or HBLANK = '1' or P65_ACCESSED_PERIPHERAL_CNT /= x"0") then
-			CPU_LAST_CLOCK <= x"4";
-		elsif REFRESHED = '1' and CPU_ACTIVEr = '1' then
-			CPU_LAST_CLOCK <= x"7";
-		elsif SPEED = FAST or (SPEED = SLOWFAST and MEMSEL = '1') then
-			CPU_LAST_CLOCK <= x"5";
-		elsif SPEED = SLOW or (SPEED = SLOWFAST and MEMSEL = '0') then
-			CPU_LAST_CLOCK <= x"7";
-		else
-			CPU_LAST_CLOCK <= x"B";
+		if P65_CLK_CNT = x"0" then
+			-- Turbo should only occur when the cpu is ONLY accessing ram/rom, in otherwords during the main game loop
+			if TURBO = '1' and P65_ACCESSED_PERIPHERAL_CNT = x"0" then
+				CPU_LAST_CLOCK <= x"4";
+			elsif REFRESHED = '1' and CPU_ACTIVEr = '1' then
+				CPU_LAST_CLOCK <= x"7";
+			elsif SPEED = FAST or (SPEED = SLOWFAST and MEMSEL = '1') then
+				CPU_LAST_CLOCK <= x"5";
+			elsif SPEED = SLOW or (SPEED = SLOWFAST and MEMSEL = '0') then
+				CPU_LAST_CLOCK <= x"7";
+			else
+				CPU_LAST_CLOCK <= x"B";
+			end if;
 		end if;
 	end process;
 	
@@ -285,8 +287,8 @@ begin
 				DMA_CLK_CNT <= (others => '0');
 			end if;
 			
-			if ((P65_A_HIGH > x"1F" and P65_A_HIGH < x"80") and (P65_BANK < x"40" or (P65_BANK > x"7F" and P65_BANK < x"C0"))) then
-				P65_ACCESSED_PERIPHERAL_CNT <= x"1F";
+			if DMA_ACTIVE = '1' or NMI_EN = '0'  or NMI_FLAG = '1' or VBLANK = '1' or HBLANK = '1' or ((P65_A_HIGH > x"1F" and P65_A_HIGH < x"80") and (P65_BANK < x"40" or (P65_BANK > x"7F" and P65_BANK < x"C0"))) then
+				P65_ACCESSED_PERIPHERAL_CNT <= x"3F";
 			elsif P65_ACCESSED_PERIPHERAL_CNT /= x"0" then
 				P65_ACCESSED_PERIPHERAL_CNT <= P65_ACCESSED_PERIPHERAL_CNT - 1;
 			end if;

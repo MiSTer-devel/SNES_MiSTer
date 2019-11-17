@@ -59,7 +59,7 @@ wire [7:0] pc_in = pix_in_cnt + 1'b1;
 reg  [7:0] pixsz, pixsz2, pixsz4 = 0;
 
 reg ce_x4i, ce_x1i;
-always @(negedge clk_vid) begin
+always @(posedge clk_vid) begin
 	reg old_ce, valid, hs;
 
 	if(~&pix_len) pix_len <= pl;
@@ -124,7 +124,7 @@ reg  [7:0] pix_out_cnt = 0;
 wire [7:0] pc_out = pix_out_cnt + 1'b1;
 
 reg ce_x4o, ce_x2o;
-always @(negedge clk_vid) begin
+always @(posedge clk_vid) begin
 	reg hs;
 
 	if(~&pix_out_cnt) pix_out_cnt <= pc_out;

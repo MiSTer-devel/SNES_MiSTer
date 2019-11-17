@@ -60,10 +60,10 @@ architecture rtl of SCPU is
 	signal INT_CLKR_CE, INT_CLKF_CE, DOT_CLK_CE : std_logic;
 	signal P65_CLK_CNT : unsigned(3 downto 0);
 	signal DMA_CLK_CNT : unsigned(2 downto 0);
-	signal DMA_LAST_CLOCK : unsigned(2 downto 0);
-	signal DMA_MID_CLOCK : unsigned(2 downto 0);
+	constant DMA_LAST_CLOCK : unsigned(2 downto 0) := "111";
+	constant DMA_MID_CLOCK : unsigned(2 downto 0) := "011";
 	signal CPU_LAST_CLOCK : unsigned(3 downto 0);
-	signal CPU_MID_CLOCK : unsigned(3 downto 0);
+	constant  CPU_MID_CLOCK : unsigned(3 downto 0) := x"2";
 	signal CPU_ACTIVEr, DMA_ACTIVEr : std_logic;
 	signal DOT_CLK_CNT : unsigned(1 downto 0); 
 	signal H_CNT : unsigned(8 downto 0);
@@ -251,27 +251,6 @@ begin
 	P65_BANK <= P65_A(23 downto 16);
 	P65_A_HIGH <= P65_A(15 downto 8);
 
-	process( SPEED, MEMSEL, REFRESHED, CPU_ACTIVEr, TURBO, P65_CLK_CNT, P65_ACCESSED_PERIPHERAL_CNT)
-	begin
-		CPU_MID_CLOCK <= x"2";
-		DMA_MID_CLOCK <= "011";
-		DMA_LAST_CLOCK <= "111";
-		if P65_CLK_CNT = x"0" then
-			-- Turbo should only occur when the cpu is ONLY accessing ram/rom, in otherwords during the main game loop
-			if TURBO = '1' and P65_ACCESSED_PERIPHERAL_CNT = x"0" then
-				CPU_LAST_CLOCK <= x"4";
-			elsif REFRESHED = '1' and CPU_ACTIVEr = '1' then
-				CPU_LAST_CLOCK <= x"7";
-			elsif SPEED = FAST or (SPEED = SLOWFAST and MEMSEL = '1') then
-				CPU_LAST_CLOCK <= x"5";
-			elsif SPEED = SLOW or (SPEED = SLOWFAST and MEMSEL = '0') then
-				CPU_LAST_CLOCK <= x"7";
-			else
-				CPU_LAST_CLOCK <= x"B";
-			end if;
-		end if;
-	end process;
-	
 	process( RST_N, CLK )
 	begin
 		if RST_N = '0' then
@@ -296,6 +275,19 @@ begin
 			P65_CLK_CNT <= P65_CLK_CNT + 1;
 			if P65_CLK_CNT >= CPU_LAST_CLOCK  then
 				P65_CLK_CNT <= (others => '0');
+				
+				-- Turbo should only occur when the cpu is ONLY accessing ram/rom, in otherwords during the main game loop
+				if TURBO = '1' and P65_ACCESSED_PERIPHERAL_CNT = x"0" then
+					CPU_LAST_CLOCK <= x"4";
+				elsif REFRESHED = '1' and CPU_ACTIVEr = '1' then
+					CPU_LAST_CLOCK <= x"7";
+				elsif SPEED = FAST or (SPEED = SLOWFAST and MEMSEL = '1') then
+					CPU_LAST_CLOCK <= x"5";
+				elsif SPEED = SLOW or (SPEED = SLOWFAST and MEMSEL = '0') then
+					CPU_LAST_CLOCK <= x"7";
+				else
+					CPU_LAST_CLOCK <= x"B";
+				end if;
 			end if;
 
 			if DMA_ACTIVEr = '0' and DMA_ACTIVE = '1' and DMA_CLK_CNT = DMA_LAST_CLOCK and REFRESHED = '0' then

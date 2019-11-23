@@ -131,7 +131,7 @@ assign AUDIO_MIX = status[20:19];
 assign LED_USER  = cart_download | (status[23] & bk_pending);
 assign LED_DISK  = 0;
 assign LED_POWER = 0;
-assign BUTTONS   = 0;
+assign BUTTONS[1]   = 0;
 
 assign VIDEO_ARX = status[31:30] == 2 ? 8'd16 : (status[30] ? 8'd8 : 8'd64);
 assign VIDEO_ARY = status[31:30] == 2 ? 8'd9  : (status[30] ? 8'd7 : 8'd49);
@@ -357,6 +357,23 @@ always @(posedge clk_sys) begin
 		to <= to - 1;
 		if(to == 1) new_vmode <= ~new_vmode;
 	end
+end
+
+// Pop OSD menu if no rom has been loaded automatically
+assign BUTTONS[0] = osd_btn;
+
+reg osd_btn = 0;
+always @(posedge clk_sys) begin : osd_block
+    integer timeout = 0;
+
+    if(!RESET) begin
+        osd_btn <= 0;
+        if(timeout < 61000000) begin
+            timeout <= timeout + 1;
+            if(timeout > 50000000)
+                osd_btn <= ~cart_download;
+        end
+    end
 end
 
 //////////////////////////  ROM DETECT  /////////////////////////////////

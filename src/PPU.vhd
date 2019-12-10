@@ -2147,6 +2147,7 @@ begin
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
 		elsif BG2_PIX_DATA(6 downto 0) /= "0000000" and BGPR1EN(1) = '1' and M7EXTBG = '1' then
 			CGRAM_FETCH_ADDR <= "0" & BG2_PIX_DATA(6 downto 0);
+			MATH := CGADSUB(1);
 		elsif SPR_PIX_DATA(3 downto 0) /= "0000" and OBJPR1EN = '1' then
 			CGRAM_FETCH_ADDR <= "1" & SPR_PIX_DATA(6 downto 0);
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
@@ -2159,6 +2160,7 @@ begin
 			MATH := CGADSUB(4) and SPR_PIX_DATA(6);
 		elsif BG2_PIX_DATA(6 downto 0) /= "0000000" and BGPR0EN(1) = '1' and M7EXTBG = '1' then
 			CGRAM_FETCH_ADDR <= "0" & BG2_PIX_DATA(6 downto 0);
+			MATH := CGADSUB(1);
 		else
 			CGRAM_FETCH_ADDR <= (others => '0');
 			MATH := CGADSUB(5);

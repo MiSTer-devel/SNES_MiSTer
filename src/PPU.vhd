@@ -181,6 +181,7 @@ signal OUT_X				: unsigned(7 downto 0);
 signal OUT_Y				: unsigned(7 downto 0);
 signal BG_MOSAIC_X 		: unsigned(3 downto 0);
 signal BG_MOSAIC_Y 		: unsigned(3 downto 0);
+signal BG_MOSAIC_Y_NEXT	: unsigned(3 downto 0);
 signal BF 					: BgFetch_r;
 signal BG3_OPT_DATA0 	: std_logic_vector(15 downto 0);
 signal BG3_OPT_DATA1 	: std_logic_vector(15 downto 0);
@@ -979,7 +980,7 @@ HIRES <= '1' when BG_MODE = "101" or BG_MODE = "110" else '0';
 BF <= BF_TBL(to_integer(unsigned(BG_MODE)), to_integer(H_CNT(2 downto 0)));
 
 process( RST_N, CLK, BF, BG_MODE, BG_SIZE, BG_SC_ADDR, BG_SC_SIZE, BG_NBA, BG_HOFS, BG_VOFS, H_CNT, V_CNT, IN_VBL, FORCE_BLANK,
-			BG_DATA, BG_TILE_INFO, BG3_OPT_DATA0, BG3_OPT_DATA1, BG_MOSAIC_Y, BG_MOSAIC_EN, FIELD, HIRES, BGINTERLACE, VRAM_DAI,
+			BG_DATA, BG_TILE_INFO, BG3_OPT_DATA0, BG3_OPT_DATA1, BG_MOSAIC_Y, BG_MOSAIC_Y_NEXT ,BG_MOSAIC_EN, FIELD, HIRES, BGINTERLACE, VRAM_DAI,
 			M7_SCREEN_X, M7_TEMP_X, M7_TEMP_Y, M7_TILE_N, M7_TILE_COL, M7_TILE_ROW, M7SEL, M7HOFS, M7VOFS, M7X, M7Y, M7A, M7B, M7C, M7D)
 variable SCREEN_X : unsigned(8 downto 0);
 variable SCREEN_Y : unsigned(7 downto 0);
@@ -987,6 +988,7 @@ variable OPTH_EN, OPTV_EN : std_logic;
 variable IS_OPT : std_logic;
 variable OPT_HOFS, OPT_VOFS : unsigned(9 downto 0);
 variable MOSAIC_Y : unsigned(7 downto 0);
+variable M7_MOSAIC_Y : unsigned(7 downto 0);
 variable TILE_INFO_N : unsigned(9 downto 0);
 variable TILE_INFO_HFLIP : std_logic;
 variable TILE_INFO_VFLIP : std_logic;
@@ -1030,9 +1032,11 @@ begin
 	SCREEN_Y := V_CNT(7 downto 0);
 
 	if BG_MOSAIC_EN(BF.BG) = '0' then
-		MOSAIC_Y := SCREEN_Y;
+		MOSAIC_Y    := SCREEN_Y;
+		M7_MOSAIC_Y := SCREEN_Y+1;
 	else
-		MOSAIC_Y := SCREEN_Y - BG_MOSAIC_Y;
+		MOSAIC_Y    := SCREEN_Y   - BG_MOSAIC_Y;
+		M7_MOSAIC_Y := SCREEN_Y+1 - BG_MOSAIC_Y_NEXT;
 	end if;
 	
 	-- MODE 0-6
@@ -1182,9 +1186,9 @@ begin
 	end if;
 	
 	if M7SEL(1) = '0' then
-		M7_Y := signed(resize(MOSAIC_Y, 9));
+		M7_Y := signed(resize(M7_MOSAIC_Y, 9));
 	else
-		M7_Y := signed(resize(not MOSAIC_Y, 9));
+		M7_Y := signed(resize(not M7_MOSAIC_Y, 9));
 	end if;
 				
 	MPY <= resize(signed(M7A) * signed(M7B(15 downto 8)), MPY'length);
@@ -1261,6 +1265,7 @@ begin
 		BG3_OPT_DATA0 <= (others => '0');
 		BG3_OPT_DATA1 <= (others => '0');
 		BG_MOSAIC_Y <= (others => '0');
+		BG_MOSAIC_Y_NEXT <= (others => '0');
 		BG_FORCE_BLANK <= '1';
 	elsif rising_edge(CLK) then 
 		if ENABLE = '1' and DOT_CLKR_CE = '1' then
@@ -1270,16 +1275,20 @@ begin
 				BG3_OPT_DATA1 <= (others => '0');
 			end if;
 			
-			if H_CNT = LAST_DOT and V_CNT >= 1 and V_CNT <= LAST_VIS_LINE then			
+			if H_CNT = LAST_DOT-1 and V_CNT >= 1 and V_CNT <= LAST_VIS_LINE then
 				if BG_MOSAIC_Y = unsigned(MOSAIC_SIZE) then
-					BG_MOSAIC_Y <= (others => '0');
+					BG_MOSAIC_Y_NEXT <= (others => '0');
 				else
-					BG_MOSAIC_Y <= BG_MOSAIC_Y + 1;
+					BG_MOSAIC_Y_NEXT <= BG_MOSAIC_Y + 1;
 				end if;
-			elsif H_CNT = LAST_DOT and V_CNT = LAST_LINE then
-				BG_MOSAIC_Y <= (others => '0');
+			elsif H_CNT = LAST_DOT-1 and V_CNT = LAST_LINE then
+				BG_MOSAIC_Y_NEXT <= (others => '0');
 			end if;
-			
+
+			if H_CNT = LAST_DOT then
+				BG_MOSAIC_Y <= BG_MOSAIC_Y_NEXT;
+			end if;
+
 			if BG_FETCH = '0' then
 				BG_FORCE_BLANK <= FORCE_BLANK;
 			elsif BG_FETCH = '1' and H_CNT(2 downto 0) = 0 then

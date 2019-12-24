@@ -21,7 +21,7 @@ entity CX4 is
 		
 		IRQ_N			: out std_logic;
 		
-		BUS_A   		: out std_logic_vector(21 downto 0);
+		BUS_A   		: out std_logic_vector(23 downto 0);
 		BUS_DI		: in std_logic_vector(7 downto 0);
 		BUS_DO		: out std_logic_vector(7 downto 0);
 		BUS_OE_N		: out std_logic;
@@ -421,7 +421,7 @@ begin
 		SRAM_SEL <= '0';
 		RAM_SEL <= '0';
 		if MAPPER = '0' then																										--LoROM
-			if INT_ADDR(22) = '0' and INT_ADDR(15) = '1' then															--00-3F:8000-FFFF, 80-BF:8000-FFFF 
+			if INT_ADDR(15) = '1' then																							--00-3F:8000-FFFF, 80-BF:8000-FFFF 
 				ROM_SEL <= '1';
 			elsif INT_ADDR(23 downto 19) = "01110" and INT_ADDR(15) = '0'	then									--70-77:0000-7FFF 
 				SRAM_SEL <= '1';
@@ -439,7 +439,7 @@ begin
 		end if;
 	end process; 
 		
-	BUS_A <= INT_ADDR(21 downto 0);
+	BUS_A <= INT_ADDR;
 
 	process(SUSPEND, SRAM_SEL, DMA_RUN, DMA_STATE, SRAM_ACCESS, SRAM_WR, ROM_SEL, INT_ADDR, MAPPER, ROM_MODE)
 	begin

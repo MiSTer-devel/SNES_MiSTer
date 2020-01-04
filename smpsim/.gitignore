@@ -1,0 +1,7 @@
+*.o
+work-obj93.cf
+smp_tb
+smp.ghw
+*.aud
+*.wav
+*.spc

@@ -59,7 +59,7 @@ end CX4Map;
 
 architecture rtl of CX4Map is
 
-	signal CX4_A : std_logic_vector(21 downto 0);
+	signal CX4_A : std_logic_vector(23 downto 0);
 	signal CX4_DI : std_logic_vector(7 downto 0);
 	signal SRAM_CE_N, ROM_CE1_N, ROM_CE2_N : std_logic;
 	signal CART_ADDR : std_logic_vector(21 downto 0);
@@ -118,10 +118,10 @@ begin
 		DBG_DAT_WR	=> DBG_DAT_WR
 	);
 	
-	CART_ADDR <= "0" & not ROM_CE2_N & CX4_A(20 downto 16) & CX4_A(14 downto 0);
+	CART_ADDR <= CX4_A(22) & not ROM_CE2_N & CX4_A(20 downto 16) & CX4_A(14 downto 0);
 	BRAM_ADDR <= CX4_A(20 downto 16) & CX4_A(14 downto 0);
 
-	ROM_ADDR <= "0" & (CART_ADDR and ROM_MASK(21 downto 0));
+	ROM_ADDR <= CART_ADDR and ROM_MASK(22 downto 0);
 	ROM_CE_N <= ROM_CE1_N and ROM_CE2_N;
 	ROM_WORD	<= '0';
 

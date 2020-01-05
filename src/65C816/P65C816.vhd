@@ -122,7 +122,7 @@ begin
 					NextState <= "0000";
 				end if; 
 			when "011" => 
-				if JumpNoOverflow = '1' then
+				if JumpNoOverflow = '1' or EF = '0' then
 					NextState <= "0000";
 				else
 					NextState <= STATE + 1;

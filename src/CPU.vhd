@@ -124,8 +124,9 @@ architecture rtl of SCPU is
 	signal MATH_CLK_CNT	: unsigned(3 downto 0);
 	signal MATH_TEMP	: std_logic_vector(22 downto 0);
 	signal HBLANK_OLD, VBLANK_OLD, VBLANK_OLD2 : std_logic;
-	signal HIRQ_VALID, IRQ_VALID : std_logic;
+	signal HIRQ_VALID, VIRQ_VALID, IRQ_VALID : std_logic;
 	signal IRQ_LOCK, IRQ_VALID_OLD : std_logic;
+	signal NMI_LOCK : std_logic;
 	
 	type refresh_t is (
 		REFS_IDLE,
@@ -250,6 +251,22 @@ begin
 	DMA_ACTIVE <= DMA_RUN or HDMA_RUN;
 	P65_BANK <= P65_A(23 downto 16);
 	P65_A_HIGH <= P65_A(15 downto 8);
+	
+	process( SPEED, MEMSEL, REFRESHED, CPU_ACTIVEr, TURBO, P65_CLK_CNT, P65_ACCESSED_PERIPHERAL_CNT)	
+	begin		
+		-- Turbo should only occur when the cpu is ONLY accessing ram/rom, in otherwords during the main game loop	
+		if TURBO = '1' and P65_ACCESSED_PERIPHERAL_CNT = x"0" then	
+			CPU_LAST_CLOCK <= x"4";	
+		elsif REFRESHED = '1' and CPU_ACTIVEr = '1' then	
+			CPU_LAST_CLOCK <= x"7";	
+		elsif SPEED = FAST or (SPEED = SLOWFAST and MEMSEL = '1') then	
+			CPU_LAST_CLOCK <= x"5";	
+		elsif SPEED = SLOW or (SPEED = SLOWFAST and MEMSEL = '0') then	
+			CPU_LAST_CLOCK <= x"7";	
+		else	
+			CPU_LAST_CLOCK <= x"B";	
+		end if;	
+	end process;
 
 	process( RST_N, CLK )
 	begin
@@ -275,19 +292,6 @@ begin
 			P65_CLK_CNT <= P65_CLK_CNT + 1;
 			if P65_CLK_CNT >= CPU_LAST_CLOCK  then
 				P65_CLK_CNT <= (others => '0');
-				
-				-- Turbo should only occur when the cpu is ONLY accessing ram/rom, in otherwords during the main game loop
-				if TURBO = '1' and P65_ACCESSED_PERIPHERAL_CNT = x"0" then
-					CPU_LAST_CLOCK <= x"4";
-				elsif REFRESHED = '1' and CPU_ACTIVEr = '1' then
-					CPU_LAST_CLOCK <= x"7";
-				elsif SPEED = FAST or (SPEED = SLOWFAST and MEMSEL = '1') then
-					CPU_LAST_CLOCK <= x"5";
-				elsif SPEED = SLOW or (SPEED = SLOWFAST and MEMSEL = '0') then
-					CPU_LAST_CLOCK <= x"7";
-				else
-					CPU_LAST_CLOCK <= x"B";
-				end if;
 			end if;
 
 			if DMA_ACTIVEr = '0' and DMA_ACTIVE = '1' and DMA_CLK_CNT = DMA_LAST_CLOCK and REFRESHED = '0' then
@@ -540,6 +544,7 @@ begin
 		if RST_N = '0' then
 			NMI_FLAG <= '0'; 
 			VBLANK_OLD2 <= '0';
+			NMI_LOCK <= '0';
 		elsif rising_edge(CLK) then
 			if P65_R_WN = '1' and P65_A(15 downto 0) = x"4210" and IO_SEL = '1' then
 				RDNMI_READ := '1';
@@ -550,13 +555,15 @@ begin
 			if ENABLE = '1' then 
 				if DOT_CLK_CE = '1' then
 					VBLANK_OLD2 <= VBLANK;
+					NMI_LOCK <= '0';
 				end if;
 				
 				if VBLANK = '1' and VBLANK_OLD2 = '0' and DOT_CLK_CE = '1' then
 					NMI_FLAG <= '1';
+					NMI_LOCK <= '1';
 				elsif VBLANK = '0' and VBLANK_OLD2 = '1' and DOT_CLK_CE = '1' then
 					NMI_FLAG <= '0';
-				elsif RDNMI_READ = '1' and INT_CLKF_CE = '1' then
+				elsif RDNMI_READ = '1' and NMI_LOCK = '0' and INT_CLKF_CE = '1' then
 					NMI_FLAG <= '0'; 
 				end if;
 			end if;
@@ -566,11 +573,12 @@ begin
 	P65_NMI_N <= not (NMI_FLAG and NMI_EN);
 	
 	process( RST_N, CLK )
-	variable TIMEUP_READ, HVIRQ_DISABLE : std_logic;
+	variable TIMEUP_READ, HVIRQ_DISABLE, TIME_SET : std_logic;
 	begin
 		if RST_N = '0' then
 			IRQ_FLAG <= '0';
 			HIRQ_VALID <= '0';
+			VIRQ_VALID <= '0'; 
 			IRQ_VALID <= '0';
 			IRQ_VALID_OLD <= '0';
 			IRQ_LOCK <= '0';
@@ -587,17 +595,29 @@ begin
 				HVIRQ_DISABLE := '0'; 
 			end if;
 					
+			if P65_R_WN = '0' and P65_A(15 downto 2) = x"420"&"10" and IO_SEL = '1' then
+				TIME_SET := '1';
+			else
+				TIME_SET := '0'; 
+			end if;
+
 			if ENABLE = '1' then 
 				if DOT_CLK_CE = '1' then
-					if H_CNT = unsigned(HTIME)+1 then
+					if H_CNT = unsigned(HTIME)+1 or HVIRQ_EN = "10" then
 						HIRQ_VALID <= '1';
 					else
 						HIRQ_VALID <= '0'; 
 					end if;
 					
+					if V_CNT = unsigned(VTIME) then
+						VIRQ_VALID <= '1';
+					else
+						VIRQ_VALID <= '0'; 
+					end if;
+
 					if HVIRQ_EN = "01" and HIRQ_VALID = '1' then												--H-IRQ:  every scanline, H=HTIME+~3.5
 						IRQ_VALID <= '1';
-					elsif HVIRQ_EN = "10" and V_CNT = unsigned(VTIME) then								--V-IRQ:  V=VTIME, H=~2.5
+					elsif HVIRQ_EN = "10" and HIRQ_VALID = '1' and VIRQ_VALID = '1' then	--V-IRQ:  V=VTIME, H=~2.5
 						IRQ_VALID <= '1';
 					elsif HVIRQ_EN = "11" and HIRQ_VALID = '1' and V_CNT = unsigned(VTIME) then	--HV-IRQ: V=VTIME, H=HTIME+~3.5
 						IRQ_VALID <= '1';
@@ -618,6 +638,11 @@ begin
 				
 				if HVIRQ_DISABLE = '1' and INT_CLKF_CE = '1' then
 					IRQ_FLAG <= '0'; 
+				end if;
+				
+				if TIME_SET = '1' and INT_CLKF_CE = '1' then
+					HIRQ_VALID <= '0'; 
+					VIRQ_VALID <= '0'; 
 				end if;
 			end if;
 		end if;

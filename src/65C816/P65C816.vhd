@@ -481,7 +481,7 @@ begin
 			IRQ_ACTIVE <= '0';
 			OLD_NMI2_N <= '1';
 		elsif rising_edge(CLK) then
-			if RDY_IN = '1' and CE = '1' then
+			if CE = '1' then
 				if IsResetInterrupt = '0' then
 					OLD_NMI2_N <= NMI_N;
 					if NMI_N = '0' and OLD_NMI2_N = '1' then

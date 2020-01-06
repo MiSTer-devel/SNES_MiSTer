@@ -573,7 +573,7 @@ begin
 	P65_NMI_N <= not (NMI_FLAG and NMI_EN);
 	
 	process( RST_N, CLK )
-	variable TIMEUP_READ, HVIRQ_DISABLE, TIME_SET : std_logic;
+	variable TIMEUP_READ, HVIRQ_DISABLE, VTIME_SET : std_logic;
 	begin
 		if RST_N = '0' then
 			IRQ_FLAG <= '0';
@@ -595,10 +595,10 @@ begin
 				HVIRQ_DISABLE := '0'; 
 			end if;
 					
-			if P65_R_WN = '0' and P65_A(15 downto 2) = x"420"&"10" and IO_SEL = '1' then
-				TIME_SET := '1';
+			if P65_R_WN = '0' and (P65_A(15 downto 0) = x"4209" or P65_A(15 downto 0) = x"420A") and IO_SEL = '1' then
+				VTIME_SET := '1';
 			else
-				TIME_SET := '0'; 
+				VTIME_SET := '0'; 
 			end if;
 
 			if ENABLE = '1' then 
@@ -640,8 +640,7 @@ begin
 					IRQ_FLAG <= '0'; 
 				end if;
 				
-				if TIME_SET = '1' and INT_CLKF_CE = '1' then
-					HIRQ_VALID <= '0'; 
+				if VTIME_SET = '1' and INT_CLKF_CE = '1' then
 					VIRQ_VALID <= '0'; 
 				end if;
 			end if;

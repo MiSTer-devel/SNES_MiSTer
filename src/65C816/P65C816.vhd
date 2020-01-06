@@ -601,7 +601,7 @@ begin
 	
 	A_OUT <= ADDR_BUS;
 
-	process(MC, IR, LAST_CYCLE, STATE, IRQ_ACTIVE, NMI_ACTIVE, IsBRKInterrupt, IsCOPInterrupt, GotInterrupt )
+	process(MC, IR, LAST_CYCLE, STATE, IRQ_ACTIVE, NMI_ACTIVE, IsBRKInterrupt, IsCOPInterrupt, GotInterrupt, P )
 		variable rmw : std_logic;
 		variable twoCls, softInt : std_logic;
 	begin

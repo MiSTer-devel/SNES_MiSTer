@@ -150,9 +150,8 @@ pll pll
 	.refclk(CLK_50M),
 	.rst(0),
 	.outclk_0(clk_mem),
-	.outclk_1(SDRAM_CLK),
-	.outclk_2(CLK_VIDEO),
-	.outclk_3(clk_sys),
+	.outclk_1(CLK_VIDEO),
+	.outclk_2(clk_sys),
 	.reconfig_to_pll(reconfig_to_pll),
 	.reconfig_from_pll(reconfig_from_pll),
 	.locked(clock_locked)

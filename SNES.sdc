@@ -1,26 +1,15 @@
 derive_pll_clocks
 
-create_generated_clock -name GSU_CASHE_CLK -source [get_pins -compatibility_mode {*|pll|pll_inst|altera_pll_i|*[3].*|divclk}] \
+create_generated_clock -name GSU_CASHE_CLK -source [get_pins -compatibility_mode {*|pll|pll_inst|altera_pll_i|*[2].*|divclk}] \
 							  -invert [get_pins {emu|main|GSUMap|GSU|CACHE|ram|altsyncram_component|auto_generated|*|clk0}]
 
-create_generated_clock -name CX4_MEM_CLK -source [get_pins -compatibility_mode {*|pll|pll_inst|altera_pll_i|*[3].*|divclk}] \
+create_generated_clock -name CX4_MEM_CLK -source [get_pins -compatibility_mode {*|pll|pll_inst|altera_pll_i|*[2].*|divclk}] \
 							  -invert [get_pins {emu|main|CX4Map|CX4|DATA_RAM|altsyncram_component|auto_generated|*|clk0 \
 														emu|main|CX4Map|CX4|DATA_ROM|spram_sz|altsyncram_component|auto_generated|altsyncram1|*|clk0 }]
-
-set clk_sdram_sys  {*|pll|pll_inst|altera_pll_i|*[0].*|divclk}
-set clk_sdram_chip {*|pll|pll_inst|altera_pll_i|*[1].*|divclk}
-
-create_generated_clock -name SDRAM_CLK -source [get_pins -compatibility_mode $clk_sdram_chip] [get_ports {SDRAM_CLK}]
 
 derive_clock_uncertainty
 
 set_clock_groups -asynchronous -group [get_clocks { GSU_CASHE_CLK CX4_MEM_CLK }] 
-
-set_input_delay -max -clock $clk_sdram_sys 10.7ns [get_ports SDRAM_DQ[*]]
-set_input_delay -min -clock $clk_sdram_sys  8.0ns [get_ports SDRAM_DQ[*]]
-
-set_output_delay -max -clock SDRAM_CLK  1.6ns [get_ports {SDRAM_D* SDRAM_A* SDRAM_BA* SDRAM_n* SDRAM_CKE}]
-set_output_delay -min -clock SDRAM_CLK -0.9ns [get_ports {SDRAM_D* SDRAM_A* SDRAM_BA* SDRAM_n* SDRAM_CKE}]
 
 
 set_max_delay 23 -from [get_registers { emu|hps_io|* \

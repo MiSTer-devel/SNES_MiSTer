@@ -635,7 +635,7 @@ dpram_dif #(BSRAM_BITS,8,BSRAM_BITS-1,16) bsram
 
 	//Thrash the BSRAM upon ROM loading
 	.address_a(cart_download ? ioctl_addr[BSRAM_BITS-1:0] : BSRAM_ADDR[BSRAM_BITS-1:0]),
-	.data_a(cart_download ? ioctl_addr[7:0] : BSRAM_D),
+	.data_a(cart_download ? 8'hFF : BSRAM_D),
 	.wren_a(cart_download ? ioctl_wr : ~BSRAM_CE_N & ~BSRAM_WE_N),
 	.q_a(BSRAM_Q),
 

@@ -245,6 +245,7 @@ parameter CONF_STR = {
     "-;",
     "D1OI,SuperFX Speed,Normal,Turbo;",
     "D3O4,CPU Speed,Normal,Turbo;",
+    "OLM,SRAM Initialization,None,FF,00;",
     "-;",
     "R0,Reset;",
     "J1,A(SS Fire),B(SS Cursor),X(SS TurboSw),Y(SS Pause),LT(SS Cursor),RT(SS Fire),Select,Start;",
@@ -648,13 +649,16 @@ wire [19:0] BSRAM_ADDR;
 wire        BSRAM_CE_N;
 wire        BSRAM_WE_N;
 wire  [7:0] BSRAM_Q, BSRAM_D;
+wire  [7:0] BSRAM_INIT_VALUE;
+assign BSRAM_INIT_VALUE = (status[22] ? 8'h00 : (status[21] ? 8'hFF : ioctl_addr[7:0]));
+
 dpram_dif #(BSRAM_BITS,8,BSRAM_BITS-1,16) bsram 
 (
 	.clock(clk_sys),
 
 	//Thrash the BSRAM upon ROM loading
 	.address_a(cart_download ? ioctl_addr[BSRAM_BITS-1:0] : BSRAM_ADDR[BSRAM_BITS-1:0]),
-	.data_a(cart_download ? 8'hFF : BSRAM_D),
+	.data_a(cart_download ? BSRAM_INIT_VALUE : BSRAM_D),
 	.wren_a(cart_download ? ioctl_wr : ~BSRAM_CE_N & ~BSRAM_WE_N),
 	.q_a(BSRAM_Q),
 

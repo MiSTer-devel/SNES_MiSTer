@@ -792,7 +792,7 @@ begin
 						P65_DI <= A2A(i)(15 downto 8);										--A2AxH
 					when x"A" =>
 						P65_DI <= NTLR(i);														--NTLRx
-					when x"B" =>
+					when x"B" | x"F" =>
 						P65_DI <= UNUSED(i);														--UNUSEDx
 					when others => 
 						P65_DI <= MDR;
@@ -985,7 +985,7 @@ begin
 							A2A(i)(15 downto 8) <= P65_DO;
 						when x"A" =>
 							NTLR(i) <= P65_DO;
-						when x"B" =>
+						when x"B" | x"F" =>
 							UNUSED(i) <= P65_DO;
 						when others => null;
 					end case;

@@ -767,7 +767,7 @@ begin
 					when others => 
 						P65_DI <= MDR;
 				end case;
-			elsif P65_A(15 downto 8) = x"43" then
+			elsif P65_A(15 downto 7) = x"43"&"0" then
 				i := to_integer(unsigned(P65_A(6 downto 4)));
 				case P65_A(3 downto 0) is
 					when x"0" =>
@@ -960,7 +960,7 @@ begin
 							HDMAEN <= P65_DO;
 						when others => null;
 					end case;
-				elsif P65_A(15 downto 8) = x"43" then
+				elsif P65_A(15 downto 7) = x"43"&"0" then
 					i := to_integer(unsigned(P65_A(6 downto 4)));
 					case P65_A(3 downto 0) is
 						when x"0" =>

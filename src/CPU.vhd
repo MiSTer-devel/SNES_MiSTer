@@ -767,7 +767,7 @@ begin
 					when others => 
 						P65_DI <= MDR;
 				end case;
-			elsif P65_A(15 downto 8) = x"43" then
+			elsif P65_A(15 downto 7) = x"43"&"0" then
 				i := to_integer(unsigned(P65_A(6 downto 4)));
 				case P65_A(3 downto 0) is
 					when x"0" =>
@@ -792,7 +792,7 @@ begin
 						P65_DI <= A2A(i)(15 downto 8);										--A2AxH
 					when x"A" =>
 						P65_DI <= NTLR(i);														--NTLRx
-					when x"B" =>
+					when x"B" | x"F" =>
 						P65_DI <= UNUSED(i);														--UNUSEDx
 					when others => 
 						P65_DI <= MDR;
@@ -960,7 +960,7 @@ begin
 							HDMAEN <= P65_DO;
 						when others => null;
 					end case;
-				elsif P65_A(15 downto 8) = x"43" then
+				elsif P65_A(15 downto 7) = x"43"&"0" then
 					i := to_integer(unsigned(P65_A(6 downto 4)));
 					case P65_A(3 downto 0) is
 						when x"0" =>
@@ -985,7 +985,7 @@ begin
 							A2A(i)(15 downto 8) <= P65_DO;
 						when x"A" =>
 							NTLR(i) <= P65_DO;
-						when x"B" =>
+						when x"B" | x"F" =>
 							UNUSED(i) <= P65_DO;
 						when others => null;
 					end case;

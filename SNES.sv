@@ -571,7 +571,7 @@ dpram #(17)	wram
 
 	// clear the RAM on loading
 	.address_b(ioctl_addr[16:0]),
-	.data_b(ioctl_addr[7:0]),
+	.data_b(8'hFF),
 	.wren_b(ioctl_wr & cart_download)
 );
 

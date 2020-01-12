@@ -245,7 +245,7 @@ parameter CONF_STR = {
     "-;",
     "D1OI,SuperFX Speed,Normal,Turbo;",
     "D3O4,CPU Speed,Normal,Turbo;",
-    "OLM,SRAM Initialization,None,FF,00;",
+    "OLM,RAM Initialization,None,FF,00;",
     "-;",
     "R0,Reset;",
     "J1,A(SS Fire),B(SS Cursor),X(SS TurboSw),Y(SS Pause),LT(SS Cursor),RT(SS Fire),Select,Start;",
@@ -282,6 +282,10 @@ wire  [7:0] joy0_x,joy0_y,joy1_x,joy1_y;
 wire [64:0] RTC;
 
 wire [21:0] gamma_bus;
+
+// Hardware behavior is random junk for RAM initialization, but emulators pre-fill sections with FF or 00
+wire [7:0] RAM_INIT_BYTE_VALUE;
+assign RAM_INIT_BYTE_VALUE = (status[22] ? 8'h00 : (status[21] ? 8'hFF : ioctl_addr[7:0]));
 
 hps_io #(.STRLEN($size(CONF_STR)>>3), .WIDE(1)) hps_io
 (
@@ -591,7 +595,7 @@ dpram #(17)	wram
 
 	// clear the RAM on loading
 	.address_b(ioctl_addr[16:0]),
-	.data_b(8'hFF),
+	.data_b(RAM_INIT_BYTE_VALUE),
 	.wren_b(ioctl_wr & cart_download)
 );
 
@@ -649,15 +653,13 @@ wire [19:0] BSRAM_ADDR;
 wire        BSRAM_CE_N;
 wire        BSRAM_WE_N;
 wire  [7:0] BSRAM_Q, BSRAM_D;
-wire  [7:0] BSRAM_INIT_VALUE;
-assign BSRAM_INIT_VALUE = (status[22] ? 8'h00 : (status[21] ? 8'hFF : ioctl_addr[7:0])); // Hardware behavior is random junk here, but emulators pre-fill with FF or 00
 dpram_dif #(BSRAM_BITS,8,BSRAM_BITS-1,16) bsram 
 (
 	.clock(clk_sys),
 
 	//Thrash or initialize the BSRAM upon ROM loading
 	.address_a(cart_download ? ioctl_addr[BSRAM_BITS-1:0] : BSRAM_ADDR[BSRAM_BITS-1:0]),
-	.data_a(cart_download ? BSRAM_INIT_VALUE : BSRAM_D),
+	.data_a(cart_download ? RAM_INIT_BYTE_VALUE : BSRAM_D),
 	.wren_a(cart_download ? ioctl_wr : ~BSRAM_CE_N & ~BSRAM_WE_N),
 	.q_a(BSRAM_Q),
 

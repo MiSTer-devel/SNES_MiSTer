@@ -210,7 +210,7 @@ always @(posedge CLK_50M) begin
 	end
 end
 
-wire reset = RESET | buttons[1] | status[0] | cart_download | bk_loading;
+wire reset = RESET | buttons[1] | status[0] | cart_download | bk_loading | clearing_ram;
 
 ////////////////////////////  HPS I/O  //////////////////////////////////
 
@@ -555,6 +555,20 @@ end
 
 ////////////////////////////  MEMORY  ///////////////////////////////////
 
+reg [16:0] mem_fill_addr;
+reg clearing_ram = 0;
+always @(posedge clk_sys) begin
+	if(~old_downloading & cart_download)
+		clearing_ram <= 1'b1;
+
+	if (&mem_fill_addr) clearing_ram <= 0;
+
+	if (clearing_ram)
+		mem_fill_addr <= mem_fill_addr + 1'b1;
+	else
+		mem_fill_addr <= 0;
+end
+
 wire[23:0] ROM_ADDR;
 wire       ROM_CE_N;
 wire       ROM_OE_N;
@@ -589,9 +603,9 @@ dpram #(17)	wram
 	.q_a(WRAM_Q),
 
 	// clear the RAM on loading
-	.address_b(ioctl_addr[16:0]),
+	.address_b(mem_fill_addr[16:0]),
 	.data_b(8'hFF),
-	.wren_b(ioctl_wr & cart_download)
+	.wren_b(clearing_ram)
 );
 
 wire [15:0] VRAM1_ADDR;
@@ -606,8 +620,8 @@ dpram #(15)	vram1
 	.q_a(VRAM1_Q),
 
 	// clear the RAM on loading
-	.address_b(ioctl_addr[14:0]),
-	.wren_b(ioctl_wr & cart_download)
+	.address_b(mem_fill_addr[14:0]),
+	.wren_b(clearing_ram)
 );
 
 wire [15:0] VRAM2_ADDR;
@@ -622,8 +636,8 @@ dpram #(15) vram2
 	.q_a(VRAM2_Q),
 
 	// clear the RAM on loading
-	.address_b(ioctl_addr[14:0]),
-	.wren_b(ioctl_wr & cart_download)
+	.address_b(mem_fill_addr[14:0]),
+	.wren_b(clearing_ram)
 );
 
 wire [15:0] ARAM_ADDR;
@@ -639,8 +653,8 @@ dpram #(16) aram
 	.q_A(ARAM_Q),
 
 	// clear the RAM on loading
-	.address_b(ioctl_addr[15:0]),
-	.wren_b(ioctl_wr & cart_download)
+	.address_b(mem_fill_addr[15:0]),
+	.wren_b(clearing_ram)
 );
 
 localparam  BSRAM_BITS = 17; // 1Mbits
@@ -653,9 +667,9 @@ dpram_dif #(BSRAM_BITS,8,BSRAM_BITS-1,16) bsram
 	.clock(clk_sys),
 
 	//Thrash the BSRAM upon ROM loading
-	.address_a(cart_download ? ioctl_addr[BSRAM_BITS-1:0] : BSRAM_ADDR[BSRAM_BITS-1:0]),
-	.data_a(cart_download ? 8'hFF : BSRAM_D),
-	.wren_a(cart_download ? ioctl_wr : ~BSRAM_CE_N & ~BSRAM_WE_N),
+	.address_a(clearing_ram ? mem_fill_addr[BSRAM_BITS-1:0] : BSRAM_ADDR[BSRAM_BITS-1:0]),
+	.data_a(clearing_ram ? 8'hFF : BSRAM_D),
+	.wren_a(clearing_ram ? 1'b1 : ~BSRAM_CE_N & ~BSRAM_WE_N),
 	.q_a(BSRAM_Q),
 
 	.address_b({sd_lba[BSRAM_BITS-10:0],sd_buff_addr}),

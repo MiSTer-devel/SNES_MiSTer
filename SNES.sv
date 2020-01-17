@@ -245,7 +245,7 @@ parameter CONF_STR = {
     "-;",
     "D1OI,SuperFX Speed,Normal,Turbo;",
     "D3O4,CPU Speed,Normal,Turbo;",
-    "OLM,RAM Initialization,None,FF,00;",
+    "OL,Emulator Quirks,Off,On;",
     "-;",
     "R0,Reset;",
     "J1,A(SS Fire),B(SS Cursor),X(SS TurboSw),Y(SS Pause),LT(SS Cursor),RT(SS Fire),Select,Start;",
@@ -285,7 +285,7 @@ wire [21:0] gamma_bus;
 
 // Hardware behavior is random junk for RAM initialization, but emulators pre-fill sections with FF or 00
 wire [7:0] RAM_INIT_BYTE_VALUE;
-assign RAM_INIT_BYTE_VALUE = (status[22] ? 8'h00 : (status[21] ? 8'hFF : ioctl_addr[7:0]));
+assign RAM_INIT_BYTE_VALUE = (status[21] ? 8'hFF : ioctl_addr[7:0]);
 
 hps_io #(.STRLEN($size(CONF_STR)>>3), .WIDE(1)) hps_io
 (

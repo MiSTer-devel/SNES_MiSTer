@@ -387,14 +387,14 @@ begin
 		
 		if P65_VPA = '0' and P65_VDA = '0' then 
 			SPEED <= FAST;
-		elsif P65_A(22) = '0' then 																	--$00-$3F, $80-$BF | System Area 
-			if P65_A(15 downto 9) = "0100000" then 												--$4000-$41FF | XSlow
+		elsif P65_A(22) = '0' then 						--$00-$3F, $80-$BF | System Area 
+			if P65_A(15 downto 9) = "0100000" then 	--$4000-$41FF | XSlow
 				SPEED <= XSLOW;
-			elsif P65_A(15 downto 8) <= x"1F" or 													--$0000-$1FFF | Slow
-					(P65_A(15 downto 8) >= x"60" and P65_A(15 downto 8) <= x"7F") then 	--$6000-$7FFF | Slow
+			elsif P65_A(15 downto 13) = "000" or 		--$0000-$1FFF | Slow
+					P65_A(15 downto 13) = "011" then 	--$6000-$7FFF | Slow
 				SPEED <= SLOW;
-			elsif P65_A(15) = '1' then 																--$8000-$FFFF | Fast,Slow
-				if P65_A(23) = '0' then											
+			elsif P65_A(15) = '1' then 					--$8000-$FFFF | Fast,Slow
+				if P65_A(23) = '0' then
 					SPEED <= SLOW;
 				else
 					SPEED <= SLOWFAST;
@@ -402,9 +402,9 @@ begin
 			else
 				SPEED <= FAST;
 			end if;
-		elsif P65_A(23 downto 16) >= x"40" and P65_A(23 downto 16) <= x"7F"  then		--$40-$7D | $0000-$FFFF | Slow
-			SPEED <= SLOW;																					--$7E-$7F | $0000-$FFFF | Slow
-		elsif P65_A(23 downto 16) >= x"C0" and P65_A(23 downto 16) <= x"FF"  then		--$C0-$FF | $0000-$FFFF | Fast,Slow
+		elsif P65_A(23 downto 22) = "01" then			--$40-$7D | $0000-$FFFF | Slow
+			SPEED <= SLOW;										--$7E-$7F | $0000-$FFFF | Slow
+		elsif P65_A(23 downto 22) = "11" then			--$C0-$FF | $0000-$FFFF | Fast,Slow
 			SPEED <= SLOWFAST;
 		end if;
 	end process;
@@ -421,19 +421,19 @@ begin
 		
 		CA <= INT_A;
 
-		if INT_A(22) = '0' then 																		--$00-$3F, $80-$BF
-			if INT_A(15 downto 8) <= x"1F" then														--$0000-$1FFF | Slow  | Address Bus A + /WRAM (mirror $7E:0000-$1FFF)
+		if INT_A(22) = '0' then 							--$00-$3F, $80-$BF
+			if INT_A(15 downto 13) = "000" then			--$0000-$1FFF | Slow  | Address Bus A + /WRAM (mirror $7E:0000-$1FFF)
 				CA(23 downto 13) <= x"7E" & "000";
 				RAMSEL_N <= '0';
-			elsif INT_A(15) = '1' then	 																--$8000-$FFFF | Slow  | Address Bus A + /CART
+			elsif INT_A(15) = '1' then	 					--$8000-$FFFF | Slow  | Address Bus A + /CART
 				ROMSEL_N <= '0';
 			end if;
-		else																									--$40-$7F, $C0-$FF
-			if (INT_A(23 downto 16) >= x"40" and INT_A(23 downto 16) <= x"7D") or		--$40-$7D | $0000-$FFFF | Slow  | Address Bus A + /CART
-				(INT_A(23 downto 16) >= x"C0" and INT_A(23 downto 16) <= x"FF") then		--$C0-$FF | $0000-$FFFF | Fast,Slow | Address Bus A + /CART
-				ROMSEL_N <= '0';
-			elsif INT_A(23 downto 17) = "0111111" then											--$7E-$7F | $0000-$FFFF | Slow  | Address Bus A + /WRAM
+		else														--$40-$7F, $C0-$FF
+			if INT_A(23 downto 17) = "0111111" then	--$7E-$7F | $0000-$FFFF | Slow  | Address Bus A + /WRAM
 				RAMSEL_N <= '0';
+			elsif INT_A(23 downto 22) = "01" or			--$40-$7D | $0000-$FFFF | Slow  | Address Bus A + /CART
+				  INT_A(23 downto 22) = "11" then		--$C0-$FF | $0000-$FFFF | Fast,Slow | Address Bus A + /CART
+				ROMSEL_N <= '0';
 			end if;
 		end if;
 	end process;
@@ -1171,13 +1171,12 @@ begin
 	HCH <= GetDMACh(HDMA_CH_WORK);
 	DCH <= GetDMACh(MDMAEN);
 
-	DMA_A <= A1B(DCH) & A1T(DCH) when DS = DS_TRANSFER else (others => '1');
-	DMA_B <= std_logic_vector( unsigned(BBAD(DCH)) + DMA_TRMODE_TAB(to_integer(unsigned(DMAP(DCH)(2 downto 0))),to_integer(DMA_TRMODE_STEP)) ) when DS = DS_TRANSFER else (others => '1');
+	DMA_A <= A1B(DCH) & A1T(DCH);
+	DMA_B <= std_logic_vector( unsigned(BBAD(DCH)) + DMA_TRMODE_TAB(to_integer(unsigned(DMAP(DCH)(2 downto 0))),to_integer(DMA_TRMODE_STEP)) );
 					
-	HDMA_A <= DASB(HCH) & std_logic_vector(unsigned(DAS(HCH))) when DMAP(HCH)(6) = '1' and HDS = HDS_TRANSFER else 
-				 A1B(HCH) & std_logic_vector(unsigned(A2A(HCH))) when (DMAP(HCH)(6) = '0' and HDS = HDS_TRANSFER) or HDS = HDS_INIT or HDS = HDS_INIT_IND else 
-				 (others => '1');
-	HDMA_B <= std_logic_vector( unsigned(BBAD(HCH)) + DMA_TRMODE_TAB(to_integer(unsigned(DMAP(HCH)(2 downto 0))),to_integer(HDMA_TRMODE_STEP)) ) when HDS = HDS_TRANSFER else (others => '1');
+	HDMA_A <= DASB(HCH) & std_logic_vector(unsigned(DAS(HCH))) when DMAP(HCH)(6) = '1' and HDS = HDS_TRANSFER else
+				 A1B(HCH) & std_logic_vector(unsigned(A2A(HCH)));
+	HDMA_B <= std_logic_vector( unsigned(BBAD(HCH)) + DMA_TRMODE_TAB(to_integer(unsigned(DMAP(HCH)(2 downto 0))),to_integer(HDMA_TRMODE_STEP)) );
 
 	process( RST_N, CLK )
 	begin

@@ -440,8 +440,12 @@ begin
 					RAM_WE <= not SMP_WE;
 					RAM_OE <= SMP_WE;
 					RAM_DO <= SMP_DO;
-					RAM_CE <= '1';			
-					
+					if SMP_A(15 downto 4) = x"00F" then
+						RAM_CE <= '0';
+					else
+						RAM_CE <= '1';
+					end if;
+
 				when others =>
 					RAM_A <= (others => '0');
 					RAM_WE <= '0';

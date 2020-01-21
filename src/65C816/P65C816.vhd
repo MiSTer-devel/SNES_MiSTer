@@ -473,22 +473,35 @@ begin
 	process(CLK, RST_N)
 	begin
 		if RST_N = '0' then
+			OLD_NMI_N <= '1';
+			NMI_SYNC <= '0';
+			IRQ_SYNC <= '0';
+		elsif rising_edge(CLK) then
+			if CE = '1' and IsResetInterrupt = '0' then
+				OLD_NMI_N <= NMI_N;
+				if NMI_N = '0' and OLD_NMI_N = '1' and NMI_SYNC = '0' then
+					NMI_SYNC <= '1';
+				elsif NMI_ACTIVE = '1' and LAST_CYCLE = '1' and EN = '1' then
+					NMI_SYNC <= '0';
+				end if;
+				IRQ_SYNC <= not IRQ_N;
+			end if;
+		end if;
+	end process; 
+	
+	process(CLK, RST_N)
+	begin
+		if RST_N = '0' then
 			IsResetInterrupt <= '1';
 			IsNMIInterrupt <= '0';
 			IsIRQInterrupt <= '0';
 			GotInterrupt <= '1';
 			NMI_ACTIVE <= '0';
 			IRQ_ACTIVE <= '0';
-			OLD_NMI2_N <= '1';
 		elsif rising_edge(CLK) then
-			if CE = '1' then
-				if IsResetInterrupt = '0' then
-					OLD_NMI2_N <= NMI_N;
-					if NMI_N = '0' and OLD_NMI2_N = '1' then
-						NMI_ACTIVE <= '1';
-					end if;
-					IRQ_ACTIVE <= not IRQ_N;
-				end if;
+			if RDY_IN = '1' and CE = '1' then
+				NMI_ACTIVE <= NMI_SYNC;
+				IRQ_ACTIVE <= not IRQ_N;
 				
 				if LAST_CYCLE = '1' and EN = '1' then
 					if GotInterrupt = '0' then
@@ -511,25 +524,6 @@ begin
 	IsBRKInterrupt <= '1' when IR = x"00" else '0';
 	IsCOPInterrupt <= '1' when IR = x"02" else '0';
 	IsABORTInterrupt <= '0';
-	
-	process(CLK, RST_N)
-	begin
-		if RST_N = '0' then
-			OLD_NMI_N <= '1';
-			NMI_SYNC <= '0';
-			IRQ_SYNC <= '0';
-		elsif rising_edge(CLK) then
-			if CE = '1' and IsResetInterrupt = '0' then
-				OLD_NMI_N <= NMI_N;
-				if NMI_N = '0' and OLD_NMI_N = '1' and NMI_SYNC = '0' then
-					NMI_SYNC <= '1';
-				elsif NMI_ACTIVE = '1' and LAST_CYCLE = '1' and EN = '1' then
-					NMI_SYNC <= '0';
-				end if;
-				IRQ_SYNC <= not IRQ_N;
-			end if;
-		end if;
-	end process; 
 	
 	process(CLK, RST_N)
 	begin

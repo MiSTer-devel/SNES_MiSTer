@@ -1171,12 +1171,13 @@ begin
 	HCH <= GetDMACh(HDMA_CH_WORK);
 	DCH <= GetDMACh(MDMAEN);
 
-	DMA_A <= A1B(DCH) & A1T(DCH);
-	DMA_B <= std_logic_vector( unsigned(BBAD(DCH)) + DMA_TRMODE_TAB(to_integer(unsigned(DMAP(DCH)(2 downto 0))),to_integer(DMA_TRMODE_STEP)) );
+	DMA_A <= A1B(DCH) & A1T(DCH) when DS = DS_TRANSFER else (others => '1');
+	DMA_B <= std_logic_vector( unsigned(BBAD(DCH)) + DMA_TRMODE_TAB(to_integer(unsigned(DMAP(DCH)(2 downto 0))),to_integer(DMA_TRMODE_STEP)) ) when DS = DS_TRANSFER else (others => '1');
 					
-	HDMA_A <= DASB(HCH) & std_logic_vector(unsigned(DAS(HCH))) when DMAP(HCH)(6) = '1' and HDS = HDS_TRANSFER else
-				 A1B(HCH) & std_logic_vector(unsigned(A2A(HCH)));
-	HDMA_B <= std_logic_vector( unsigned(BBAD(HCH)) + DMA_TRMODE_TAB(to_integer(unsigned(DMAP(HCH)(2 downto 0))),to_integer(HDMA_TRMODE_STEP)) );
+	HDMA_A <= DASB(HCH) & std_logic_vector(unsigned(DAS(HCH))) when DMAP(HCH)(6) = '1' and HDS = HDS_TRANSFER else 
+				 A1B(HCH) & std_logic_vector(unsigned(A2A(HCH))) when (DMAP(HCH)(6) = '0' and HDS = HDS_TRANSFER) or HDS = HDS_INIT or HDS = HDS_INIT_IND else 
+				 (others => '1');
+	HDMA_B <= std_logic_vector( unsigned(BBAD(HCH)) + DMA_TRMODE_TAB(to_integer(unsigned(DMAP(HCH)(2 downto 0))),to_integer(HDMA_TRMODE_STEP)) ) when HDS = HDS_TRANSFER else (others => '1');
 
 	process( RST_N, CLK )
 	begin

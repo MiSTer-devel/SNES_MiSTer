@@ -214,6 +214,12 @@ wire reset = RESET | buttons[1] | status[0] | cart_download | bk_loading | clear
 
 ////////////////////////////  HPS I/O  //////////////////////////////////
 
+// Status Bit Map:
+// 0         1         2         3
+// 01234567890123456789012345678901
+// 0123456789ABCDEFGHIJKLMNOPQRSTUV
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
 `include "build_id.v"
 parameter CONF_STR = {
     "SNES;;",
@@ -246,11 +252,12 @@ parameter CONF_STR = {
     "D1OI,SuperFX Speed,Normal,Turbo;",
     "D3O4,CPU Speed,Normal,Turbo;",
     "-;",
+    "OLM,Initial WRAM,00FF(SNES1),9966(SNES2),55(SD2SNES),FF;",
+    "-;",
     "R0,Reset;",
     "J1,A(SS Fire),B(SS Cursor),X(SS TurboSw),Y(SS Pause),LT(SS Cursor),RT(SS Fire),Select,Start;",
     "V,v",`BUILD_DATE
 };
-// free bits: 8,L,M
 
 wire  [1:0] buttons;
 wire [31:0] status;
@@ -569,6 +576,16 @@ always @(posedge clk_sys) begin
 		mem_fill_addr <= 0;
 end
 
+reg [7:0] wram_fill_data;
+always @* begin
+    case(status[22:21])
+        0: wram_fill_data = (mem_fill_addr[9] ^ mem_fill_addr[0]) ? 8'hFF : 8'h00;
+        1: wram_fill_data = (mem_fill_addr[8] ^ mem_fill_addr[2]) ? 8'h66 : 8'h99;
+        2: wram_fill_data = 8'h55;
+        3: wram_fill_data = 8'hFF;
+    endcase
+end
+
 wire[23:0] ROM_ADDR;
 wire       ROM_CE_N;
 wire       ROM_OE_N;
@@ -604,7 +621,7 @@ dpram #(17)	wram
 
 	// clear the RAM on loading
 	.address_b(mem_fill_addr[16:0]),
-	.data_b(8'hFF),
+	.data_b(wram_fill_data),
 	.wren_b(clearing_ram)
 );
 

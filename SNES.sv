@@ -244,6 +244,7 @@ parameter CONF_STR = {
     "O7,Swap Joysticks,No,Yes;",
     "OH,Multitap,Disabled,Port2;",
     "O8,Serial,OFF,SNAC;",
+	"H5o0,SNAC Mode, 1 Player, 2 Players;",	
     "-;",
     "OPQ,Super Scope,Disabled,Joy1,Joy2,Mouse;",
     "D4OR,Super Scope Btn,Joy,Mouse;",
@@ -260,8 +261,8 @@ parameter CONF_STR = {
 };
 
 wire  [1:0] buttons;
-wire [31:0] status;
-wire [15:0] status_menumask = {!GUN_MODE, ~turbo_allow, ~gg_available, ~GSU_ACTIVE, ~bk_ena};
+wire [32:0] status;
+wire [15:0] status_menumask = {!raw_serial, !GUN_MODE, ~turbo_allow, ~gg_available, ~GSU_ACTIVE, ~bk_ena};
 wire        forced_scandoubler;
 reg  [31:0] sd_lba;
 reg         sd_rd = 0;
@@ -845,11 +846,12 @@ lightgun lightgun
 // 5 = RX-   = P4
 
 wire raw_serial = status[8];
+wire raw_serial2 = status[32];
 
 assign USER_OUT[2] = 1'b1;
 assign USER_OUT[3] = 1'b1;
 assign USER_OUT[5] = 1'b1;
-assign USER_OUT[6] = 1'b1;
+//assign USER_OUT[6] = 1'b1;
 
 // JOYX_DO[0] is P4, JOYX_DO[1] is P5
 wire [1:0] JOY1_DI;
@@ -857,16 +859,26 @@ wire [1:0] JOY2_DI;
 wire JOY2_P6_DI;
 
 always_comb begin
-	if (raw_serial) begin
+	if (raw_serial & !raw_serial2) begin
 		USER_OUT[0] = JOY_STRB;
 		USER_OUT[1] = joy_swap ? ~JOY2_CLK : ~JOY1_CLK;
+		USER_OUT[6] = 1'b1;	
 		USER_OUT[4] = joy_swap ? JOY2_P6 : JOY1_P6;
 		JOY1_DI = joy_swap ? JOY1_DO : {USER_IN[2], USER_IN[5]};
 		JOY2_DI = joy_swap ? {USER_IN[2], USER_IN[5]} : JOY2_DO;
 		JOY2_P6_DI = joy_swap ? USER_IN[4] : (LG_P6_out | !GUN_MODE);
+	end else if (raw_serial & raw_serial2) begin
+		USER_OUT[0] = JOY_STRB;
+		USER_OUT[1] = joy_swap ? ~JOY2_CLK : ~JOY1_CLK;
+		USER_OUT[6] = joy_swap ? ~JOY1_CLK : ~JOY2_CLK;
+		USER_OUT[4] = joy_swap ? JOY2_P6 : JOY1_P6;
+		JOY1_DI = joy_swap ? {1'b1      , USER_IN[3]} : {USER_IN[2], USER_IN[5]};
+		JOY2_DI = joy_swap ? {USER_IN[2], USER_IN[5]} : {1'b1      , USER_IN[3]};
+		JOY2_P6_DI = joy_swap ? USER_IN[4] : (LG_P6_out | !GUN_MODE);
 	end else begin
 		USER_OUT[0] = 1'b1;
 		USER_OUT[1] = 1'b1;
+		USER_OUT[6] = 1'b1;
 		USER_OUT[4] = 1'b1;
 		JOY1_DI = JOY1_DO;
 		JOY2_DI = JOY2_DO;

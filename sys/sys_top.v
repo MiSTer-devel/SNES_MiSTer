@@ -423,12 +423,12 @@ cyclonev_hps_interface_peripheral_uart uart
 `endif
 );
 
-wire aspi_sck,aspi_mosi,aspi_ss;
+wire aspi_sck,aspi_mosi,aspi_ss,aspi_miso;
 cyclonev_hps_interface_peripheral_spi_master spi
 (
 	.sclk_out(aspi_sck),
 	.txd(aspi_mosi), // mosi
-	.rxd(1),         // miso
+	.rxd(aspi_miso), // miso
 
 	.ss_0_n(aspi_ss),
 	.ss_in_n(1)
@@ -494,15 +494,15 @@ sysmem_lite sysmem
 
 	//64-bit DDR3 RAM access
 	.ram2_clk(clk_audio),
-	.ram2_address((ap_en1 == ap_en2) ? aram_address : pram_address),
-	.ram2_burstcount((ap_en1 == ap_en2) ? aram_burstcount : pram_burstcount),
-	.ram2_waitrequest(aram_waitrequest),
-	.ram2_readdata(aram_readdata),
-	.ram2_readdatavalid(aram_readdatavalid),
-	.ram2_read((ap_en1 == ap_en2) ? aram_read : pram_read),
-	.ram2_writedata(0),
-	.ram2_byteenable(8'hFF),
-	.ram2_write(0),
+	.ram2_address(ram2_address),
+	.ram2_burstcount(ram2_burstcount),
+	.ram2_waitrequest(ram2_waitrequest),
+	.ram2_readdata(ram2_readdata),
+	.ram2_readdatavalid(ram2_readdatavalid),
+	.ram2_read(ram2_read),
+	.ram2_writedata(ram2_writedata),
+	.ram2_byteenable(ram2_byteenable),
+	.ram2_write(ram2_write),
 
 	//128-bit DDR3 RAM access
 	// HDMI frame buffer
@@ -517,6 +517,46 @@ sysmem_lite sysmem
 	.vbuf_readdatavalid(vbuf_readdatavalid),
 	.vbuf_read(vbuf_read)
 );
+
+wire [28:0] ram2_address;
+wire  [7:0] ram2_burstcount;
+wire  [7:0] ram2_byteenable;
+wire        ram2_waitrequest;
+wire [63:0] ram2_readdata;
+wire [63:0] ram2_writedata;
+wire        ram2_readdatavalid;
+wire        ram2_read;
+wire        ram2_write;
+wire  [7:0] ram2_bcnt;
+
+ddr_svc ddr_svc
+(
+	.clk(clk_audio),
+
+	.ram_waitrequest(ram2_waitrequest),
+	.ram_burstcnt(ram2_burstcount),
+	.ram_addr(ram2_address),
+	.ram_readdata(ram2_readdata),
+	.ram_read_ready(ram2_readdatavalid),
+	.ram_read(ram2_read),
+	.ram_writedata(ram2_writedata),
+	.ram_byteenable(ram2_byteenable),
+	.ram_write(ram2_write),
+	.ram_bcnt(ram2_bcnt),
+
+	.ch0_addr(alsa_address),
+	.ch0_burst(1),
+	.ch0_data(alsa_readdata),
+	.ch0_req(alsa_req),
+	.ch0_ready(alsa_ready),
+
+	.ch1_addr(pal_addr),
+	.ch1_burst(128),
+	.ch1_data(pal_data),
+	.ch1_req(pal_req),
+	.ch1_ready(pal_wr)
+);
+
 
 wire  [27:0] vbuf_address;
 wire   [7:0] vbuf_burstcount;
@@ -687,37 +727,21 @@ pll_hdmi_adj pll_hdmi_adj
 	.o_writedata(cfg_data)
 );
 
-wire [23:0] pal_d;
-wire  [7:0] pal_a;
+wire [63:0] pal_data;
+wire [47:0] pal_d = {pal_data[55:32], pal_data[23:0]};
+wire  [6:0] pal_a = ram2_bcnt[6:0];
 wire        pal_wr;
 
-wire ap_en1, ap_en2;
+reg  [28:0] pal_addr;
+reg         pal_req = 0;
+always @(posedge clk_pal) begin
+	reg old_vs;
 
-wire [28:0] pram_address;
-wire  [7:0] pram_burstcount;
-wire        pram_read;
+	pal_addr <= FB_BASE[31:3] - 29'd512;
 
-fbpal fbpal
-(
-	.reset(reset),
-	.en_in(ap_en2),
-	.en_out(ap_en1),
-
-	.ram_clk(clk_pal),
-	.ram_address(pram_address),
-	.ram_burstcount(pram_burstcount),
-	.ram_waitrequest(aram_waitrequest),
-	.ram_readdata(aram_readdata),
-	.ram_readdatavalid(aram_readdatavalid),
-	.ram_read(pram_read),
-
-	.fb_address(FB_BASE),
-
-	.pal_en(~FB_FMT[2] & FB_FMT[1] & FB_FMT[0] & FB_EN),
-	.pal_a(pal_a),
-	.pal_d(pal_d),
-	.pal_wr(pal_wr)
-);
+	old_vs <= hdmi_vs;
+	if(~old_vs & hdmi_vs & ~FB_FMT[2] & FB_FMT[1] & FB_FMT[0] & FB_EN) pal_req <= ~pal_req;
+end
 
 
 /////////////////////////  HDMI output  /////////////////////////////////
@@ -1087,32 +1111,28 @@ audio_out audio_out
 	.spdif(spdif)
 );
 
-wire [28:0] aram_address;
-wire  [7:0] aram_burstcount;
-wire        aram_waitrequest;
-wire [63:0] aram_readdata;
-wire        aram_readdatavalid;
-wire        aram_read;
+wire [28:0] alsa_address;
+wire [63:0] alsa_readdata;
+wire        alsa_ready;
+wire        alsa_req;
+wire        alsa_late;
 
 wire [15:0] alsa_l, alsa_r;
 
 alsa alsa
 (
 	.reset(reset),
-	.en_in(ap_en1),
-	.en_out(ap_en2),
+	.clk(clk_audio),
 
-	.ram_clk(clk_audio),
-	.ram_address(aram_address),
-	.ram_burstcount(aram_burstcount),
-	.ram_waitrequest(aram_waitrequest),
-	.ram_readdata(aram_readdata),
-	.ram_readdatavalid(aram_readdatavalid),
-	.ram_read(aram_read),
+	.ram_address(alsa_address),
+	.ram_data(alsa_readdata),
+	.ram_req(alsa_req),
+	.ram_ready(alsa_ready),
 
 	.spi_ss(aspi_ss),
 	.spi_sck(aspi_sck),
 	.spi_mosi(aspi_mosi),
+	.spi_miso(aspi_miso),
 
 	.pcm_l(alsa_l),
 	.pcm_r(alsa_r)

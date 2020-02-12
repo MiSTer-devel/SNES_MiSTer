@@ -1,6 +1,6 @@
 //============================================================================
 //
-//  Copyright (C) 2017-2019 Sorgelig
+//  Copyright (C) 2017-2020 Sorgelig
 //
 //============================================================================
 
@@ -10,8 +10,9 @@
 //  8 : 3R 3G 2B
 //  9 : 3R 3G 3B
 // 12 : 4R 4G 4B
+// 24 : 8R 8G 8B
 
-module arcade_rotate_fx #(parameter WIDTH=320, HEIGHT=240, DW=8, GAMMA=1)
+module arcade_video #(parameter WIDTH=320, HEIGHT=240, DW=8, GAMMA=1)
 (
 	input         clk_video,
 	input         ce_pix,
@@ -45,7 +46,6 @@ module arcade_rotate_fx #(parameter WIDTH=320, HEIGHT=240, DW=8, GAMMA=1)
 	input         forced_scandoubler,
 	input         no_rotate,
 	input         rotate_ccw,
-	input         direct_video,
 	inout  [21:0] gamma_bus
 );
 
@@ -99,167 +99,57 @@ screen_rotate #(WIDTH,HEIGHT,DW,4) rotator
 	.vblank_out(rvblank)
 );
 
-wire [3:0] Rr,Gr,Br;
-
 generate
 	if(DW == 6) begin
-		assign Rr = {RGB_out[5:4],RGB_out[5:4]};
-		assign Gr = {RGB_out[3:2],RGB_out[3:2]};
-		assign Br = {RGB_out[1:0],RGB_out[1:0]};
+		wire [3:0] Rr = {RGB_out[5:4],RGB_out[5:4]};
+		wire [3:0] Gr = {RGB_out[3:2],RGB_out[3:2]};
+		wire [3:0] Br = {RGB_out[1:0],RGB_out[1:0]};
 	end
 	else if(DW == 8) begin
-		assign Rr = {RGB_out[7:5],RGB_out[7]};
-		assign Gr = {RGB_out[4:2],RGB_out[4]};
-		assign Br = {RGB_out[1:0],RGB_out[1:0]};
+		wire [3:0] Rr = {RGB_out[7:5],RGB_out[7]};
+		wire [3:0] Gr = {RGB_out[4:2],RGB_out[4]};
+		wire [3:0] Br = {RGB_out[1:0],RGB_out[1:0]};
 	end
 	else if(DW == 9) begin
-		assign Rr = {RGB_out[8:6],RGB_out[8]};
-		assign Gr = {RGB_out[5:3],RGB_out[5]};
-		assign Br = {RGB_out[2:0],RGB_out[2]};
+		wire [3:0] Rr = {RGB_out[8:6],RGB_out[8]};
+		wire [3:0] Gr = {RGB_out[5:3],RGB_out[5]};
+		wire [3:0] Br = {RGB_out[2:0],RGB_out[2]};
 	end
-	else begin
-		assign Rr = RGB_out[11:8];
-		assign Gr = RGB_out[7:4];
-		assign Br = RGB_out[3:0];
+	else if(DW == 12) begin
+		wire [3:0] Rr = RGB_out[11:8];
+		wire [3:0] Gr = RGB_out[7:4];
+		wire [3:0] Br = RGB_out[3:0];
+	end
+	else begin // 24
+		wire [7:0] Rr = RGB_out[23:16];
+		wire [7:0] Gr = RGB_out[15:8];
+		wire [7:0] Br = RGB_out[7:0];
 	end
 endgenerate
-
-reg norot;
-always @(posedge VGA_CLK) norot <= no_rotate | direct_video;
-
-assign HDMI_CLK = VGA_CLK;
-assign HDMI_SL  = (no_rotate & ~direct_video) ? 2'd0 : sl[1:0];
-wire [2:0] sl = fx ? fx - 1'd1 : 3'd0;
-wire scandoubler = fx || forced_scandoubler;
-
-video_mixer #(WIDTH+4, 1, GAMMA) video_mixer
-(
-	.clk_vid(HDMI_CLK),
-	.ce_pix(CE | (~scandoubler & ~gamma_bus[19] & ~norot)),
-	.ce_pix_out(HDMI_CE),
-
-	.scandoubler(scandoubler),
-	.hq2x(fx==1),
-	.gamma_bus(gamma_bus),
-
-	.R(norot ? R[7:4] : Rr),
-	.G(norot ? G[7:4] : Gr),
-	.B(norot ? B[7:4] : Br),
-
-	.HSync (norot ? HS  : rhs),
-	.VSync (norot ? VS  : rvs),
-	.HBlank(norot ? HBL : rhblank),
-	.VBlank(norot ? VBL : rvblank),
-
-	.VGA_R(HDMI_R),
-	.VGA_G(HDMI_G),
-	.VGA_B(HDMI_B),
-	.VGA_VS(HDMI_VS),
-	.VGA_HS(HDMI_HS),
-	.VGA_DE(HDMI_DE)
-);
-
-assign VGA_CE = direct_video ? HDMI_CE : CE;
-assign VGA_R  = direct_video ? HDMI_R  : R;
-assign VGA_G  = direct_video ? HDMI_G  : G;
-assign VGA_B  = direct_video ? HDMI_B  : B;
-assign VGA_HS = direct_video ? HDMI_HS : HS;
-assign VGA_VS = direct_video ? HDMI_VS : VS;
-assign VGA_DE = direct_video ? HDMI_DE : ~(HBL | VBL);
-
-endmodule
-
-//////////////////////////////////////////////////////////
-// DW:
-//  6 : 2R 2G 2B
-//  8 : 3R 3G 2B
-//  9 : 3R 3G 3B
-// 12 : 4R 4G 4B
-
-module arcade_fx #(parameter WIDTH=320, DW=8, GAMMA=1)
-(
-	input         clk_video,
-	input         ce_pix,
-
-	input[DW-1:0] RGB_in,
-	input         HBlank,
-	input         VBlank,
-	input         HSync,
-	input         VSync,
-
-	output        VGA_CLK,
-	output        VGA_CE,
-	output  [7:0] VGA_R,
-	output  [7:0] VGA_G,
-	output  [7:0] VGA_B,
-	output        VGA_HS,
-	output        VGA_VS,
-	output        VGA_DE,
-
-	output        HDMI_CLK,
-	output        HDMI_CE,
-	output  [7:0] HDMI_R,
-	output  [7:0] HDMI_G,
-	output  [7:0] HDMI_B,
-	output        HDMI_HS,
-	output        HDMI_VS,
-	output        HDMI_DE,
-	output  [1:0] HDMI_SL,
-
-	input   [2:0] fx,
-	input         forced_scandoubler,
-	inout  [21:0] gamma_bus
-);
-
-wire [7:0] R,G,B;
-wire       CE,HS,VS,HBL,VBL;
-
-wire VGA_HBL, VGA_VBL;
-arcade_vga #(DW) vga
-(
-	.clk_video(clk_video),
-	.ce_pix(ce_pix),
-
-	.RGB_in(RGB_in),
-	.HBlank(HBlank),
-	.VBlank(VBlank),
-	.HSync(HSync),
-	.VSync(VSync),
-
-	.VGA_CLK(VGA_CLK),
-	.VGA_CE(CE),
-	.VGA_R(R),
-	.VGA_G(G),
-	.VGA_B(B),
-	.VGA_HS(HS),
-	.VGA_VS(VS),
-	.VGA_HBL(HBL),
-	.VGA_VBL(VBL)
-);
 
 assign HDMI_CLK = VGA_CLK;
 assign HDMI_SL  = sl[1:0];
 wire [2:0] sl = fx ? fx - 1'd1 : 3'd0;
 wire scandoubler = fx || forced_scandoubler;
 
-video_mixer #(WIDTH+4, 1, GAMMA) video_mixer
+video_mixer #(.LINE_LENGTH(WIDTH+4), .HALF_DEPTH(DW!=24), .GAMMA(GAMMA)) video_mixer
 (
 	.clk_vid(HDMI_CLK),
-	.ce_pix(CE),
+	.ce_pix(CE | (~scandoubler & ~gamma_bus[19] & ~no_rotate)),
 	.ce_pix_out(HDMI_CE),
 
 	.scandoubler(scandoubler),
 	.hq2x(fx==1),
 	.gamma_bus(gamma_bus),
 
-	.R(R[7:4]),
-	.G(G[7:4]),
-	.B(B[7:4]),
+	.R(no_rotate ? ((DW!=24) ? R[7:4] : R) : Rr),
+	.G(no_rotate ? ((DW!=24) ? G[7:4] : G) : Gr),
+	.B(no_rotate ? ((DW!=24) ? B[7:4] : B) : Br),
 
-	.HSync(HS),
-	.VSync(VS),
-	.HBlank(HBL),
-	.VBlank(VBL),
+	.HSync (no_rotate ? HS  : rhs),
+	.VSync (no_rotate ? VS  : rvs),
+	.HBlank(no_rotate ? HBL : rhblank),
+	.VBlank(no_rotate ? VBL : rvblank),
 
 	.VGA_R(HDMI_R),
 	.VGA_G(HDMI_G),
@@ -269,13 +159,13 @@ video_mixer #(WIDTH+4, 1, GAMMA) video_mixer
 	.VGA_DE(HDMI_DE)
 );
 
-assign VGA_CE = HDMI_CE;
-assign VGA_R  = HDMI_R;
-assign VGA_G  = HDMI_G;
-assign VGA_B  = HDMI_B;
-assign VGA_HS = HDMI_HS;
-assign VGA_VS = HDMI_VS;
-assign VGA_DE = HDMI_DE;
+assign VGA_CE = no_rotate ? HDMI_CE : CE;
+assign VGA_R  = no_rotate ? HDMI_R  : R;
+assign VGA_G  = no_rotate ? HDMI_G  : G;
+assign VGA_B  = no_rotate ? HDMI_B  : B;
+assign VGA_HS = no_rotate ? HDMI_HS : HS;
+assign VGA_VS = no_rotate ? HDMI_VS : VS;
+assign VGA_DE = no_rotate ? HDMI_DE : ~(HBL | VBL);
 
 endmodule
 
@@ -345,10 +235,15 @@ generate
 		assign VGA_G = {RGB_fix[5:3],RGB_fix[5:3],RGB_fix[5:4]};
 		assign VGA_B = {RGB_fix[2:0],RGB_fix[2:0],RGB_fix[2:1]};
 	end
-	else begin
+	else if(DW == 12) begin
 		assign VGA_R = {RGB_fix[11:8],RGB_fix[11:8]};
 		assign VGA_G = {RGB_fix[7:4],RGB_fix[7:4]};
 		assign VGA_B = {RGB_fix[3:0],RGB_fix[3:0]};
+	end
+	else begin // 24
+		assign VGA_R = RGB_fix[23:16];
+		assign VGA_G = RGB_fix[15:8];
+		assign VGA_B = RGB_fix[7:0];
 	end
 endgenerate
 

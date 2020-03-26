@@ -303,7 +303,7 @@ reg  [8:0] coef_data;
 reg        coef_wr = 0;
 
 wire [7:0] ARX, ARY;
-reg [11:0] VSET = 0;
+reg [11:0] VSET = 0, HSET = 0;
 reg  [2:0] scaler_flt;
 reg        lowlat = 0;
 reg        cfg_dis = 0;
@@ -387,6 +387,7 @@ always@(posedge clk_sys) begin
 			if(cmd == 'h27) VSET    <= io_din[11:0];
 			if(cmd == 'h2A) {coef_wr,coef_addr,coef_data} <= {1'b1,io_din};
 			if(cmd == 'h2B) scaler_flt <= io_din[2:0];
+			if(cmd == 'h37) HSET    <= io_din[11:0];
 		end
 	end
 	
@@ -671,7 +672,12 @@ always @(posedge clk_vid) begin
 	reg  [2:0] state;
 	reg [11:0] videow;
 	reg [11:0] videoh;
-	
+	reg [11:0] height;
+	reg [11:0] width;
+
+	height <= (VSET && (VSET < HEIGHT)) ? VSET : HEIGHT;
+	width  <= (HSET && (HSET < WIDTH))  ? HSET : WIDTH;
+
 	state <= state + 1'd1;
 	case(state)
 		0: if(FB_EN) begin
@@ -682,21 +688,16 @@ always @(posedge clk_vid) begin
 				state<= 0;
 			end
 			else if(ARX && ARY) begin
-				wcalc <= VSET ? (VSET*ARX)/ARY : (HEIGHT*ARX)/ARY;
-				hcalc <= (WIDTH*ARY)/ARX;
+				wcalc <= (height*ARX)/ARY;
+				hcalc <= (width*ARY)/ARX;
 			end
 			else begin
-				hmin <= 0;
-				hmax <= WIDTH - 1'd1;
-				vmin <= 0;
-				vmax <= HEIGHT - 1'd1;
-				wcalc<= WIDTH;
-				hcalc<= HEIGHT;
-				state<= 0;
+				wcalc <= width;
+				hcalc <= height;
 			end
 		6: begin
-				videow <= (!VSET && (wcalc > WIDTH))     ? WIDTH  : wcalc[11:0];
-				videoh <= VSET ? VSET : (hcalc > HEIGHT) ? HEIGHT : hcalc[11:0];
+				videow <= (wcalc > width)  ? width  : wcalc[11:0];
+				videoh <= (hcalc > height) ? height : hcalc[11:0];
 			end
 		7: begin
 				hmin <= ((WIDTH  - videow)>>1);

@@ -304,12 +304,15 @@ reg        coef_wr = 0;
 
 wire [7:0] ARX, ARY;
 reg [11:0] VSET = 0, HSET = 0;
+reg        FREESCALE = 0;
 reg  [2:0] scaler_flt;
 reg        lowlat = 0;
 reg        cfg_dis = 0;
 
 reg        vs_wait = 0;
+reg [11:0] vs_line = 0;
 
+reg        scaler_out = 0;
 always@(posedge clk_sys) begin
 	reg  [7:0] cmd;
 	reg        has_cmd;
@@ -336,6 +339,7 @@ always@(posedge clk_sys) begin
 			if(cmd == 1) begin
 				cfg <= io_din;
 				cfg_set <= 1;
+				scaler_out <= 1;
 			end
 			if(cmd == 'h20) begin
 				cfg_set <= 0;
@@ -384,13 +388,14 @@ always@(posedge clk_sys) begin
 			end
 			if(cmd == 'h25) {led_overtake, led_state} <= io_din;
 			if(cmd == 'h26) vol_att <= io_din[4:0];
-			if(cmd == 'h27) VSET    <= io_din[11:0];
+			if(cmd == 'h27) VSET <= io_din[11:0];
 			if(cmd == 'h2A) {coef_wr,coef_addr,coef_data} <= {1'b1,io_din};
 			if(cmd == 'h2B) scaler_flt <= io_din[2:0];
-			if(cmd == 'h37) HSET    <= io_din[11:0];
+			if(cmd == 'h37) {FREESCALE,HSET} <= {io_din[15],io_din[11:0]};
+			if(cmd == 'h38) vs_line <= io_din[11:0];
 		end
 	end
-	
+
 	vs_d0 <= HDMI_TX_VS;
 	if(vs_d0 == HDMI_TX_VS) vs_d1 <= vs_d0;
 
@@ -435,7 +440,7 @@ cyclonev_hps_interface_peripheral_spi_master spi
 	.ss_in_n(1)
 );
 
-wire [63:0] f2h_irq = {HDMI_TX_VS};
+wire [63:0] f2h_irq = {video_sync,HDMI_TX_VS};
 cyclonev_hps_interface_interrupts interrupts
 (
 	.irq(f2h_irq)
@@ -600,7 +605,7 @@ ascal
 	.vimax    (0),
 
 	.o_clk    (clk_hdmi),
-	.o_ce     (1),
+	.o_ce     (scaler_out),
 	.o_r      (hdmi_data[23:16]),
 	.o_g      (hdmi_data[15:8]),
 	.o_b      (hdmi_data[7:0]),
@@ -687,7 +692,7 @@ always @(posedge clk_vid) begin
 				vmax <= FB_VMAX;
 				state<= 0;
 			end
-			else if(ARX && ARY) begin
+			else if(ARX && ARY && !FREESCALE) begin
 				wcalc <= (height*ARX)/ARY;
 				hcalc <= (width*ARY)/ARX;
 			end
@@ -1047,6 +1052,31 @@ csync csync_vga(clk_vid, vga_hs_osd, vga_vs_osd, vga_cs_osd);
 	assign VGA_G  = (VGA_EN | SW[3]) ? 6'bZZZZZZ : vga_o[15:10];
 	assign VGA_B  = (VGA_EN | SW[3]) ? 6'bZZZZZZ : vga_o[7:2];
 `endif
+
+reg video_sync = 0;
+always @(posedge clk_vid) begin
+	reg [11:0] line_cnt  = 0;
+	reg [11:0] sync_line = 0;
+	reg  [1:0] hs_cnt = 0;
+	reg        old_hs;
+
+	old_hs <= hs_fix;
+	if(~old_hs & hs_fix) begin
+
+		video_sync <= (sync_line == line_cnt);
+
+		line_cnt <= line_cnt + 1'd1;
+		if(~hs_cnt[1]) begin	
+			hs_cnt <= hs_cnt + 1'd1;
+			if(hs_cnt[0]) begin
+				sync_line <= (line_cnt - vs_line);
+				line_cnt <= 0;
+			end
+		end
+	end
+
+	if(de_emu) hs_cnt <= 0;
+end
 
 /////////////////////////  Audio output  ////////////////////////////////
 

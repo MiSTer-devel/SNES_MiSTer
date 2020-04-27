@@ -223,7 +223,7 @@ wire reset = RESET | buttons[1] | status[0] | cart_download | spc_download | bk_
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX   XX 
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX   XXX
 
 `include "build_id.v"
 parameter CONF_STR = {
@@ -258,6 +258,7 @@ parameter CONF_STR = {
 	"P2OPQ,Super Scope,Disabled,Joy1,Joy2,Mouse;",
 	"D4P2OR,Super Scope Btn,Joy,Mouse;",
 	"D4P2OST,Cross,Small,Big,None;",
+	"D4P2o2,Gun Type,Super Scope,Justifier;",
 	"P2-;",
 	"D1P2OI,SuperFX Speed,Normal,Turbo;",
 	"D3P2O4,CPU Speed,Normal,Turbo;",
@@ -353,6 +354,7 @@ hps_io #(.STRLEN($size(CONF_STR)>>3), .WIDE(1)) hps_io
 
 wire       GUN_BTN = status[27];
 wire [1:0] GUN_MODE = status[26:25];
+wire       GUN_TYPE = status[34];
 wire       GSU_TURBO = status[18];
 wire       BLEND = ~status[16];
 wire [1:0] mouse_mode = status[6:5];
@@ -873,6 +875,7 @@ lightgun lightgun
 	
 	.TARGET(LG_TARGET),
 	.SIZE(status[28]),
+	.GUN_TYPE(GUN_TYPE),
 
 	.PORT_LATCH(JOY_STRB),
 	.PORT_CLK(JOY2_CLK),

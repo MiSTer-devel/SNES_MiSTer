@@ -2,7 +2,7 @@
 # Makefile
 #
 
-SRC=../src
+SRC=../rtl
 SPC_SRC = $(SRC)/SPC700
 SRCS = dpram.vhd aram.vhd audio.vhd $(SPC_SRC)/SPC700_pkg.vhd $(SPC_SRC)/BCDAdj.vhd $(SPC_SRC)/AddSub.vhd $(SPC_SRC)/MulDiv.vhd $(SPC_SRC)/ALU.vhd $(SPC_SRC)/AddrGen.vhd $(SPC_SRC)/MCode.vhd $(SPC_SRC)/SPC700.vhd $(SRC)/SMP.vhd $(SRC)/CEGen.vhd $(SRC)/DSP_PKG.vhd $(SRC)/DSP.vhd
 OBJS = $(notdir $(SRCS:.vhd=.o)) aram_c.o audio_c.o

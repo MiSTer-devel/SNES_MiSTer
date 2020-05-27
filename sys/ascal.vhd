@@ -2152,7 +2152,7 @@ BEGIN
       o_copyv(1 TO 8)<=o_copyv(0 TO 7);
       
       o_dcptv(1)<=o_dcpt;
-      IF o_dcptv(1)>o_hsize THEN
+      IF o_dcptv(1)>=o_hsize THEN
         o_copyv(2)<='0';
       END IF;
       o_dcptv(2)<=o_dcptv(1) MOD OHRES;

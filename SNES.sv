@@ -444,7 +444,7 @@ wire turbo_allow;
 
 main main
 (
-	.RESET_N(~reset),
+	.RESET_N(RESET_N),
 
 	.MCLK(clk_sys), // 21.47727 / 21.28137
 	.ACLK(clk_sys),
@@ -460,7 +460,6 @@ main main
 
 	.ROM_ADDR(ROM_ADDR),
 	.ROM_Q(ROM_Q),
-	.ROM_CE_N(ROM_CE_N),
 	.ROM_OE_N(ROM_OE_N),
 	.ROM_WORD(ROM_WORD),
 
@@ -529,6 +528,17 @@ main main
 	.AUDIO_R(AUDIO_R)
 );
 
+reg RESET_N = 0;
+reg RFSH = 0;
+always @(posedge clk_sys) begin
+	reg [1:0] div;
+	
+	div <= div + 1'd1;
+	RFSH <= !div;
+	
+	if (div == 2) RESET_N <= ~reset;
+end
+
 ////////////////////////////  CODES  ///////////////////////////////////
 
 reg [128:0] gg_code;
@@ -587,7 +597,6 @@ always @* begin
 end
 
 wire[23:0] ROM_ADDR;
-wire       ROM_CE_N;
 wire       ROM_OE_N;
 wire       ROM_WORD;
 wire[15:0] ROM_Q;
@@ -601,7 +610,7 @@ sdram sdram
 	.addr(cart_download ? ioctl_addr-10'd512 : ROM_ADDR),
 	.din(ioctl_dout),
 	.dout(ROM_Q),
-	.rd(~cart_download & ~ROM_CE_N & ~ROM_OE_N),
+	.rd(~cart_download & (RESET_N ? ~ROM_OE_N : RFSH)),
 	.wr(ioctl_wr & cart_download),
 	.word(cart_download | ROM_WORD),
 	.busy()

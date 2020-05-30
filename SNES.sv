@@ -252,7 +252,7 @@ parameter CONF_STR = {
     "D1OI,SuperFX Speed,Normal,Turbo;",
     "D3O4,CPU Speed,Normal,Turbo;",
     "-;",
-    "OLM,Initial WRAM,00FF(SNES1),9966(SNES2),55(SD2SNES),FF;",
+    "OLM,Initial WRAM,9966(SNES2),00FF(SNES1),55(SD2SNES),FF;",
     "-;",
     "R0,Reset;",
     "J1,A(SS Fire),B(SS Cursor),X(SS TurboSw),Y(SS Pause),LT(SS Cursor),RT(SS Fire),Select,Start;",
@@ -589,8 +589,8 @@ end
 reg [7:0] wram_fill_data;
 always @* begin
     case(status[22:21])
-        0: wram_fill_data = (mem_fill_addr[9] ^ mem_fill_addr[0]) ? 8'hFF : 8'h00;
-        1: wram_fill_data = (mem_fill_addr[8] ^ mem_fill_addr[2]) ? 8'h66 : 8'h99;
+        0: wram_fill_data = (mem_fill_addr[8] ^ mem_fill_addr[2]) ? 8'h66 : 8'h99;
+        1: wram_fill_data = (mem_fill_addr[9] ^ mem_fill_addr[0]) ? 8'hFF : 8'h00;
         2: wram_fill_data = 8'h55;
         3: wram_fill_data = 8'hFF;
     endcase

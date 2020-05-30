@@ -265,6 +265,8 @@ signal CGRAM_FETCH_ADDR : std_logic_vector(7 downto 0);
 signal CGRAM_ADDR 		: std_logic_vector(7 downto 0);
 signal CGRAM_ADDR_INC	: std_logic;
 
+signal CGRAM_ADDR_CLR	: unsigned(7 downto 0);
+
 -- COLOR MATH
 signal PREV_COLOR			: std_logic_vector(14 downto 0);
 signal SUB_BD 				: std_logic;
@@ -333,14 +335,20 @@ begin
 end process;
 
 
-CGRAM : entity work.spram generic map(8,15)
+CGRAM : entity work.dpram generic map(8,15)
 port map(
-	clock		=> CLK,
-	address	=> CGRAM_ADDR,
-	data		=> CGRAM_D,
-	wren		=> CGRAM_WE,
-	q			=> CGRAM_Q
+	clock		 => CLK,
+	address_a => CGRAM_ADDR,
+	data_a	 => CGRAM_D,
+	wren_a	 => CGRAM_WE,
+	q_a		 => CGRAM_Q,
+	
+	address_b => std_logic_vector(CGRAM_ADDR_CLR),
+	data_b	 => std_logic_vector(CGRAM_ADDR_CLR(6 downto 0)) & std_logic_vector(CGRAM_ADDR_CLR),
+	wren_b	 => not RST_N
 );
+
+CGRAM_ADDR_CLR <= CGRAM_ADDR_CLR + 1 when rising_edge(CLK);
 
 CGRAM_ADDR <= DBG_CGRAM_ADDR when ENABLE = '0' else 
 				  CGRAM_FETCH_ADDR when BG_MATH = '1' and FORCE_BLANK = '0' else 

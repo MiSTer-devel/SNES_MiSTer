@@ -74,7 +74,7 @@ always @(posedge CLK) begin
 	old_latch <= PORT_LATCH;
 
 	if(old_latch & ~PORT_LATCH) begin
-		MS_LATCH <= ~{JOY0[15:6] | MOUSE[1:0],speed,4'b0001,sdy,dy,sdx,dx};
+		MS_LATCH <= ~{8'h00, MOUSE[1:0],speed,4'b0001,sdy,dy,sdx,dx};
 		curdx <= 0;
 		curdy <= 0;
 	end
@@ -96,7 +96,10 @@ always @(posedge CLK) begin
 	end
 
 	if(~old_clk & PORT_CLK) begin
-		if(PORT_LATCH) speed <= speed + 1'd1;
+		if(PORT_LATCH) begin
+			speed <= speed + 1'd1;
+			if(speed == 2) speed <= 0;
+		end
 		else MS_LATCH <= MS_LATCH << 1;
 	end
 end

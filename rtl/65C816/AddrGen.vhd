@@ -150,7 +150,11 @@ begin
 				when others => null;
 			end case;
 		else 
-			NewAAH <= "0" & AAH;
+			if AAHCtrl(2) = '0' then
+				NewAAH <= "0" & AAH;
+			else
+				NewAAH <= "0" & DH;
+			end if;
 		end if;
 	end process;
 

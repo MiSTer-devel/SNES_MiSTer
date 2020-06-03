@@ -214,6 +214,12 @@ wire reset = RESET | buttons[1] | status[0] | cart_download | bk_loading | clear
 
 ////////////////////////////  HPS I/O  //////////////////////////////////
 
+// Status Bit Map:
+// 0         1         2         3
+// 01234567890123456789012345678901
+// 0123456789ABCDEFGHIJKLMNOPQRSTUV
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
 `include "build_id.v"
 parameter CONF_STR = {
     "SNES;;",
@@ -229,28 +235,37 @@ parameter CONF_STR = {
     "D0RD,Save Backup RAM;",
     "D0ON,Autosave,Off,On;",
     "D0-;",
-    "OUV,Aspect Ratio,4:3,8:7,16:9;",
-    "O9B,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
-    "OG,Pseudo Transparency,Blend,Off;",
-    "OJK,Stereo Mix,None,25%,50%,100%;", 
+
+	 "P1,Audio & Video;",
+    "P1-;",
+    "P1OUV,Aspect Ratio,4:3,8:7,16:9;",
+    "P1O9B,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
+    "P1OG,Pseudo Transparency,Blend,Off;",
+    "P1-;",
+    "P1OJK,Stereo Mix,None,25%,50%,100%;", 
+
+	 "P2,Hardware;",
+    "P2-;",
+    "P2OH,Multitap,Disabled,Port2;",
+    "P2O8,Serial,OFF,SNAC;",
+    "P2-;",
+    "P2OPQ,Super Scope,Disabled,Joy1,Joy2,Mouse;",
+    "D4P2OR,Super Scope Btn,Joy,Mouse;",
+    "D4P2OST,Cross,Small,Big,None;",
+    "P2-;",
+    "D1P2OI,SuperFX Speed,Normal,Turbo;",
+    "D3P2O4,CPU Speed,Normal,Turbo;",
+    "P2-;",
+    "P2OLM,Initial WRAM,9966(SNES2),00FF(SNES1),55(SD2SNES),FF;",
+
     "-;",
     "O56,Mouse,None,Port1,Port2;",
     "O7,Swap Joysticks,No,Yes;",
-    "OH,Multitap,Disabled,Port2;",
-    "O8,Serial,OFF,SNAC;",
-    "-;",
-    "OPQ,Super Scope,Disabled,Joy1,Joy2,Mouse;",
-    "D4OR,Super Scope Btn,Joy,Mouse;",
-    "D4OST,Cross,Small,Big,None;",
-    "-;",
-    "D1OI,SuperFX Speed,Normal,Turbo;",
-    "D3O4,CPU Speed,Normal,Turbo;",
     "-;",
     "R0,Reset;",
     "J1,A(SS Fire),B(SS Cursor),X(SS TurboSw),Y(SS Pause),LT(SS Cursor),RT(SS Fire),Select,Start;",
     "V,v",`BUILD_DATE
 };
-// free bits: 8,L,M
 
 wire  [1:0] buttons;
 wire [31:0] status;
@@ -437,7 +452,7 @@ wire turbo_allow;
 
 main main
 (
-	.RESET_N(~reset),
+	.RESET_N(RESET_N),
 
 	.MCLK(clk_sys), // 21.47727 / 21.28137
 	.ACLK(clk_sys),
@@ -453,7 +468,6 @@ main main
 
 	.ROM_ADDR(ROM_ADDR),
 	.ROM_Q(ROM_Q),
-	.ROM_CE_N(ROM_CE_N),
 	.ROM_OE_N(ROM_OE_N),
 	.ROM_WORD(ROM_WORD),
 
@@ -522,6 +536,17 @@ main main
 	.AUDIO_R(AUDIO_R)
 );
 
+reg RESET_N = 0;
+reg RFSH = 0;
+always @(posedge clk_sys) begin
+	reg [1:0] div;
+	
+	div <= div + 1'd1;
+	RFSH <= !div;
+	
+	if (div == 2) RESET_N <= ~reset;
+end
+
 ////////////////////////////  CODES  ///////////////////////////////////
 
 reg [128:0] gg_code;
@@ -569,8 +594,17 @@ always @(posedge clk_sys) begin
 		mem_fill_addr <= 0;
 end
 
+reg [7:0] wram_fill_data;
+always @* begin
+    case(status[22:21])
+        0: wram_fill_data = (mem_fill_addr[8] ^ mem_fill_addr[2]) ? 8'h66 : 8'h99;
+        1: wram_fill_data = (mem_fill_addr[9] ^ mem_fill_addr[0]) ? 8'hFF : 8'h00;
+        2: wram_fill_data = 8'h55;
+        3: wram_fill_data = 8'hFF;
+    endcase
+end
+
 wire[23:0] ROM_ADDR;
-wire       ROM_CE_N;
 wire       ROM_OE_N;
 wire       ROM_WORD;
 wire[15:0] ROM_Q;
@@ -584,7 +618,7 @@ sdram sdram
 	.addr(cart_download ? ioctl_addr-10'd512 : ROM_ADDR),
 	.din(ioctl_dout),
 	.dout(ROM_Q),
-	.rd(~cart_download & ~ROM_CE_N & ~ROM_OE_N),
+	.rd(~cart_download & (RESET_N ? ~ROM_OE_N : RFSH)),
 	.wr(ioctl_wr & cart_download),
 	.word(cart_download | ROM_WORD),
 	.busy()
@@ -604,7 +638,7 @@ dpram #(17)	wram
 
 	// clear the RAM on loading
 	.address_b(mem_fill_addr[16:0]),
-	.data_b(8'hFF),
+	.data_b(wram_fill_data),
 	.wren_b(clearing_ram)
 );
 

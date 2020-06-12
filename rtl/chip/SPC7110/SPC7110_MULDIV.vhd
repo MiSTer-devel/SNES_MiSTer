@@ -1,262 +1,262 @@
-LIBRARY ieee;
-USE ieee.std_logic_1164.all;
+library ieee;
+use ieee.std_logic_1164.all;
 
-LIBRARY lpm;
-USE lpm.all;
+library lpm;
+use lpm.all;
 
-ENTITY SPC7110_UMULT IS
-	PORT
-	(
-		dataa		: IN STD_LOGIC_VECTOR (15 DOWNTO 0);
-		datab		: IN STD_LOGIC_VECTOR (15 DOWNTO 0);
-		result		: OUT STD_LOGIC_VECTOR (31 DOWNTO 0)
-	);
-END SPC7110_UMULT;
-
-
-ARCHITECTURE SYN OF SPC7110_UMULT IS
-
-	SIGNAL sub_wire0	: STD_LOGIC_VECTOR (31 DOWNTO 0);
+entity SPC7110_UMULT is
+  port
+    (
+      dataa  : in  std_logic_vector (15 downto 0);
+      datab  : in  std_logic_vector (15 downto 0);
+      result : out std_logic_vector (31 downto 0)
+      );
+end SPC7110_UMULT;
 
 
+architecture SYN of SPC7110_UMULT is
 
-	COMPONENT lpm_mult
-	GENERIC (
-		lpm_hint		: STRING;
-		lpm_representation		: STRING;
-		lpm_type		: STRING;
-		lpm_widtha		: NATURAL;
-		lpm_widthb		: NATURAL;
-		lpm_widthp		: NATURAL
-	);
-	PORT (
-			dataa	: IN STD_LOGIC_VECTOR (15 DOWNTO 0);
-			datab	: IN STD_LOGIC_VECTOR (15 DOWNTO 0);
-			result	: OUT STD_LOGIC_VECTOR (31 DOWNTO 0)
-	);
-	END COMPONENT;
-
-BEGIN
-	result    <= sub_wire0(31 DOWNTO 0);
-
-	lpm_mult_component : lpm_mult
-	GENERIC MAP (
-		lpm_hint => "MAXIMIZE_SPEED=5",
-		lpm_representation => "UNSIGNED",
-		lpm_type => "LPM_MULT",
-		lpm_widtha => 16,
-		lpm_widthb => 16,
-		lpm_widthp => 32
-	)
-	PORT MAP (
-		dataa => dataa,
-		datab => datab,
-		result => sub_wire0
-	);
+  signal sub_wire0 : std_logic_vector (31 downto 0);
 
 
 
-END SYN;
+  component lpm_mult
+    generic (
+      lpm_hint           : string;
+      lpm_representation : string;
+      lpm_type           : string;
+      lpm_widtha         : natural;
+      lpm_widthb         : natural;
+      lpm_widthp         : natural
+      );
+    port (
+      dataa  : in  std_logic_vector (15 downto 0);
+      datab  : in  std_logic_vector (15 downto 0);
+      result : out std_logic_vector (31 downto 0)
+      );
+  end component;
 
----------------------------------------------------------------------
-LIBRARY ieee;
-USE ieee.std_logic_1164.all;
+begin
+  result <= sub_wire0(31 downto 0);
 
-LIBRARY lpm;
-USE lpm.all;
-
-ENTITY SPC7110_SMULT IS
-	PORT
-	(
-		dataa		: IN STD_LOGIC_VECTOR (15 DOWNTO 0);
-		datab		: IN STD_LOGIC_VECTOR (15 DOWNTO 0);
-		result		: OUT STD_LOGIC_VECTOR (31 DOWNTO 0)
-	);
-END SPC7110_SMULT;
-
-
-ARCHITECTURE SYN OF SPC7110_SMULT IS
-
-	SIGNAL sub_wire0	: STD_LOGIC_VECTOR (31 DOWNTO 0);
-
-
-
-	COMPONENT lpm_mult
-	GENERIC (
-		lpm_hint		: STRING;
-		lpm_representation		: STRING;
-		lpm_type		: STRING;
-		lpm_widtha		: NATURAL;
-		lpm_widthb		: NATURAL;
-		lpm_widthp		: NATURAL
-	);
-	PORT (
-			dataa	: IN STD_LOGIC_VECTOR (15 DOWNTO 0);
-			datab	: IN STD_LOGIC_VECTOR (15 DOWNTO 0);
-			result	: OUT STD_LOGIC_VECTOR (31 DOWNTO 0)
-	);
-	END COMPONENT;
-
-BEGIN
-	result    <= sub_wire0(31 DOWNTO 0);
-
-	lpm_mult_component : lpm_mult
-	GENERIC MAP (
-		lpm_hint => "MAXIMIZE_SPEED=5",
-		lpm_representation => "SIGNED",
-		lpm_type => "LPM_MULT",
-		lpm_widtha => 16,
-		lpm_widthb => 16,
-		lpm_widthp => 32
-	)
-	PORT MAP (
-		dataa => dataa,
-		datab => datab,
-		result => sub_wire0
-	);
+  lpm_mult_component : lpm_mult
+    generic map (
+      lpm_hint           => "MAXIMIZE_SPEED=5",
+      lpm_representation => "UNSIGNED",
+      lpm_type           => "LPM_MULT",
+      lpm_widtha         => 16,
+      lpm_widthb         => 16,
+      lpm_widthp         => 32
+      )
+    port map (
+      dataa  => dataa,
+      datab  => datab,
+      result => sub_wire0
+      );
 
 
 
-END SYN;
+end SYN;
 
 ---------------------------------------------------------------------
-LIBRARY ieee;
-USE ieee.std_logic_1164.all;
+library ieee;
+use ieee.std_logic_1164.all;
 
-LIBRARY lpm;
-USE lpm.all;
+library lpm;
+use lpm.all;
 
-ENTITY SPC7110_UDIV IS
-	PORT
-	(
-		clock		: IN STD_LOGIC ;
-		denom		: IN STD_LOGIC_VECTOR (15 DOWNTO 0);
-		numer		: IN STD_LOGIC_VECTOR (31 DOWNTO 0);
-		quotient		: OUT STD_LOGIC_VECTOR (31 DOWNTO 0);
-		remain		: OUT STD_LOGIC_VECTOR (15 DOWNTO 0)
-	);
-END SPC7110_UDIV;
+entity SPC7110_SMULT is
+  port
+    (
+      dataa  : in  std_logic_vector (15 downto 0);
+      datab  : in  std_logic_vector (15 downto 0);
+      result : out std_logic_vector (31 downto 0)
+      );
+end SPC7110_SMULT;
 
 
-ARCHITECTURE SYN OF SPC7110_UDIV IS
+architecture SYN of SPC7110_SMULT is
 
-	SIGNAL sub_wire0	: STD_LOGIC_VECTOR (15 DOWNTO 0);
-	SIGNAL sub_wire1	: STD_LOGIC_VECTOR (31 DOWNTO 0);
+  signal sub_wire0 : std_logic_vector (31 downto 0);
 
 
 
-	COMPONENT lpm_divide
-	GENERIC (
-		lpm_drepresentation		: STRING;
-		lpm_hint		: STRING;
-		lpm_nrepresentation		: STRING;
-		lpm_pipeline		: NATURAL;
-		lpm_type		: STRING;
-		lpm_widthd		: NATURAL;
-		lpm_widthn		: NATURAL
-	);
-	PORT (
-			clock	: IN STD_LOGIC ;
-			remain	: OUT STD_LOGIC_VECTOR (15 DOWNTO 0);
-			denom	: IN STD_LOGIC_VECTOR (15 DOWNTO 0);
-			numer	: IN STD_LOGIC_VECTOR (31 DOWNTO 0);
-			quotient	: OUT STD_LOGIC_VECTOR (31 DOWNTO 0)
-	);
-	END COMPONENT;
+  component lpm_mult
+    generic (
+      lpm_hint           : string;
+      lpm_representation : string;
+      lpm_type           : string;
+      lpm_widtha         : natural;
+      lpm_widthb         : natural;
+      lpm_widthp         : natural
+      );
+    port (
+      dataa  : in  std_logic_vector (15 downto 0);
+      datab  : in  std_logic_vector (15 downto 0);
+      result : out std_logic_vector (31 downto 0)
+      );
+  end component;
 
-BEGIN
-	remain    <= sub_wire0(15 DOWNTO 0);
-	quotient    <= sub_wire1(31 DOWNTO 0);
+begin
+  result <= sub_wire0(31 downto 0);
 
-	LPM_DIVIDE_component : LPM_DIVIDE
-	GENERIC MAP (
-		lpm_drepresentation => "UNSIGNED",
-		lpm_hint => "LPM_REMAINDERPOSITIVE=TRUE",
-		lpm_nrepresentation => "UNSIGNED",
-		lpm_pipeline => 8,
-		lpm_type => "LPM_DIVIDE",
-		lpm_widthd => 16,
-		lpm_widthn => 32
-	)
-	PORT MAP (
-		clock => clock,
-		denom => denom,
-		numer => numer,
-		remain => sub_wire0,
-		quotient => sub_wire1
-	);
+  lpm_mult_component : lpm_mult
+    generic map (
+      lpm_hint           => "MAXIMIZE_SPEED=5",
+      lpm_representation => "SIGNED",
+      lpm_type           => "LPM_MULT",
+      lpm_widtha         => 16,
+      lpm_widthb         => 16,
+      lpm_widthp         => 32
+      )
+    port map (
+      dataa  => dataa,
+      datab  => datab,
+      result => sub_wire0
+      );
 
 
 
-END SYN;
+end SYN;
 
 ---------------------------------------------------------------------
-LIBRARY ieee;
-USE ieee.std_logic_1164.all;
+library ieee;
+use ieee.std_logic_1164.all;
 
-LIBRARY lpm;
-USE lpm.all;
+library lpm;
+use lpm.all;
 
-ENTITY SPC7110_SDIV IS
-	PORT
-	(
-		clock		: IN STD_LOGIC ;
-		denom		: IN STD_LOGIC_VECTOR (15 DOWNTO 0);
-		numer		: IN STD_LOGIC_VECTOR (31 DOWNTO 0);
-		quotient		: OUT STD_LOGIC_VECTOR (31 DOWNTO 0);
-		remain		: OUT STD_LOGIC_VECTOR (15 DOWNTO 0)
-	);
-END SPC7110_SDIV;
-
-
-ARCHITECTURE SYN OF SPC7110_SDIV IS
-
-	SIGNAL sub_wire0	: STD_LOGIC_VECTOR (15 DOWNTO 0);
-	SIGNAL sub_wire1	: STD_LOGIC_VECTOR (31 DOWNTO 0);
+entity SPC7110_UDIV is
+  port
+    (
+      clock    : in  std_logic;
+      denom    : in  std_logic_vector (15 downto 0);
+      numer    : in  std_logic_vector (31 downto 0);
+      quotient : out std_logic_vector (31 downto 0);
+      remain   : out std_logic_vector (15 downto 0)
+      );
+end SPC7110_UDIV;
 
 
+architecture SYN of SPC7110_UDIV is
 
-	COMPONENT lpm_divide
-	GENERIC (
-		lpm_drepresentation		: STRING;
-		lpm_hint		: STRING;
-		lpm_nrepresentation		: STRING;
-		lpm_pipeline		: NATURAL;
-		lpm_type		: STRING;
-		lpm_widthd		: NATURAL;
-		lpm_widthn		: NATURAL
-	);
-	PORT (
-			clock	: IN STD_LOGIC ;
-			remain	: OUT STD_LOGIC_VECTOR (15 DOWNTO 0);
-			denom	: IN STD_LOGIC_VECTOR (15 DOWNTO 0);
-			numer	: IN STD_LOGIC_VECTOR (31 DOWNTO 0);
-			quotient	: OUT STD_LOGIC_VECTOR (31 DOWNTO 0)
-	);
-	END COMPONENT;
-
-BEGIN
-	remain    <= sub_wire0(15 DOWNTO 0);
-	quotient    <= sub_wire1(31 DOWNTO 0);
-
-	LPM_DIVIDE_component : LPM_DIVIDE
-	GENERIC MAP (
-		lpm_drepresentation => "SIGNED",
-		lpm_hint => "LPM_REMAINDERPOSITIVE=TRUE",
-		lpm_nrepresentation => "SIGNED",
-		lpm_pipeline => 8,
-		lpm_type => "LPM_DIVIDE",
-		lpm_widthd => 16,
-		lpm_widthn => 32
-	)
-	PORT MAP (
-		clock => clock,
-		denom => denom,
-		numer => numer,
-		remain => sub_wire0,
-		quotient => sub_wire1
-	);
+  signal sub_wire0 : std_logic_vector (15 downto 0);
+  signal sub_wire1 : std_logic_vector (31 downto 0);
 
 
 
-END SYN;
+  component lpm_divide
+    generic (
+      lpm_drepresentation : string;
+      lpm_hint            : string;
+      lpm_nrepresentation : string;
+      lpm_pipeline        : natural;
+      lpm_type            : string;
+      lpm_widthd          : natural;
+      lpm_widthn          : natural
+      );
+    port (
+      clock    : in  std_logic;
+      remain   : out std_logic_vector (15 downto 0);
+      denom    : in  std_logic_vector (15 downto 0);
+      numer    : in  std_logic_vector (31 downto 0);
+      quotient : out std_logic_vector (31 downto 0)
+      );
+  end component;
+
+begin
+  remain   <= sub_wire0(15 downto 0);
+  quotient <= sub_wire1(31 downto 0);
+
+  LPM_DIVIDE_component : LPM_DIVIDE
+    generic map (
+      lpm_drepresentation => "UNSIGNED",
+      lpm_hint            => "LPM_REMAINDERPOSITIVE=TRUE",
+      lpm_nrepresentation => "UNSIGNED",
+      lpm_pipeline        => 8,
+      lpm_type            => "LPM_DIVIDE",
+      lpm_widthd          => 16,
+      lpm_widthn          => 32
+      )
+    port map (
+      clock    => clock,
+      denom    => denom,
+      numer    => numer,
+      remain   => sub_wire0,
+      quotient => sub_wire1
+      );
+
+
+
+end SYN;
+
+---------------------------------------------------------------------
+library ieee;
+use ieee.std_logic_1164.all;
+
+library lpm;
+use lpm.all;
+
+entity SPC7110_SDIV is
+  port
+    (
+      clock    : in  std_logic;
+      denom    : in  std_logic_vector (15 downto 0);
+      numer    : in  std_logic_vector (31 downto 0);
+      quotient : out std_logic_vector (31 downto 0);
+      remain   : out std_logic_vector (15 downto 0)
+      );
+end SPC7110_SDIV;
+
+
+architecture SYN of SPC7110_SDIV is
+
+  signal sub_wire0 : std_logic_vector (15 downto 0);
+  signal sub_wire1 : std_logic_vector (31 downto 0);
+
+
+
+  component lpm_divide
+    generic (
+      lpm_drepresentation : string;
+      lpm_hint            : string;
+      lpm_nrepresentation : string;
+      lpm_pipeline        : natural;
+      lpm_type            : string;
+      lpm_widthd          : natural;
+      lpm_widthn          : natural
+      );
+    port (
+      clock    : in  std_logic;
+      remain   : out std_logic_vector (15 downto 0);
+      denom    : in  std_logic_vector (15 downto 0);
+      numer    : in  std_logic_vector (31 downto 0);
+      quotient : out std_logic_vector (31 downto 0)
+      );
+  end component;
+
+begin
+  remain   <= sub_wire0(15 downto 0);
+  quotient <= sub_wire1(31 downto 0);
+
+  LPM_DIVIDE_component : LPM_DIVIDE
+    generic map (
+      lpm_drepresentation => "SIGNED",
+      lpm_hint            => "LPM_REMAINDERPOSITIVE=TRUE",
+      lpm_nrepresentation => "SIGNED",
+      lpm_pipeline        => 8,
+      lpm_type            => "LPM_DIVIDE",
+      lpm_widthd          => 16,
+      lpm_widthn          => 32
+      )
+    port map (
+      clock    => clock,
+      denom    => denom,
+      numer    => numer,
+      remain   => sub_wire0,
+      quotient => sub_wire1
+      );
+
+
+
+end SYN;

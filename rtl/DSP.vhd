@@ -127,7 +127,7 @@ architecture rtl of DSP is
 	signal BD_STATE 	: BrrDecState_t;
 	signal SR 		: signed(15 downto 0);
 	signal BD_VOICE 	: unsigned(2 downto 0);
-	signal P0 		: signed(15 downto 0);
+	signal P0 		: signed(16 downto 0);
 
 	signal ECHO_POS 		: unsigned(14 downto 0);
 	signal ECHO_ADDR 		: unsigned(15 downto 0);
@@ -522,7 +522,7 @@ begin
 		variable FILTER : std_logic_vector(1 downto 0);
 		variable SCALE : unsigned(3 downto 0);
 		variable SOUT : signed(15 downto 0);
-		variable P1 : signed(15 downto 0);
+		variable P1 : signed(16 downto 0);
 		variable SF: signed(16 downto 0);
 		variable S: std_logic_vector(15 downto 0);
 		variable BRR_BUF_ADDR_PREV: unsigned(3 downto 0);
@@ -575,9 +575,9 @@ begin
 					BRR_BUF_ADDR_A(3 downto 0) <= std_logic_vector(BRR_BUF_ADDR_PREV);
 				when BD_P0 =>
 					BD_STATE <= BD_P1;
-					P0 <= BRR_BUF_DO;
+					P0 <= resize(BRR_BUF_DO, 17);
 				when BD_P1 =>
-					P1 := shift_right(BRR_BUF_DO, 1);
+					P1 := shift_right(resize(BRR_BUF_DO, 17), 1);
 
 					case FILTER is
 						when "00" => 

@@ -111,6 +111,8 @@ iir_filter_tap iir_tap_2
 	.tap(tap2)
 );
 
+wire [15:0] y_clamp = (~y[39] & |y[38:35]) ? 16'h7FFF : (y[39] & ~&y[38:35]) ? 16'h8000 : y[35:20];
+
 reg        ch = 0;
 reg [15:0] out_l, out_r, out_m;
 reg [15:0] inp, inp_m;
@@ -118,18 +120,18 @@ always @(posedge clk) if (ce) begin
 	if(!stereo) begin
 		ch    <= 0;
 		inp   <= input_l;
-		out_l <= y[35:20];
-		out_r <= y[35:20];
+		out_l <= y_clamp;
+		out_r <= y_clamp;
 	end
 	else begin
 		ch <= ~ch;
 		if(ch) begin
-			out_m <= y[35:20];
+			out_m <= y_clamp;
 			inp   <= inp_m;
 		end
 		else begin
 			out_l <= out_m;
-			out_r <= y[35:20];
+			out_r <= y_clamp;
 			inp   <= input_l;
 			inp_m <= input_r;
 		end

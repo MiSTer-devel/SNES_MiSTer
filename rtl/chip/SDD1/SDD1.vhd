@@ -15,6 +15,7 @@ entity SDD1 is
 		DI				: in  std_logic_vector(7 downto 0);
 		CPURD_N		: in  std_logic;
 		CPUWR_N		: in  std_logic;
+		ROMSEL_N		: in std_logic;
 
 		SYSCLKF_CE	: in  std_logic;
 		SYSCLKR_CE	: in  std_logic;
@@ -100,8 +101,9 @@ architecture rtl of SDD1 is
 	signal HEADER : std_logic_vector(3 downto 0);
 	signal DEC_IN_DATA : std_logic_vector(15 downto 0);
 	signal IM_DATA_REQ : std_logic;
-
+	signal CPUWR_N_OLD : std_logic;
 	signal RD_PULSE : std_logic;
+	signal PULSE_CNT : unsigned(1 downto 0);
 	
 begin
 
@@ -110,7 +112,7 @@ begin
 	DEC_CUR_ADDR <= DMAA(DMA_CH);
 	DEC_CUR_SIZE <= DMAS(DMA_CH);
 	
-	SNES_ACCESS <= not (CPUWR_N and CPURD_N);
+	SNES_ACCESS <= not (CPUWR_N and CPURD_N) and not ROMSEL_N;
 
 	process( RST_N, CLK)
 		variable i : integer range 0 to 7; 
@@ -129,6 +131,7 @@ begin
 		elsif rising_edge(CLK) then
 			if ENABLE = '1' then
 				DEC_START <= '0';
+				
 				if CPUWR_N = '0' and SYSCLKF_CE = '1' then
 					if CA(22) = '0' and CA(15 downto 8) = x"43" and CA(7) = '0' then 
 						i := to_integer(unsigned(CA(6 downto 4))); 
@@ -150,11 +153,11 @@ begin
 							when x"0" =>
 								DMAEN <= DI;
 							when x"1" =>
-								DMARUN <= DI;
-								if (DI and DMAEN) /= x"00" then
-									DEC_START <= '1';
-									OUT_DATA_SEL <= '0';
-								end if;
+--								DMARUN <= DI;
+--								if (DI and DMAEN) /= x"00" then
+--									DEC_START <= '1';
+--									OUT_DATA_SEL <= '0';
+--								end if;
 							when x"4" =>
 								ROMBANKC <= DI(3 downto 0);
 							when x"5" =>
@@ -173,6 +176,15 @@ begin
 						if DMAS(DMA_CH) = x"0001" then
 							DMARUN(DMA_CH) <= '0';
 						end if;
+					end if;
+				end if;
+				
+				CPUWR_N_OLD <= CPUWR_N;
+				if CA(22) = '0' and CA(15 downto 0) = x"4801" and CPUWR_N = '0' and CPUWR_N_OLD = '1' then
+					DMARUN <= DI;
+					if (DI and DMAEN) /= x"00" then
+						DEC_START <= '1';
+						OUT_DATA_SEL <= '0';
 					end if;
 				end if;
 			end if;
@@ -227,8 +239,8 @@ begin
 		end if;
 	end process; 
 	
-	DEC_EN <= '1' when (DS = DS_WAIT_INIT or DS = DS_PREDECODING) and SNES_ACCESS = '0' else
-				 '1' when DS = DS_DECODING and CA = DEC_CUR_ADDR else 
+	DEC_EN <= '1' when (DS = DS_WAIT_INIT) and SNES_ACCESS = '0' else
+				 '1' when (DS = DS_DECODING or DS = DS_PREDECODING) and CA = DEC_CUR_ADDR else 
 				 '0';
 	
 	DEC_INIT <= '1' when DS = DS_INIT else '0';

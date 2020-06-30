@@ -80,6 +80,7 @@ begin
 		CPUWR_N		=> CPUWR_N,
 		DO				=> SDD1_DO,
 		DI				=> DI,
+		ROMSEL_N		=> ROMSEL_N,
 		
 		SYSCLKF_CE	=> SYSCLKF_CE,
 		SYSCLKR_CE	=> SYSCLKR_CE,

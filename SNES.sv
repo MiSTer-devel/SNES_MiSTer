@@ -901,7 +901,7 @@ reg bk_pending;
 always @(posedge clk_sys) begin
 	if (bk_ena && ~OSD_STATUS && bk_save_write)
 		bk_pending <= 1'b1;
-	else if (bk_state)
+	else if (bk_state | ~bk_ena)
 		bk_pending <= 1'b0;
 end
 

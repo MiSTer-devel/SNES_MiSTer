@@ -19,7 +19,8 @@ entity DSPn is
 		DP_ADDR		: in std_logic_vector(11 downto 0);
 		DP_SEL      : in std_logic;
 
-		VER			: in std_logic_vector(2 downto 0);--00-DSP1B, 01-DSP2, 10-DSP3, 11-DSP4
+		VER			: in std_logic_vector(2 downto 0); -- 00-DSP1, 01-DSP2, 10-DSP3, 11-DSP4
+		REV			: in std_logic;                    --  1-DSP1B
 		
 		BRK_OUT		: out std_logic;
 		DBG_REG		: in std_logic_vector(7 downto 0);
@@ -421,21 +422,27 @@ begin
 		end if;
 	end process; 
 
-	PROG_ROM_ADDR <= std_logic_vector(unsigned(PC) + ("0"&x"000")) when VER="000" else
-                    std_logic_vector(unsigned(PC) + ("0"&x"500")) when VER="001" else
-                    std_logic_vector(unsigned(PC) + ("0"&x"C00")) when VER="010" else
-                    std_logic_vector(unsigned(PC) + ("1"&x"254")) when VER="011" else
-                    std_logic_vector(unsigned(PC) + ("1"&x"954"));
+	PROG_ROM_ADDR <= std_logic_vector(unsigned(PC) + ("0"&x"000")) when VER="000" and REV='0' else
+	                 std_logic_vector(unsigned(PC) + ("0"&x"4F2")) when VER="000" and REV='1' else
+	                 std_logic_vector(unsigned(PC) + ("0"&x"9E5")) when VER="001" else
+	                 std_logic_vector(unsigned(PC) + ("1"&x"0B8")) when VER="010" else
+	                 std_logic_vector(unsigned(PC) + ("1"&x"6BD")) when VER="011" else
+	                 std_logic_vector(unsigned(PC) + ("1"&x"D8B"));
 
-	PROG_ROM : entity work.spram_sz generic map(13, 24, 7018, "rtl/chip/DSP/dsp1b23410_p.mif")
+	PROG_ROM : entity work.spram_sz generic map(13, 24, 8096, "rtl/chip/DSP/dsp11b23410_p.mif")
 	port map(
 		clock		=> CLK,
 		address	=> PROG_ROM_ADDR,
 		q			=> PROG_ROM_Q
 	);
 
-	DATA_ROM_ADDR <= VER(2 downto 1) & (VER(0) or (RP(10) and VER(2))) & RP(9 downto 0);
-	DATA_ROM : entity work.spram_sz generic map(13, 16, 6144, "rtl/chip/DSP/dsp1b23410_d.mif")
+	DATA_ROM_ADDR <= std_logic_vector(unsigned(RP( 9 downto 0)) + ("0"&x"000")) when VER="000" and REV='0' else
+	                 std_logic_vector(unsigned(RP( 9 downto 0)) + ("0"&x"400")) when VER="000" and REV='1' else
+	                 std_logic_vector(unsigned(RP( 9 downto 0)) + ("0"&x"800")) when VER="001" else
+	                 std_logic_vector(unsigned(RP( 9 downto 0)) + ("0"&x"C00")) when VER="010" else
+	                 std_logic_vector(unsigned(RP( 9 downto 0)) + ("1"&x"000")) when VER="011" else
+	                 std_logic_vector(unsigned(RP(10 downto 0)) + ("1"&x"400"));
+	DATA_ROM : entity work.spram_sz generic map(13, 16, 7168, "rtl/chip/DSP/dsp11b23410_d.mif")
 	port map(
 		clock		=> CLK,
 		address	=> DATA_ROM_ADDR,

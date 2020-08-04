@@ -51,6 +51,8 @@ entity DSP_LHRomMap is
 		MAP_CTRL		: in std_logic_vector(7 downto 0);
 		ROM_MASK		: in std_logic_vector(23 downto 0);
 		BSRAM_MASK	: in std_logic_vector(23 downto 0);
+
+		DSP1_REV		: in std_logic;
 		
 		EXT_RTC		: in std_logic_vector(64 downto 0);
 		
@@ -210,6 +212,7 @@ begin
 		DP_SEL      => DP_SEL,
 
 		VER			=> MAP_CTRL(3)&MAP_CTRL(5 downto 4),
+		REV			=> DSP1_REV,
 
 		BRK_OUT		=> BRK_OUT,
 		DBG_REG  	=> DBG_REG,

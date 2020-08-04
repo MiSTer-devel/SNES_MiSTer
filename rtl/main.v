@@ -49,6 +49,8 @@ module main (
    output            GSU_ACTIVE,
    input             GSU_TURBO,
 
+   input             DSP1_REV,
+
    input             BLEND,
    input             PAL,
    output            HIGH_RES,
@@ -252,6 +254,8 @@ DSP_LHRomMap #(.USE_DSPn(USE_DSPn)) DSP_LHRomMap
 	.rom_mask(ROM_MASK),
 	.bsram_mask(RAM_MASK),
 	
+	.dsp1_rev(DSP1_REV),
+
 	.ext_rtc(EXT_RTC)
 );
 end else begin

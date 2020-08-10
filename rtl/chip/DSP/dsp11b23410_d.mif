@@ -1,9 +1,9 @@
--- 0000 -> dsp1
--- 0400 -> dsp1b
--- 0800 -> dsp2
--- 0C00 -> dsp3
--- 1000 -> dsp4
--- 1400 -> st010
+-- 0000: dsp1.rom
+-- 0400: dsp1b.rom
+-- 0800: dsp2.rom
+-- 0C00: dsp3.rom
+-- 1000: dsp4.rom
+-- 1400: st010.rom
 
 WIDTH=16;
 DEPTH=7168;

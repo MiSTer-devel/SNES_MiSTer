@@ -49,6 +49,7 @@ module main (
    output            GSU_ACTIVE,
    input             GSU_TURBO,
 
+   output            DSP1_ACTIVE,
    input             DSP1_REV,
 
    input             BLEND,
@@ -254,6 +255,7 @@ DSP_LHRomMap #(.USE_DSPn(USE_DSPn)) DSP_LHRomMap
 	.rom_mask(ROM_MASK),
 	.bsram_mask(RAM_MASK),
 	
+	.dsp1_active(DSP1_ACTIVE),
 	.dsp1_rev(DSP1_REV),
 
 	.ext_rtc(EXT_RTC)

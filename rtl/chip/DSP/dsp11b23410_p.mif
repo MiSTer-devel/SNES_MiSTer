@@ -1,9 +1,9 @@
--- 0000 -> dsp1
--- 04F2 -> dsp1b
--- 09E5 -> dsp2
--- 10B8 -> dsp3
--- 16BD -> dsp4
--- 1D8B -> st010
+-- 0000: dsp1.rom
+-- 04F2: dsp1b.rom
+-- 09E5: dsp2.rom
+-- 10B8: dsp3.rom
+-- 16BD: dsp4.rom
+-- 1D8B: st010.rom
 
 WIDTH=24;
 DEPTH=8096;

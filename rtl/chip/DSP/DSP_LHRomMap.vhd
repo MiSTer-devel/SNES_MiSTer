@@ -52,6 +52,7 @@ entity DSP_LHRomMap is
 		ROM_MASK		: in std_logic_vector(23 downto 0);
 		BSRAM_MASK	: in std_logic_vector(23 downto 0);
 
+		DSP1_ACTIVE	: out std_logic;
 		DSP1_REV		: in std_logic;
 		
 		EXT_RTC		: in std_logic_vector(64 downto 0);
@@ -87,17 +88,21 @@ architecture rtl of DSP_LHRomMap is
 	
 	signal OPENBUS   		: std_logic_vector(7 downto 0);
 
-	signal MAP_DSP_SEL 	: std_logic;
+	signal MAP_DSP_VER	: std_logic_vector(2 downto 0);
+	signal MAP_DSP_SEL	: std_logic;
 	signal MAP_OBC1_SEL 	: std_logic;
 	signal DSP_CLK	  		: integer;
 	signal ROM_RD	  		: std_logic;
 		
 begin
 	
+	MAP_DSP_VER <= MAP_CTRL(3) & MAP_CTRL(5 downto 4);
 	MAP_DSP_SEL <= not MAP_CTRL(6) and (MAP_CTRL(7) or not (MAP_CTRL(5) or MAP_CTRL(4)));	--8..B
 	MAP_OBC1_SEL <= MAP_CTRL(7) and MAP_CTRL(6) and not MAP_CTRL(5) and not MAP_CTRL(4);	--C
 	MAP_ACTIVE <= MAP_DSP_SEL or MAP_OBC1_SEL;
-	
+
+	DSP1_ACTIVE <= not MAP_CTRL(6) when MAP_DSP_VER = "000" else '0';
+
 	CEGen : entity work.CEGen
 	port map(
 		CLK     => MCLK,
@@ -211,7 +216,7 @@ begin
 		DP_ADDR     => CA(11 downto 0),
 		DP_SEL      => DP_SEL,
 
-		VER			=> MAP_CTRL(3)&MAP_CTRL(5 downto 4),
+		VER			=> MAP_DSP_VER,
 		REV			=> DSP1_REV,
 
 		BRK_OUT		=> BRK_OUT,

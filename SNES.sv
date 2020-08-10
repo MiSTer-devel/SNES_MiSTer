@@ -454,7 +454,7 @@ end
 wire GSU_ACTIVE;
 wire turbo_allow;
 
-wire DSP1_ACTIVE = rom_type[3] & rom_type[5:4] == 0;
+wire DSP1_ACTIVE;
 
 main main
 (
@@ -466,6 +466,7 @@ main main
 	.GSU_ACTIVE(GSU_ACTIVE),
 	.GSU_TURBO(GSU_TURBO),
 
+	.DSP1_ACTIVE(DSP1_ACTIVE),
 	.DSP1_REV(DSP1_REV),
 
 	.ROM_TYPE(rom_type),

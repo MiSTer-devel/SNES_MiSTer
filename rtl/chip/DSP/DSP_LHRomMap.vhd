@@ -101,7 +101,7 @@ begin
 	MAP_OBC1_SEL <= MAP_CTRL(7) and MAP_CTRL(6) and not MAP_CTRL(5) and not MAP_CTRL(4);	--C
 	MAP_ACTIVE <= MAP_DSP_SEL or MAP_OBC1_SEL;
 
-	DSP1_ACTIVE <= not MAP_CTRL(6) when MAP_DSP_VER = "000" else '0';
+	DSP1_ACTIVE <= '1' when MAP_CTRL(7 downto 4) = x"8" and MAP_CTRL(3) = '0' else '0';
 
 	CEGen : entity work.CEGen
 	port map(

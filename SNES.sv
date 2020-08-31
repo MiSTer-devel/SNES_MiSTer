@@ -219,7 +219,7 @@ wire reset = RESET | buttons[1] | status[0] | cart_download | bk_loading | clear
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX X
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX 
 
 `include "build_id.v"
 parameter CONF_STR = {
@@ -257,8 +257,6 @@ parameter CONF_STR = {
     "D1P2OI,SuperFX Speed,Normal,Turbo;",
     "D3P2O4,CPU Speed,Normal,Turbo;",
     "P2-;",
-    "D5P2o0,DSP1B Revision,Yes,No;",
-    "P2-;",
     "P2OLM,Initial WRAM,9966(SNES2),00FF(SNES1),55(SD2SNES),FF;",
 
     "-;",
@@ -272,7 +270,7 @@ parameter CONF_STR = {
 
 wire  [1:0] buttons;
 wire [63:0] status;
-wire [15:0] status_menumask = {~DSP1_ACTIVE, !GUN_MODE, ~turbo_allow, ~gg_available, ~GSU_ACTIVE, ~bk_ena};
+wire [15:0] status_menumask = {!GUN_MODE, ~turbo_allow, ~gg_available, ~GSU_ACTIVE, ~bk_ena};
 wire        forced_scandoubler;
 reg  [31:0] sd_lba;
 reg         sd_rd = 0;
@@ -351,7 +349,6 @@ hps_io #(.STRLEN($size(CONF_STR)>>3), .WIDE(1)) hps_io
 wire       GUN_BTN = status[27];
 wire [1:0] GUN_MODE = status[26:25];
 wire       GSU_TURBO = status[18];
-wire       DSP1_REV = ~status[32];
 wire       BLEND = ~status[16];
 wire [1:0] mouse_mode = status[6:5];
 wire       joy_swap = status[7];
@@ -454,8 +451,6 @@ end
 wire GSU_ACTIVE;
 wire turbo_allow;
 
-wire DSP1_ACTIVE;
-
 main main
 (
 	.RESET_N(RESET_N),
@@ -465,9 +460,6 @@ main main
 
 	.GSU_ACTIVE(GSU_ACTIVE),
 	.GSU_TURBO(GSU_TURBO),
-
-	.DSP1_ACTIVE(DSP1_ACTIVE),
-	.DSP1_REV(DSP1_REV),
 
 	.ROM_TYPE(rom_type),
 	.ROM_MASK(rom_mask),

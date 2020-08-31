@@ -52,11 +52,8 @@ entity DSP_LHRomMap is
 		ROM_MASK		: in std_logic_vector(23 downto 0);
 		BSRAM_MASK	: in std_logic_vector(23 downto 0);
 
-		DSP1_ACTIVE	: out std_logic;
-		DSP1_REV		: in std_logic;
-		
 		EXT_RTC		: in std_logic_vector(64 downto 0);
-		
+
 		BRK_OUT		: out std_logic;
 		DBG_REG		: in std_logic_vector(7 downto 0) := (others => '0');
 		DBG_DAT_IN	: in std_logic_vector(7 downto 0) := (others => '0');
@@ -101,8 +98,6 @@ begin
 	MAP_OBC1_SEL <= MAP_CTRL(7) and MAP_CTRL(6) and not MAP_CTRL(5) and not MAP_CTRL(4);	--C
 	MAP_ACTIVE <= MAP_DSP_SEL or MAP_OBC1_SEL;
 
-	DSP1_ACTIVE <= not MAP_CTRL(6) when MAP_DSP_VER = "000" else '0';
-
 	CEGen : entity work.CEGen
 	port map(
 		CLK     => MCLK,
@@ -121,8 +116,8 @@ begin
 		OBC1_SEL <= '0';
 		BSRAM_SEL <= '0';
 		if ROM_MASK(23) = '0' then
-			case MAP_CTRL(2 downto 0) is
-				when "000" =>							-- LoROM/ExLoROM
+			case MAP_CTRL(1 downto 0) is
+				when "00" =>							-- LoROM/ExLoROM
 					CART_ADDR <= '0' & not CA(23) & CA(22 downto 16) & CA(14 downto 0);
 					BRAM_ADDR <= CA(20 downto 16) & CA(14 downto 0);
 					if MAP_CTRL(3) = '0' then
@@ -153,7 +148,7 @@ begin
 						end if;
 						DSP_A0 <= CA(0);
 					end if;
-				when "001" =>							-- HiROM
+				when "01" =>							-- HiROM
 					CART_ADDR <= "00" & CA(21 downto 0);
 					BRAM_ADDR <= "00" & CA(20 downto 16) & CA(12 downto 0);
 					if CA(22 downto 21) = "01" and CA(15 downto 13) = "011" and BSRAM_MASK(10) = '1' then
@@ -163,7 +158,7 @@ begin
 						DSP_SEL <= MAP_CTRL(7) and not MAP_CTRL(6);
 					end if;
 					DSP_A0 <= CA(12);
-				when "101"|"010" =>					-- ExHiROM
+				when "10" =>					-- ExHiROM
 					CART_ADDR <= "0" & (not CA(23)) & CA(21 downto 0);
 					BRAM_ADDR <= "0" & CA(21 downto 16) & CA(12 downto 0);
 					if CA(22 downto 21) = "01" and CA(15 downto 13) = "011" and BSRAM_MASK(10) = '1' then
@@ -217,7 +212,7 @@ begin
 		DP_SEL      => DP_SEL,
 
 		VER			=> MAP_DSP_VER,
-		REV			=> DSP1_REV,
+		REV			=> not MAP_CTRL(2),
 
 		BRK_OUT		=> BRK_OUT,
 		DBG_REG  	=> DBG_REG,

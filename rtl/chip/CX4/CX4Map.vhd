@@ -76,7 +76,7 @@ begin
 		CLK     => MCLK,
 		RST_N   => RST_N,
 		IN_CLK  => 2147727,
-		OUT_CLK => 1800000,
+		OUT_CLK => 2000000,
 		CE      => CX4_CE
 	);
 

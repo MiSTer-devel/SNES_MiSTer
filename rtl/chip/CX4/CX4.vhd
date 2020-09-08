@@ -455,12 +455,17 @@ begin
 			SRAM_CE_N <= '0';
 			BUS_OE_N <= DMA_STATE;
 			BUS_WE_N <= not DMA_STATE;
-		elsif SRAM_SEL = '1' and SRAM_ACCESS = '1' then
+		elsif SRAM_SEL = '1' then
 			ROM_CE1_N <= '1';
 			ROM_CE2_N <= '1';
 			SRAM_CE_N <= '0';
-			BUS_OE_N <= SRAM_WR;
-			BUS_WE_N <= not SRAM_WR;
+			if SRAM_ACCESS = '1' then
+				BUS_OE_N <= SRAM_WR;
+				BUS_WE_N <= not SRAM_WR;
+			else
+				BUS_OE_N <= RD_n;
+				BUS_WE_N <= WR_n;
+			end if;
 		elsif ROM_SEL = '1' then
 			if (MAPPER = '0' and ROM_MODE = '0') or (MAPPER = '1' and ROM_MODE = '1') then
 				ROM_CE1_N <= INT_ADDR(21);
@@ -473,7 +478,7 @@ begin
 				ROM_CE2_N <= not INT_ADDR(20);
 			end if;
 			SRAM_CE_N <= '1';
-			BUS_OE_N <= '0';
+			BUS_OE_N <= '1';
 			BUS_WE_N <= '1';
 		else
 			ROM_CE1_N <= '1';
@@ -617,8 +622,10 @@ begin
 		end if;
 	end process;
 	
-	BUS_DO <= DMA_DAT when DMA_RUN = '1' else MBR;
-	
+	BUS_DO <= DMA_DAT when DMA_RUN = '1' else
+		  DI when (SRAM_SEL = '1' and SRAM_ACCESS = '0' and WR_n = '0') else
+		  MBR;
+
 	IR <= CACHE_Q_H & CACHE_Q_L;
 	
 	process(IR)

@@ -216,10 +216,10 @@ wire reset = RESET | buttons[1] | status[0] | cart_download | bk_loading | clear
 ////////////////////////////  HPS I/O  //////////////////////////////////
 
 // Status Bit Map:
-// 0         1         2         3
-// 01234567890123456789012345678901
-// 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+// 0         1         2         3          4         5         6
+// 01234567890123456789012345678901 23456789012345678901234567890123
+// 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX 
 
 `include "build_id.v"
 parameter CONF_STR = {
@@ -269,7 +269,7 @@ parameter CONF_STR = {
 };
 
 wire  [1:0] buttons;
-wire [31:0] status;
+wire [63:0] status;
 wire [15:0] status_menumask = {!GUN_MODE, ~turbo_allow, ~gg_available, ~GSU_ACTIVE, ~bk_ena};
 wire        forced_scandoubler;
 reg  [31:0] sd_lba;
@@ -319,7 +319,7 @@ hps_io #(.STRLEN($size(CONF_STR)>>3), .WIDE(1)) hps_io
 
 	.status(status),
 	.status_menumask(status_menumask),
-	.status_in({status[31:5],1'b0,status[3:0]}),
+	.status_in({status[63:5],1'b0,status[3:0]}),
 	.status_set(cart_download),
 
 	.ioctl_addr(ioctl_addr),
@@ -901,7 +901,7 @@ reg bk_pending;
 always @(posedge clk_sys) begin
 	if (bk_ena && ~OSD_STATUS && bk_save_write)
 		bk_pending <= 1'b1;
-	else if (bk_state)
+	else if (bk_state | ~bk_ena)
 		bk_pending <= 1'b0;
 end
 

@@ -51,9 +51,9 @@ entity DSP_LHRomMap is
 		MAP_CTRL		: in std_logic_vector(7 downto 0);
 		ROM_MASK		: in std_logic_vector(23 downto 0);
 		BSRAM_MASK	: in std_logic_vector(23 downto 0);
-		
+
 		EXT_RTC		: in std_logic_vector(64 downto 0);
-		
+
 		BRK_OUT		: out std_logic;
 		DBG_REG		: in std_logic_vector(7 downto 0) := (others => '0');
 		DBG_DAT_IN	: in std_logic_vector(7 downto 0) := (others => '0');
@@ -85,17 +85,19 @@ architecture rtl of DSP_LHRomMap is
 	
 	signal OPENBUS   		: std_logic_vector(7 downto 0);
 
-	signal MAP_DSP_SEL 	: std_logic;
+	signal MAP_DSP_VER	: std_logic_vector(2 downto 0);
+	signal MAP_DSP_SEL	: std_logic;
 	signal MAP_OBC1_SEL 	: std_logic;
 	signal DSP_CLK	  		: integer;
 	signal ROM_RD	  		: std_logic;
 		
 begin
 	
+	MAP_DSP_VER <= MAP_CTRL(3) & MAP_CTRL(5 downto 4);
 	MAP_DSP_SEL <= not MAP_CTRL(6) and (MAP_CTRL(7) or not (MAP_CTRL(5) or MAP_CTRL(4)));	--8..B
 	MAP_OBC1_SEL <= MAP_CTRL(7) and MAP_CTRL(6) and not MAP_CTRL(5) and not MAP_CTRL(4);	--C
 	MAP_ACTIVE <= MAP_DSP_SEL or MAP_OBC1_SEL;
-	
+
 	CEGen : entity work.CEGen
 	port map(
 		CLK     => MCLK,
@@ -114,8 +116,8 @@ begin
 		OBC1_SEL <= '0';
 		BSRAM_SEL <= '0';
 		if ROM_MASK(23) = '0' then
-			case MAP_CTRL(2 downto 0) is
-				when "000" =>							-- LoROM/ExLoROM
+			case MAP_CTRL(1 downto 0) is
+				when "00" =>							-- LoROM/ExLoROM
 					CART_ADDR <= '0' & not CA(23) & CA(22 downto 16) & CA(14 downto 0);
 					BRAM_ADDR <= CA(20 downto 16) & CA(14 downto 0);
 					if MAP_CTRL(3) = '0' then
@@ -146,7 +148,7 @@ begin
 						end if;
 						DSP_A0 <= CA(0);
 					end if;
-				when "001" =>							-- HiROM
+				when "01" =>							-- HiROM
 					CART_ADDR <= "00" & CA(21 downto 0);
 					BRAM_ADDR <= "00" & CA(20 downto 16) & CA(12 downto 0);
 					if CA(22 downto 21) = "01" and CA(15 downto 13) = "011" and BSRAM_MASK(10) = '1' then
@@ -156,7 +158,7 @@ begin
 						DSP_SEL <= MAP_CTRL(7) and not MAP_CTRL(6);
 					end if;
 					DSP_A0 <= CA(12);
-				when "101"|"010" =>					-- ExHiROM
+				when "10" =>					-- ExHiROM
 					CART_ADDR <= "0" & (not CA(23)) & CA(21 downto 0);
 					BRAM_ADDR <= "0" & CA(21 downto 16) & CA(12 downto 0);
 					if CA(22 downto 21) = "01" and CA(15 downto 13) = "011" and BSRAM_MASK(10) = '1' then
@@ -209,7 +211,8 @@ begin
 		DP_ADDR     => CA(11 downto 0),
 		DP_SEL      => DP_SEL,
 
-		VER			=> MAP_CTRL(3)&MAP_CTRL(5 downto 4),
+		VER			=> MAP_DSP_VER,
+		REV			=> not MAP_CTRL(2),
 
 		BRK_OUT		=> BRK_OUT,
 		DBG_REG  	=> DBG_REG,

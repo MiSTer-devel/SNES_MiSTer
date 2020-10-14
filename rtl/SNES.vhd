@@ -122,6 +122,7 @@ architecture rtl of SNES is
 
 	signal BUSB_DO	: std_logic_vector(7 downto 0);
 	signal BUSA_SEL : std_logic;
+	signal BUSB_SEL : std_logic;
 
 	signal WRAM_A : std_logic_vector(16 downto 0);
 	signal WRAM_DO, WRAM_DI	: std_logic_vector(7 downto 0);
@@ -248,14 +249,16 @@ begin
 					'1' when INT_CA(23 downto 16) >= x"C0" else
 					'0';
 
+	BUSB_SEL <= '1' when INT_PA(7) = '0' or INT_PA(7 downto 2) = "100000" else '0';
 	BUSB_DO <= PPU_DO when INT_PA(7 downto 6) = "00" else 
-				  WRAM_DO when INT_PA(7 downto 6) = "10" else
 				  SMP_CPU_DO when INT_PA(7 downto 6) = "01" else
+				  WRAM_DO when INT_PA(7 downto 2) = "100000" else
 				  x"FF";
 
 	CPU_DI <= WRAM_DO when INT_RAMSEL_N = '0' else
 				 DI when BUSA_SEL = '1' else
-				 BUSB_DO;
+				 BUSB_DO when BUSB_SEL = '1' else
+				 DI;
 
 
 

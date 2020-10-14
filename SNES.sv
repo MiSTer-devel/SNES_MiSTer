@@ -224,7 +224,7 @@ wire reset = RESET | buttons[1] | status[0] | cart_download | bk_loading | clear
 `include "build_id.v"
 parameter CONF_STR = {
     "SNES;;",
-    "FS,SFCSMCBIN;",
+    "FS,SFCSMCBINBS ;",
     "-;",
     "OEF,Video Region,Auto,NTSC,PAL;",
     "O13,ROM Header,Auto,No Header,LoROM,HiROM,ExHiROM;",
@@ -468,8 +468,10 @@ main main
 	.BLEND(BLEND),
 
 	.ROM_ADDR(ROM_ADDR),
+	.ROM_D(ROM_D),
 	.ROM_Q(ROM_Q),
 	.ROM_OE_N(ROM_OE_N),
+	.ROM_WE_N(ROM_WE_N),
 	.ROM_WORD(ROM_WORD),
 
 	.BSRAM_ADDR(BSRAM_ADDR),
@@ -607,7 +609,9 @@ end
 
 wire[23:0] ROM_ADDR;
 wire       ROM_OE_N;
+wire       ROM_WE_N;
 wire       ROM_WORD;
+wire[15:0] ROM_D;
 wire[15:0] ROM_Q;
 
 sdram sdram
@@ -617,10 +621,10 @@ sdram sdram
 	.clk(clk_mem),
 	
 	.addr(cart_download ? ioctl_addr-10'd512 : ROM_ADDR),
-	.din(ioctl_dout),
+	.din(cart_download ? ioctl_dout : ROM_D),
 	.dout(ROM_Q),
 	.rd(~cart_download & (RESET_N ? ~ROM_OE_N : RFSH)),
-	.wr(ioctl_wr & cart_download),
+	.wr(cart_download ? ioctl_wr : ~ROM_WE_N),
 	.word(cart_download | ROM_WORD),
 	.busy()
 );

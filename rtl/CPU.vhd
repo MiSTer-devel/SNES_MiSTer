@@ -41,14 +41,7 @@ entity SCPU is
 		JOY1_CLK			: out std_logic;
 		JOY2_CLK			: out std_logic;
 
-		TURBO				: in std_logic;
-
-		DBG_CPU_BRK 	: out std_logic;
-		DBG_REG			: in std_logic_vector(7 downto 0);
-		DBG_DAT			: out std_logic_vector(7 downto 0);
-		DBG_DAT_IN		: in std_logic_vector(7 downto 0);
-		DBG_CPU_DAT		: out std_logic_vector(7 downto 0);
-		DBG_CPU_WR		: in std_logic
+		TURBO				: in std_logic
 	);
 end SCPU;
 
@@ -109,9 +102,9 @@ architecture rtl of SCPU is
 	signal AUTO_JOY_EN : std_logic;
 	signal WRIO	: std_logic_vector(7 downto 0);
 	signal WRMPYA : std_logic_vector(7 downto 0);
-	signal WRMPYB : std_logic_vector(7 downto 0);
+--	signal WRMPYB : std_logic_vector(7 downto 0);
 	signal WRDIVA : std_logic_vector(15 downto 0);
-	signal WRDIVB : std_logic_vector(7 downto 0);
+--	signal WRDIVB : std_logic_vector(7 downto 0);
 	signal HTIME : std_logic_vector(8 downto 0);
 	signal VTIME : std_logic_vector(8 downto 0);
 	signal MDMAEN : std_logic_vector(7 downto 0);
@@ -242,10 +235,6 @@ architecture rtl of SCPU is
 	-- Counter to determine the number of clock cycles since the p65 last accessed a peripheral
 	signal P65_ACCESSED_PERIPHERAL_CNT : unsigned(7 downto 0);
 
-	--debug
-	signal FRAME_CNT: unsigned(15 downto 0);
-	signal P65_RDY: std_logic;
-
 begin
 
 	DMA_ACTIVE <= DMA_RUN or HDMA_RUN;
@@ -370,14 +359,7 @@ begin
 		IRQ_N       => P65_IRQ_N,
 		ABORT_N     => '1',
 		VPA      	=> P65_VPA,
-		VDA      	=> P65_VDA,
-		RDY_OUT     => P65_RDY,
-		
-		BRK_OUT     => P65_BRK,
-		DBG_REG     => DBG_REG,
-		DBG_DAT_IN	=> DBG_DAT_IN,
-		DBG_DAT_OUT	=> DBG_CPU_DAT,
-		DBG_DAT_WR	=> DBG_CPU_WR
+		VDA      	=> P65_VDA
 	); 
 
 
@@ -649,9 +631,9 @@ begin
 	begin
 		if RST_N = '0' then
 			WRMPYA <= (others => '1');
-			WRMPYB <= (others => '0');
+--			WRMPYB <= (others => '0');
 			WRDIVA <= (others => '1');
-			WRDIVB <= (others => '0');
+--			WRDIVB <= (others => '0');
 			RDDIV <= (others => '0');
 			RDMPY <= (others => '0');
 			MUL_REQ <= '0';
@@ -691,7 +673,7 @@ begin
 						when x"02" =>
 							WRMPYA <= P65_DO;
 						when x"03" =>
-							WRMPYB <= P65_DO;
+--							WRMPYB <= P65_DO;
 							RDMPY <= (others => '0');
 							RDDIV <= P65_DO & WRMPYA;
 							MATH_TEMP <= "000000000000000" & P65_DO;
@@ -702,7 +684,7 @@ begin
 						when x"05" =>
 							WRDIVA(15 downto 8) <= P65_DO;
 						when x"06" =>
-							WRDIVB <= P65_DO;
+--							WRDIVB <= P65_DO;
 							RDMPY <= WRDIVA;
 							RDDIV <= (others => '0');
 							MATH_TEMP <= P65_DO & "000000000000000";
@@ -838,7 +820,6 @@ begin
 			H_CNT <= (others => '0');
 			V_CNT <= (others => '0');
 			FIELD <= '0';
-			FRAME_CNT <= (others => '0');
 			HBLANK_OLD <= '0';
 			VBLANK_OLD <= '0';
 		elsif rising_edge(CLK) then
@@ -864,7 +845,6 @@ begin
 				if VBLANK = '0' and VBLANK_OLD = '1' then
 					V_CNT <= (others => '0');
 					FIELD <= not FIELD;
-					FRAME_CNT <= FRAME_CNT + 1;
 				end if;
 			end if;
 		end if;
@@ -1308,70 +1288,5 @@ begin
 	JOY_STRB <= OLD_JOY_STRB or AUTO_JOY_STRB;
 	JOY1_CLK <= OLD_JOY1_CLK or AUTO_JOY_CLK;
 	JOY2_CLK <= OLD_JOY2_CLK or AUTO_JOY_CLK;
-	
-	--debug
-	process( CLK )
-		variable i : integer range 0 to 7;
-	begin
-		if rising_edge(CLK) then
-			if DBG_REG(7) = '0' then
-				case DBG_REG is
-					when x"00" => DBG_DAT <= NMI_EN & "0" & HVIRQ_EN & "000" & AUTO_JOY_EN;
-					when x"01" => DBG_DAT <= WRIO;
-					when x"02" => DBG_DAT <= WRMPYA;
-					when x"03" => DBG_DAT <= WRMPYB(7 downto 0);
-					when x"04" => DBG_DAT <= WRDIVA(7 downto 0);
-					when x"05" => DBG_DAT <= WRDIVA(15 downto 8);
-					when x"06" => DBG_DAT <= WRDIVB(7 downto 0);
-					when x"07" => DBG_DAT <= HTIME(7 downto 0);
-					when x"08" => DBG_DAT <= "0000000" & HTIME(8);
-					when x"09" => DBG_DAT <= VTIME(7 downto 0);
-					when x"0A" => DBG_DAT <= "0000000" & VTIME(8);
-					when x"0B" => DBG_DAT <= "0000000" & MEMSEL;
-					when x"0C" => DBG_DAT <= MDMAEN;
-					when x"0D" => DBG_DAT <= HDMAEN;
-					when x"0E" => DBG_DAT <= x"00";
-					when x"0F" => DBG_DAT <= x"00";
-					when x"10" => DBG_DAT <= NMI_FLAG & "0000000";
-					when x"11" => DBG_DAT <= IRQ_FLAG & "0000000";
-					when x"12" => DBG_DAT <= VBLANK & HBLANK & "00000" & JOYRD_BUSY;
-					when x"13" => DBG_DAT <= RDDIV(7 downto 0);
-					when x"14" => DBG_DAT <= RDDIV(15 downto 8);
-					when x"15" => DBG_DAT <= RDMPY(7 downto 0);
-					when x"16" => DBG_DAT <= RDMPY(15 downto 8);
-					when x"17" => DBG_DAT <= MDR;
-					when x"18" => DBG_DAT <= std_logic_vector(H_CNT(7 downto 0));
-					when x"19" => DBG_DAT <= "0000000" & H_CNT(8);
-					when x"1A" => DBG_DAT <= std_logic_vector(V_CNT(7 downto 0));
-					when x"1B" => DBG_DAT <= "0000000" & V_CNT(8);
-					when x"1C" => DBG_DAT <= "0000000" & FIELD;
-					when x"1D" => DBG_DAT <= JOY1_DATA(7 downto 0);
-					when x"1E" => DBG_DAT <= JOY1_DATA(15 downto 8);
-					when x"1F" => DBG_DAT <= std_logic_vector(FRAME_CNT(7 downto 0));
-					when x"20" => DBG_DAT <= std_logic_vector(FRAME_CNT(15 downto 8));
-					when x"21" => DBG_DAT <= ENABLE & CPU_ACTIVEr & DMA_ACTIVEr & P65_RDY & REFRESHED & DMA_RUN & HDMA_RUN & P65_EN;
-					when others => DBG_DAT <= x"00";
-				end case;
-			else
-				i := to_integer(unsigned(DBG_REG(6 downto 4)));
-				case DBG_REG(3 downto 0) is
-					when x"0" => DBG_DAT <= DMAP(i);
-					when x"1" => DBG_DAT <= BBAD(i);
-					when x"2" => DBG_DAT <= A1T(i)(7 downto 0);
-					when x"3" => DBG_DAT <= A1T(i)(15 downto 8);
-					when x"4" => DBG_DAT <= A1B(i);
-					when x"5" => DBG_DAT <= DAS(i)(7 downto 0);
-					when x"6" => DBG_DAT <= DAS(i)(15 downto 8);
-					when x"7" => DBG_DAT <= DASB(i);
-					when x"8" => DBG_DAT <= A2A(i)(7 downto 0);
-					when x"9" => DBG_DAT <= A2A(i)(15 downto 8);
-					when x"A" => DBG_DAT <= NTLR(i);
-					when others => DBG_DAT <= x"00";
-				end case;
-			end if;
-		end if;
-	end process; 
-
-	DBG_CPU_BRK <= P65_BRK and (not DMA_ACTIVE) and (not REFRESHED);
 	
 end rtl;

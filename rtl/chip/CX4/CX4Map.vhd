@@ -47,13 +47,7 @@ entity CX4Map is
 		MAP_ACTIVE  : out std_logic;
 		MAP_CTRL		: in std_logic_vector(7 downto 0);
 		ROM_MASK		: in std_logic_vector(23 downto 0);
-		BSRAM_MASK	: in std_logic_vector(23 downto 0);
-		
-		BRK_OUT		: out std_logic;
-		DBG_REG		: in std_logic_vector(7 downto 0) := (others => '0');
-		DBG_DAT_IN	: in std_logic_vector(7 downto 0) := (others => '0');
-		DBG_DAT_OUT	: out std_logic_vector(7 downto 0);
-		DBG_DAT_WR	: in std_logic := '0'
+		BSRAM_MASK	: in std_logic_vector(23 downto 0)
 	);
 end CX4Map;
 
@@ -109,13 +103,7 @@ begin
 		
 		BUS_RD_N		=> ROM_OE_N,
 		
-		MAPPER		=> MAP_CTRL(0),
-		
-		BRK_OUT		=> BRK_OUT,
-		DBG_REG  	=> DBG_REG,
-		DBG_DAT_IN	=> DBG_DAT_IN,
-		DBG_DAT_OUT	=> DBG_DAT_OUT,
-		DBG_DAT_WR	=> DBG_DAT_WR
+		MAPPER		=> MAP_CTRL(0)
 	);
 	
 	CART_ADDR <= CX4_A(22) & not ROM_CE2_N & CX4_A(20 downto 16) & CX4_A(14 downto 0);

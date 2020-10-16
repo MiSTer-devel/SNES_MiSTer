@@ -50,13 +50,7 @@ entity SA1Map is
 		MAP_ACTIVE  : out std_logic;
 		MAP_CTRL		: in std_logic_vector(7 downto 0);
 		ROM_MASK		: in std_logic_vector(23 downto 0);
-		BSRAM_MASK	: in std_logic_vector(23 downto 0);
-		
-		BRK_OUT		: out std_logic;
-		DBG_REG		: in std_logic_vector(7 downto 0) := (others => '0');
-		DBG_DAT_IN	: in std_logic_vector(7 downto 0) := (others => '0');
-		DBG_DAT_OUT	: out std_logic_vector(7 downto 0);
-		DBG_DAT_WR	: in std_logic := '0'
+		BSRAM_MASK	: in std_logic_vector(23 downto 0)
 	);
 end SA1Map;
 
@@ -100,13 +94,7 @@ begin
 		BWRAM_OE_N	=> BSRAM_OE_N,
 		BWRAM_WE_N	=> BSRAM_WE_N,
 		
-		IRQ_N			=> IRQ_N,
-		
-		BRK_OUT		=> BRK_OUT,
-		DBG_REG  	=> DBG_REG,
-		DBG_DAT_IN	=> DBG_DAT_IN,
-		DBG_DAT_OUT	=> DBG_DAT_OUT,
-		DBG_DAT_WR	=> DBG_DAT_WR
+		IRQ_N			=> IRQ_N
 	);
 
 	ROM_ADDR 	<= ROM_A and ROM_MASK(22 downto 0);

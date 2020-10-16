@@ -22,13 +22,7 @@ entity P65C816 is
 		  VPA 		: out std_logic;
 		  VDA 		: out std_logic;
 		  MLB 		: out std_logic;
-		  VPB 		: out std_logic;
-		  
-		  BRK_OUT	: out std_logic;
-		  DBG_REG	: in std_logic_vector(7 downto 0);
-		  DBG_DAT_IN		: in std_logic_vector(7 downto 0);
-		  DBG_DAT_OUT	: out std_logic_vector(7 downto 0);
-		  DBG_DAT_WR	: in std_logic
+		  VPB 		: out std_logic
     );
 end P65C816;
 
@@ -209,8 +203,7 @@ begin
 		AB     		=> AB, 
 		DX     		=> DX,
 		AALCarry     => AALCarry, 
-		JumpNoOfl 	=> JumpNoOverflow,
-		DBG_NEXT_PC => DBG_NEXT_PC
+		JumpNoOfl 	=> JumpNoOverflow
 	);
 	
 	
@@ -640,121 +633,5 @@ begin
 	end process;
 	
 	RDY_OUT <= EN;
-	
-	
-	--debug
-	process(CLK, RST_N)
-		variable AFTER_JSR_PC: std_logic_vector(15 downto 0);
-		variable JSRS: std_logic;
-	begin
-		if RST_N = '0' then
-			BRK_OUT <= '0';
-			DBG_RUN_LAST <= '0';
-			JSR_RET_ADDR <= (others=>'0');
-			JSR_FOUND <= '0';
-		elsif rising_edge(CLK) then
-			if CE = '1' and RDY_IN = '1' then
-				if NextIR = x"20" or NextIR = x"22" or NextIR = x"FC" then
-					JSRS := '1';
-				else
-					JSRS := '0';
-				end if;
-				if NextIR = x"20" or NextIR = x"FC" then
-					AFTER_JSR_PC := std_logic_vector(unsigned(PC) + 3);
-				else
-					AFTER_JSR_PC := std_logic_vector(unsigned(PC) + 4);
-				end if;
-
-				BRK_OUT <= '0';
-				if DBG_CTRL(0) = '1' then			--step
-					if LAST_CYCLE = '1' then
-						if DBG_CTRL(1) = '1' then	--trace
-							BRK_OUT <= '1';
-							JSR_FOUND <= '0';
-						elsif JSR_FOUND = '0' then
-							BRK_OUT <= '1';
-							if JSRS = '1' then
-								JSR_RET_ADDR <= PBR & AFTER_JSR_PC;
-								JSR_FOUND <= '1';
-							end if;
-						elsif JSR_RET_ADDR(15 downto 0) = DBG_NEXT_PC and JSR_RET_ADDR(23 downto 16) = PBR and JSR_FOUND = '1' then
-							BRK_OUT <= '1';
-							if JSRS = '1' then
-								JSR_RET_ADDR <= PBR & AFTER_JSR_PC;
-								JSR_FOUND <= '1';
-							else
-								JSR_FOUND <= '0';
-							end if;
-						end if;
-					end if;
-				elsif DBG_CTRL(2) = '1' then		--opcode address break
-					if LAST_CYCLE = '1' and DBG_BRK_ADDR(15 downto 0) = DBG_NEXT_PC and DBG_BRK_ADDR(23 downto 16) = PBR then
-						BRK_OUT <= '1';
-					end if;
-				elsif DBG_CTRL(3) = '1' then		--read/write address break
-					if DBG_BRK_ADDR = ADDR_BUS and MC.VA = "10" then
-						BRK_OUT <= '1';
-					end if;
-				end if;
-			end if;
-			
-			DBG_RUN_LAST <= DBG_CTRL(7);			--run
-			if DBG_CTRL(7) = '1' and DBG_RUN_LAST = '0' then
-				BRK_OUT <= '0';
-			end if;
-		end if;
-	end process;
-	
-	process(RST_N, CLK, DBG_REG, A, X, Y, PC, P, SP, D, PBR, DBR, MC, AA, AB, DX, 
-			  GotInterrupt, IsResetInterrupt, IsNMIInterrupt, IsIRQInterrupt, RDY_IN, EN, WAIExec, STPExec,
-			  DBG_BRK_ADDR, DBG_CTRL)
-	begin
-		case DBG_REG is
-			when x"00" => DBG_DAT_OUT <= A(7 downto 0);
-			when x"01" => DBG_DAT_OUT <= A(15 downto 8);
-			when x"02" => DBG_DAT_OUT <= X(7 downto 0);
-			when x"03" => DBG_DAT_OUT <= X(15 downto 8);
-			when x"04" => DBG_DAT_OUT <= Y(7 downto 0);
-			when x"05" => DBG_DAT_OUT <= Y(15 downto 8);
-			when x"06" => DBG_DAT_OUT <= PC(7 downto 0);
-			when x"07" => DBG_DAT_OUT <= PC(15 downto 8);
-			when x"08" => DBG_DAT_OUT <= P(7 downto 0);
-			when x"09" => DBG_DAT_OUT <= SP(7 downto 0);
-			when x"0A" => DBG_DAT_OUT <= SP(15 downto 8);
-			when x"0B" => DBG_DAT_OUT <= D(7 downto 0);
-			when x"0C" => DBG_DAT_OUT <= D(15 downto 8);
-			when x"0D" => DBG_DAT_OUT <= PBR;
-			when x"0E" => DBG_DAT_OUT <= DBR;
-			when x"0F" => DBG_DAT_OUT <= "000000" & MC.ADDR_INC;
-			when x"10" => DBG_DAT_OUT <= AA(7 downto 0);
-			when x"11" => DBG_DAT_OUT <= AA(15 downto 8);
-			when x"12" => DBG_DAT_OUT <= AB;
-			when x"13" => DBG_DAT_OUT <= DX(7 downto 0);
-			when x"14" => DBG_DAT_OUT <= DX(15 downto 8);
-			when x"15" => DBG_DAT_OUT <= GotInterrupt & IsResetInterrupt & IsNMIInterrupt & IsIRQInterrupt & RDY_IN & EN & WAIExec & STPExec;
-			
-			when x"80" => DBG_DAT_OUT <= DBG_BRK_ADDR(7 downto 0);
-			when x"81" => DBG_DAT_OUT <= DBG_BRK_ADDR(15 downto 8);
-			when x"82" => DBG_DAT_OUT <= DBG_BRK_ADDR(23 downto 16);
-			when x"83" => DBG_DAT_OUT <= DBG_CTRL;
-			when others => DBG_DAT_OUT <= x"00";
-		end case; 
-
-		if RST_N = '0' then
-			DBG_DAT_WRr <= '0';
-		elsif rising_edge(CLK) then
-			DBG_DAT_WRr <= DBG_DAT_WR;
-			if DBG_DAT_WR = '1' and DBG_DAT_WRr = '0' then
-				case DBG_REG is
-					when x"80" => DBG_BRK_ADDR(7 downto 0) <= DBG_DAT_IN;
-					when x"81" => DBG_BRK_ADDR(15 downto 8) <= DBG_DAT_IN;
-					when x"82" => DBG_BRK_ADDR(23 downto 16) <= DBG_DAT_IN;
-					when x"83" => DBG_CTRL <= DBG_DAT_IN;
-					when others => null;
-				end case;
-			end if;
-		end if;
-	end process;
-	
 
 end rtl;

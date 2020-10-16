@@ -49,13 +49,7 @@ entity GSUMap is
 		ROM_MASK		: in std_logic_vector(23 downto 0);
 		BSRAM_MASK	: in std_logic_vector(23 downto 0);
 
-		TURBO		   : in std_logic;
-
-		BRK_OUT		: out std_logic;
-		DBG_REG		: in std_logic_vector(7 downto 0) := (others => '0');
-		DBG_DAT_IN	: in std_logic_vector(7 downto 0) := (others => '0');
-		DBG_DAT_OUT	: out std_logic_vector(7 downto 0);
-		DBG_DAT_WR	: in std_logic := '0'
+		TURBO		   : in std_logic
 	);
 end GSUMap;
 
@@ -98,13 +92,7 @@ begin
 		RAM_WE_N		=> RAM_WE_N,
 		RAM_CE_N		=> BSRAM_CE_N,
 				
-		TURBO			=> TURBO,
-
-		BRK_OUT		=> BRK_OUT,
-		DBG_REG  	=> DBG_REG,
-		DBG_DAT_IN	=> DBG_DAT_IN,
-		DBG_DAT_OUT	=> DBG_DAT_OUT,
-		DBG_DAT_WR	=> DBG_DAT_WR
+		TURBO			=> TURBO
 	);
 	
 	ROM_ADDR 	<= ("00" & ROM_A) and ROM_MASK(22 downto 0);

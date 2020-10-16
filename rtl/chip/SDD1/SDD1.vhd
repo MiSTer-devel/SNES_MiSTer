@@ -22,10 +22,7 @@ entity SDD1 is
 
 		ROM_A       : out std_logic_vector(23 downto 0);
 		ROM_DO		: in  std_logic_vector(15 downto 0);
-		ROM_RD_N		: out std_logic;
-
-		DBG_REG		: in  std_logic_vector(7 downto 0);
-		DBG_DAT_OUT	: out std_logic_vector(7 downto 0)
+		ROM_RD_N		: out std_logic
 	);
 end SDD1;
 
@@ -361,28 +358,5 @@ begin
 
 	RD_PULSE <= SYSCLKF_CE or SYSCLKR_CE when rising_edge(CLK);
 	ROM_RD_N <= not RD_PULSE;
-	
-	--debug
-	process(DBG_REG, HEADER, DEC_A, DEC_OUT_DATA0, DEC_OUT_DATA1, DEC_DONE, DMAEN, DMARUN, ROMBANKC, ROMBANKD, ROMBANKE, ROMBANKF,
-			  DEC_INIT, DEC_EN, TRANSFERING, DEC_PLANE_DONE, DEC_INIT_DONE)
-	begin
-		case DBG_REG is
-			when x"00" => DBG_DAT_OUT <= "0000" & HEADER;
-			when x"01" => DBG_DAT_OUT <= DEC_A(7 downto 0);
-			when x"02" => DBG_DAT_OUT <= DEC_A(15 downto 8);
-			when x"03" => DBG_DAT_OUT <= DEC_A(23 downto 16);
-			when x"04" => DBG_DAT_OUT <= x"00";
-			when x"05" => DBG_DAT_OUT <= DEC_OUT_DATA0;
-			when x"06" => DBG_DAT_OUT <= DEC_OUT_DATA1;
-			when x"07" => DBG_DAT_OUT <= "0" & DEC_INIT & DEC_EN & TRANSFERING & '0' & DEC_PLANE_DONE & DEC_INIT_DONE & DEC_DONE;
-			when x"08" => DBG_DAT_OUT <= DMAEN;
-			when x"09" => DBG_DAT_OUT <= DMARUN;
-			when x"0A" => DBG_DAT_OUT <= "0000" & ROMBANKC;
-			when x"0B" => DBG_DAT_OUT <= "0000" & ROMBANKD;
-			when x"0C" => DBG_DAT_OUT <= "0000" & ROMBANKE;
-			when x"0D" => DBG_DAT_OUT <= "0000" & ROMBANKF;
-			when others => DBG_DAT_OUT <= x"00";
-		end case; 
-	end process;
 	
 end rtl;

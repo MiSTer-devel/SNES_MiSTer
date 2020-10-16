@@ -84,17 +84,16 @@ entity SNES is
 		BCK			: out std_logic;
 		SDAT			: out std_logic;
 
-		DBG_SEL		: in std_logic_vector(7 downto 0);
-		DBG_REG		: in std_logic_vector(7 downto 0);
-		DBG_REG_WR	: in std_logic;
-		DBG_DAT_IN	: in std_logic_vector(7 downto 0);
-		DBG_DAT_OUT	: out std_logic_vector(7 downto 0);
-		DBG_BREAK	: out std_logic;
-
 		GG_EN			: in std_logic;
 		GG_CODE		: in std_logic_vector(128 downto 0);
 		GG_RESET		: in std_logic;
 		GG_AVAILABLE: out std_logic;
+		
+		SPC_MODE		: in std_logic;
+		
+		IO_ADDR     : in std_logic_vector(16 downto 0);
+		IO_DAT  		: in std_logic_vector(15 downto 0);
+		IO_WR 		: in std_logic;
 		
 		TURBO			: in std_logic;
 
@@ -152,11 +151,6 @@ architecture rtl of SNES is
 	signal GENIE_DO	: std_logic_vector(7 downto 0);
 	signal GENIE_DI   : std_logic_vector(7 downto 0);
 
-	-- DEBUG
-	signal DBG_CPU_DAT, DBG_SCPU_DAT, DBG_WRAM_DAT, DBG_PPU_DAT, DBG_SMP_DAT, DBG_SPC700_DAT, DBG_DSP_DAT : std_logic_vector(7 downto 0);
-	signal CPU_BRK, SMP_BRK, PPU_DBG_BRK	: std_logic;
-	signal CPU_DBG_WR, WRAM_DBG_WR, SPC700_DAT_WR, SMP_DAT_WR, PPU_DBG_WR, DSP_DBG_WR : std_logic;
-
 	component CODES is
 		generic(
 			ADDR_WIDTH  : in integer := 16;
@@ -201,7 +195,7 @@ begin
 	CPU : entity work.SCPU
 	port map(
 		CLK			=> MCLK,
-		RST_N			=> RST_N,
+		RST_N			=> RST_N and not SPC_MODE,
 		
 		ENABLE		=> ENABLE,
 		
@@ -234,14 +228,7 @@ begin
 		JOY1_CLK		=> JOY1_CLK,
 		JOY2_CLK		=> JOY2_CLK,
 
-		TURBO			=> TURBO,
-
-		DBG_CPU_BRK => CPU_BRK,
-		DBG_REG     => DBG_REG,
-		DBG_DAT     => DBG_SCPU_DAT,
-		DBG_DAT_IN  => DBG_DAT_IN,
-		DBG_CPU_DAT => DBG_CPU_DAT,
-		DBG_CPU_WR 	=> CPU_DBG_WR
+		TURBO			=> TURBO
 	);
 
 	BUSA_SEL <= '1' when INT_CA(22) = '0' and INT_CA(15 downto 8) /= x"21" else
@@ -260,8 +247,6 @@ begin
 				 BUSB_DO when BUSB_SEL = '1' else
 				 DI;
 
-
-
 	-- WRAM
 	WRAM_DI <= DI when BUSA_SEL = '1' else
 				  BUSB_DO when INT_PARD_N = '0' else
@@ -271,7 +256,7 @@ begin
 	port map(
 		CLK			=> MCLK,
 		SYSCLK_CE	=> INT_SYSCLKF_CE,
-		RST_N			=> RST_N,
+		RST_N			=> RST_N and not SPC_MODE,
 		ENABLE		=> ENABLE,
 		
 		CA				=> INT_CA,
@@ -291,12 +276,7 @@ begin
 		RAM_Q			=> WSRAM_Q,
 		RAM_WE_N		=> WSRAM_WE_N,
 		RAM_CE_N		=> WSRAM_CE_N,
-		RAM_OE_N		=> WSRAM_OE_N,
-		
-		DBG_REG     => DBG_REG,
-		DBG_DAT_OUT => DBG_WRAM_DAT,
-		DBG_DAT_IN	=> DBG_DAT_IN,
-		DBG_DAT_WR	=> WRAM_DBG_WR
+		RAM_OE_N		=> WSRAM_OE_N
 	);
 	
 
@@ -307,7 +287,7 @@ begin
  
 	PPU : entity work.SPPU
 	port map(
-		RST_N			=> RST_N,
+		RST_N			=> RST_N and not SPC_MODE,
 		CLK			=> MCLK,
 		SYSCLK_CE	=> INT_SYSCLKF_CE,
 		ENABLE		=> ENABLE,
@@ -344,13 +324,7 @@ begin
 		HDE			=> HDE,
 		VDE			=> VDE,
 		HSYNC			=> HSYNC,
-		VSYNC			=> VSYNC,
-
-		DBG_REG 		=> DBG_REG,
-		DBG_DAT_OUT => DBG_PPU_DAT,
-		DBG_DAT_IN	=> DBG_DAT_IN,
-		DBG_DAT_WR	=> PPU_DBG_WR,
-		DBG_BRK		=> PPU_DBG_BRK
+		VSYNC			=> VSYNC
 	);
 
 
@@ -379,15 +353,10 @@ begin
 		CPU_DO		=> SMP_CPU_DO,
 		CS				=> INT_PA(6),
 		CS_N			=> INT_PA(7),
-		
-		DBG_REG			=> DBG_REG,
-		DBG_DAT_IN		=> DBG_DAT_IN,
-		DBG_CPU_DAT 	=> DBG_SPC700_DAT,
-		DBG_SMP_DAT		=> DBG_SMP_DAT,
-		DBG_CPU_DAT_WR	=> SPC700_DAT_WR,
-		DBG_SMP_DAT_WR	=> SMP_DAT_WR,
-		BRK_OUT    		=> SMP_BRK
-		
+ 
+		IO_ADDR		=> IO_ADDR,
+		IO_DAT  		=> IO_DAT,
+		IO_WR			=> IO_WR
 	);
 
 	-- DSP 
@@ -416,10 +385,9 @@ begin
 		BCK 			=> BCK,
 		SDAT 			=> SDAT,
 		
-		DBG_REG		=> DBG_REG,
-		DBG_DAT_IN  => DBG_DAT_IN,
-		DBG_DAT_OUT => DBG_DSP_DAT,
-		DBG_DAT_WR	=> DSP_DBG_WR,
+		IO_ADDR		=> IO_ADDR,
+		IO_DAT  		=> IO_DAT,
+		IO_WR			=> IO_WR,
 		
 		AUDIO_L		=> AUDIO_L,
 		AUDIO_R		=> AUDIO_R
@@ -440,25 +408,6 @@ begin
 	
 	SYSCLKF_CE <= INT_SYSCLKF_CE;
 	SYSCLKR_CE <= INT_SYSCLKR_CE;
-	
-	CPU_DBG_WR <= DBG_SEL(0) and DBG_REG_WR;
-	WRAM_DBG_WR <= DBG_SEL(2) and DBG_REG_WR;
-	SPC700_DAT_WR <= DBG_SEL(3) and DBG_REG_WR;
-	SMP_DAT_WR <= DBG_SEL(4) and DBG_REG_WR;
-	PPU_DBG_WR <= DBG_SEL(5) and DBG_REG_WR;
-	DSP_DBG_WR <= DBG_SEL(6) and DBG_REG_WR;
-
-	DBG_DAT_OUT <= DBG_CPU_DAT when DBG_SEL(0) = '1' else 
-						DBG_SCPU_DAT when DBG_SEL(1) = '1' else 
-						DBG_WRAM_DAT when DBG_SEL(2) = '1' else 
-						DBG_SPC700_DAT when DBG_SEL(3) = '1' else 
-						DBG_SMP_DAT when DBG_SEL(4) = '1' else 
-						DBG_PPU_DAT when DBG_SEL(5) = '1' else 
-						DBG_DSP_DAT when DBG_SEL(6) = '1' else 
-						x"00";
-
-
-	DBG_BREAK <= CPU_BRK or SMP_BRK or PPU_DBG_BRK;
 
 	JOY1_P6 <= JPIO67(6);
 	JOY2_P6 <= JPIO67(7);

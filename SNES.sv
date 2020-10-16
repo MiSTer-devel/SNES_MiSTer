@@ -129,7 +129,7 @@ assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 assign AUDIO_S   = 1;
 assign AUDIO_MIX = status[20:19];
 
-assign LED_USER  = cart_download | (status[23] & bk_pending);
+assign LED_USER  = cart_download | spc_download | (status[23] & bk_pending);
 assign LED_DISK  = 0;
 assign LED_POWER = 0;
 assign BUTTONS   = osd_btn;
@@ -211,7 +211,7 @@ always @(posedge CLK_50M) begin
 	end
 end
 
-wire reset = RESET | buttons[1] | status[0] | cart_download | bk_loading | clearing_ram;
+wire reset = RESET | buttons[1] | status[0] | cart_download | spc_download | bk_loading | clearing_ram;
 
 ////////////////////////////  HPS I/O  //////////////////////////////////
 
@@ -224,7 +224,8 @@ wire reset = RESET | buttons[1] | status[0] | cart_download | bk_loading | clear
 `include "build_id.v"
 parameter CONF_STR = {
     "SNES;;",
-    "FS,SFCSMCBINBS ;",
+    "FS0,SFCSMCBINBS ;",
+	 "FS1,SPC;",
     "-;",
     "OEF,Video Region,Auto,NTSC,PAL;",
     "O13,ROM Header,Auto,No Header,LoROM,HiROM,ExHiROM;",
@@ -356,7 +357,8 @@ wire [2:0] LHRom_type = status[3:1];
 
 wire code_index = &ioctl_index;
 wire code_download = ioctl_download & code_index;
-wire cart_download = ioctl_download & ~code_index;
+wire cart_download = ioctl_download & ioctl_index[5:0] == 0;
+wire spc_download = ioctl_download & ioctl_index[5:0] == 1;
 
 reg new_vmode;
 always @(posedge clk_sys) begin
@@ -423,6 +425,13 @@ always @(posedge clk_sys) begin
 	end
 	else begin
 		PAL <= (!status[15:14]) ? rom_region : status[15];
+	end
+end
+
+reg spc_mode = 0;
+always @(posedge clk_sys) begin
+	if(ioctl_wr) begin
+		spc_mode <= spc_download;
 	end
 end
 
@@ -532,6 +541,12 @@ main main
 	.GG_RESET((code_download && ioctl_wr && !ioctl_addr) || cart_download),
 	.GG_AVAILABLE(gg_available),
 	
+	.SPC_MODE(spc_mode),
+	
+	.IO_ADDR(ioctl_addr[16:0]),
+	.IO_DAT(ioctl_dout),
+	.IO_WR(spc_download & ioctl_wr),
+	
 	.TURBO(status[4] & turbo_allow),
 	.TURBO_ALLOW(turbo_allow),
 
@@ -614,13 +629,15 @@ wire       ROM_WORD;
 wire[15:0] ROM_D;
 wire[15:0] ROM_Q;
 
+wire[24:0] addr_download = ioctl_addr-10'd512;
+
 sdram sdram
 (
 	.*,
 	.init(0), //~clock_locked),
 	.clk(clk_mem),
 	
-	.addr(cart_download ? ioctl_addr-10'd512 : ROM_ADDR),
+	.addr(cart_download ? addr_download : ROM_ADDR),
 	.din(cart_download ? ioctl_dout : ROM_D),
 	.dout(ROM_Q),
 	.rd(~cart_download & (RESET_N ? ~ROM_OE_N : RFSH)),
@@ -683,7 +700,7 @@ wire [15:0] ARAM_ADDR;
 wire        ARAM_CE_N;
 wire        ARAM_WE_N;
 wire  [7:0] ARAM_Q, ARAM_D;
-dpram #(16) aram
+dpram_dif #(16,8,15,16) aram
 (
 	.clock(clk_sys),
 	.address_a(ARAM_ADDR),
@@ -692,8 +709,9 @@ dpram #(16) aram
 	.q_A(ARAM_Q),
 
 	// clear the RAM on loading
-	.address_b(mem_fill_addr[15:0]),
-	.wren_b(clearing_ram)
+	.address_b(spc_download ? addr_download[15:1] : mem_fill_addr[15:1]),
+	.data_b(spc_download ? ioctl_dout : 16'h0000),
+	.wren_b(spc_download ? ioctl_wr : clearing_ram)
 );
 
 localparam  BSRAM_BITS = 17; // 1Mbits

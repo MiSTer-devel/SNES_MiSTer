@@ -80,6 +80,12 @@ module main (
    input     [128:0] GG_CODE,
    input             GG_RESET,
    output            GG_AVAILABLE,
+	
+	input             SPC_MODE,
+	
+	input      [16:0] IO_ADDR,
+	input      [15:0] IO_DAT,
+	input             IO_WR,
 
    input             TURBO,
    output            TURBO_ALLOW,
@@ -192,6 +198,12 @@ SNES SNES
 	.gg_code(GG_CODE),
 	.gg_reset(GG_RESET),
 	.gg_available(GG_AVAILABLE),
+	
+	.spc_mode(SPC_MODE),
+	
+	.io_addr(IO_ADDR),
+	.io_dat(IO_DAT),
+	.io_wr(IO_WR),
 	
 	.turbo(TURBO),
 

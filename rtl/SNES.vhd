@@ -83,7 +83,7 @@ entity SNES is
 		LRCK			: out std_logic;
 		BCK			: out std_logic;
 		SDAT			: out std_logic;
-
+		  
 		DBG_SEL		: in std_logic_vector(7 downto 0);
 		DBG_REG		: in std_logic_vector(7 downto 0);
 		DBG_REG_WR	: in std_logic;
@@ -95,6 +95,12 @@ entity SNES is
 		GG_CODE		: in std_logic_vector(128 downto 0);
 		GG_RESET		: in std_logic;
 		GG_AVAILABLE: out std_logic;
+		
+		SPC_MODE		: in std_logic;
+		
+		IO_ADDR     : in std_logic_vector(16 downto 0);
+		IO_DAT  		: in std_logic_vector(15 downto 0);
+		IO_WR 		: in std_logic;
 		
 		TURBO			: in std_logic;
 
@@ -201,7 +207,7 @@ begin
 	CPU : entity work.SCPU
 	port map(
 		CLK			=> MCLK,
-		RST_N			=> RST_N,
+		RST_N			=> RST_N and not SPC_MODE,
 		
 		ENABLE		=> ENABLE,
 		
@@ -271,7 +277,7 @@ begin
 	port map(
 		CLK			=> MCLK,
 		SYSCLK_CE	=> INT_SYSCLKF_CE,
-		RST_N			=> RST_N,
+		RST_N			=> RST_N and not SPC_MODE,
 		ENABLE		=> ENABLE,
 		
 		CA				=> INT_CA,
@@ -307,7 +313,7 @@ begin
  
 	PPU : entity work.SPPU
 	port map(
-		RST_N			=> RST_N,
+		RST_N			=> RST_N and not SPC_MODE,
 		CLK			=> MCLK,
 		SYSCLK_CE	=> INT_SYSCLKF_CE,
 		ENABLE		=> ENABLE,
@@ -379,15 +385,10 @@ begin
 		CPU_DO		=> SMP_CPU_DO,
 		CS				=> INT_PA(6),
 		CS_N			=> INT_PA(7),
-		
-		DBG_REG			=> DBG_REG,
-		DBG_DAT_IN		=> DBG_DAT_IN,
-		DBG_CPU_DAT 	=> DBG_SPC700_DAT,
-		DBG_SMP_DAT		=> DBG_SMP_DAT,
-		DBG_CPU_DAT_WR	=> SPC700_DAT_WR,
-		DBG_SMP_DAT_WR	=> SMP_DAT_WR,
-		BRK_OUT    		=> SMP_BRK
-		
+ 
+		IO_ADDR		=> IO_ADDR,
+		IO_DAT  		=> IO_DAT,
+		IO_WR			=> IO_WR
 	);
 
 	-- DSP 
@@ -416,10 +417,9 @@ begin
 		BCK 			=> BCK,
 		SDAT 			=> SDAT,
 		
-		DBG_REG		=> DBG_REG,
-		DBG_DAT_IN  => DBG_DAT_IN,
-		DBG_DAT_OUT => DBG_DSP_DAT,
-		DBG_DAT_WR	=> DSP_DBG_WR,
+		IO_ADDR		=> IO_ADDR,
+		IO_DAT  		=> IO_DAT,
+		IO_WR			=> IO_WR,
 		
 		AUDIO_L		=> AUDIO_L,
 		AUDIO_R		=> AUDIO_R

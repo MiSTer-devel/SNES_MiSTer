@@ -14,12 +14,9 @@ entity SPC700 is
         D_OUT        : out std_logic_vector(7 downto 0);
         A_OUT			: out std_logic_vector(15 downto 0);
         WE				: out std_logic;
-		  
-		  DBG_REG		: in std_logic_vector(7 downto 0);
-		  DBG_DAT_IN	: in std_logic_vector(7 downto 0);
-		  DBG_DAT_OUT	: out std_logic_vector(7 downto 0);
-		  DBG_DAT_WR	: in std_logic;
-		  BRK_OUT		: out std_logic
+
+		  REG_DAT		: in std_logic_vector(55 downto 0);
+		  REG_SET		: in std_logic
     );
 end SPC700;
 
@@ -58,13 +55,6 @@ architecture rtl of SPC700 is
 	signal nBit : integer range 0 to 7;
 	
 	constant ONE : unsigned(7 downto 0) := x"01";
-	
-	--debug
-	signal DBG_NEXT_PC : std_logic_vector(15 downto 0);
-	signal DBG_RUN_LAST : std_logic;
-	signal DBG_DAT_WRr : std_logic_vector(3 downto 0);
-	signal DBG_BRK_ADDR : std_logic_vector(15 downto 0) := (others => '1');
-	signal DBG_CTRL : std_logic_vector(7 downto 0) := (others => '0');
 
 begin
 	EN <= RDY and not STPExec;
@@ -200,10 +190,8 @@ begin
 		PC     		=> PC, 
 		AX     		=> AX, 
 		ALCarry     => ALCarry, 
-		DBG_REG     => DBG_REG,
-		DBG_DAT_IN  => DBG_DAT_IN,
-		DBG_DAT_WR  => DBG_DAT_WR,
-		DBG_NEXT_PC => DBG_NEXT_PC
+		REG_DAT	   => REG_DAT(15 downto 0), 
+		REG_SET	   => REG_SET
 	);
 	
 	BitToC <= std_logic_vector(unsigned(D_IN) srl nBit);
@@ -277,15 +265,12 @@ begin
 			X <= (others=>'0');
 			Y <= (others=>'0');
 		elsif rising_edge(CLK) then
-			if EN = '0' then
-				if DBG_DAT_WR = '1' then
-					case DBG_REG is
-						when x"00" => A <= DBG_DAT_IN;
-						when x"01" => X <= DBG_DAT_IN;
-						when x"02" => Y <= DBG_DAT_IN;
-						when others => null;
-					end case;
-				end if;
+			if REG_SET = '1' then
+				A <= REG_DAT(23 downto 16); 
+				X <= REG_DAT(31 downto 24);
+				Y <= REG_DAT(39 downto 32);
+			elsif EN = '0' then
+				
 			else
 				if MC.LOAD_AXY = "10" then 
 					X <= AluR;
@@ -314,14 +299,11 @@ begin
 			SP <= (others=>'0');
 			T <= (others=>'0');
 		elsif rising_edge(CLK) then
-			if EN = '0' then
-				if DBG_DAT_WR = '1' then
-					case DBG_REG is
-						when x"05" => PSW <= DBG_DAT_IN;
-						when x"06" => SP <= DBG_DAT_IN;
-						when others => null;
-					end case;
-				end if;
+			if REG_SET = '1' then
+				PSW <= REG_DAT(47 downto 40);
+				SP <= REG_DAT(55 downto 48);
+			elsif EN = '0' then
+				
 			else
 				case MC.LOAD_SP is
 					when "00" => null;
@@ -422,11 +404,11 @@ begin
 			IsIRQInterrupt <= '0'; 
 			STPExec <= '0'; 
 		elsif rising_edge(CLK) then
-			if EN = '0' then
-				if DBG_DAT_WR = '1' and (DBG_REG = x"03" or DBG_REG = x"04") then
-					GotInterrupt <= '0';	--need for SPC Player
-					IsResetInterrupt <= '0';
-				end if;
+			if REG_SET = '1' then	--need for SPC Player
+				GotInterrupt <= '0'; 
+				IsResetInterrupt <= '0';
+			elsif EN = '0' then
+				
 			else
 				if LAST_CYCLE = '1' then
 					GotInterrupt <= IrqActive;
@@ -446,63 +428,6 @@ begin
 				end if;
 			end if;
 		end if;
-	end process;
-
-	
-	--debug
-	process(CLK, RST_N)
-	begin
-		if RST_N = '0' then
-			BRK_OUT <= '0';
-			DBG_RUN_LAST <= '0';
-		elsif rising_edge(CLK) then
-			if EN = '1' then
-				BRK_OUT <= '0';
-				if DBG_CTRL(0) = '1' and LAST_CYCLE = '1' then	--step
-					BRK_OUT <= '1';
-				elsif DBG_CTRL(2) = '1' and LAST_CYCLE = '1' and DBG_BRK_ADDR = DBG_NEXT_PC then	--opcode address break
-					BRK_OUT <= '1';
-				end if;
-			end if;
-			
-			DBG_RUN_LAST <= DBG_CTRL(7);
-			if DBG_CTRL(7) = '1' and DBG_RUN_LAST = '0' then
-				BRK_OUT <= '0';
-			end if;
-		end if;
-	end process;
-	
-	
-	process(RST_N, CLK, DBG_REG, A, X, Y, PC, PSW, SP, AX)
-	begin
-		case DBG_REG is
-			when x"00" => DBG_DAT_OUT <= A;
-			when x"01" => DBG_DAT_OUT <= X;
-			when x"02" => DBG_DAT_OUT <= Y;
-			when x"03" => DBG_DAT_OUT <= PC(7 downto 0);
-			when x"04" => DBG_DAT_OUT <= PC(15 downto 8);
-			when x"05" => DBG_DAT_OUT <= PSW;
-			when x"06" => DBG_DAT_OUT <= SP;
-			when x"07" => DBG_DAT_OUT <= AX(7 downto 0);
-			when x"08" => DBG_DAT_OUT <= AX(15 downto 8);
-			when others => DBG_DAT_OUT <= x"00";
-		end case; 
-
-		if RST_N = '0' then
-			DBG_DAT_WRr <= (others=>'0');
-		elsif rising_edge(CLK) then
-			DBG_DAT_WRr <= DBG_DAT_WRr(2 downto 0) & DBG_DAT_WR;
-			if DBG_DAT_WRr = "0001" then
-				case DBG_REG is
-					when x"80" => DBG_BRK_ADDR(7 downto 0) <= DBG_DAT_IN;
-					when x"81" => DBG_BRK_ADDR(15 downto 8) <= DBG_DAT_IN;
-					when x"82" => null;
-					when x"83" => DBG_CTRL <= DBG_DAT_IN;
-					when others => null;
-				end case;
-			end if;
-		end if;
-
 	end process;
 	
 end rtl;

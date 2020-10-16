@@ -31,10 +31,9 @@ entity DSP is
 		BCK			: out std_logic;
 		SDAT			: out std_logic;
 		
-		DBG_REG     : in std_logic_vector(7 downto 0);
-		DBG_DAT_IN  : in std_logic_vector(7 downto 0);
-		DBG_DAT_OUT : out std_logic_vector(7 downto 0);
-		DBG_DAT_WR 	: in std_logic;
+		IO_ADDR     : in std_logic_vector(16 downto 0);
+		IO_DAT  		: in std_logic_vector(15 downto 0);
+		IO_WR 		: in std_logic;
 
 		AUDIO_L		: out std_logic_vector(15 downto 0);
 		AUDIO_R		: out std_logic_vector(15 downto 0);
@@ -210,9 +209,14 @@ architecture rtl of DSP is
 	signal RAM_CE 			: std_logic;
 	
 	--debug
-	signal DBG_ADDR		: std_logic_vector(15 downto 0);
-	signal DBG_DAT_WRr	: std_logic;
 	signal DBG_VMUTE 		: std_logic_vector(7 downto 0) := (others => '0');
+	signal IO_REG_DAT		: std_logic_vector(7 downto 0);
+	signal IO_REG_WR 		: std_logic_vector(1 downto 0) := (others => '0');
+	signal REG4C			: std_logic_vector(7 downto 0);
+	signal REG5D			: std_logic_vector(7 downto 0);
+	signal REG6C			: std_logic_vector(7 downto 0);
+	signal REG6D			: std_logic_vector(7 downto 0);
+	signal REG_SET 		: std_logic;
 
 begin
 	
@@ -252,18 +256,18 @@ begin
 	SUBSTEP <= to_integer(SUBSTEP_CNT);
 	
 	
-	REGS_ADDR_WR <= DBG_REG(6 downto 0) when ENABLE = '0' else 
+	REGS_ADDR_WR <= IO_ADDR(6 downto 1)&IO_REG_WR(1) when IO_REG_WR /= "00" else 
 						 REGN_WR;
-	REGS_ADDR_RD <= DBG_REG(6 downto 0) when ENABLE = '0' else REGN_RD;					
-	REGS_DI <= DBG_DAT_IN   when ENABLE = '0' else 
+	REGS_ADDR_RD <= REGN_RD;					
+	REGS_DI <= IO_REG_DAT   when IO_REG_WR /= "00" else 
 				  SMP_DO 	   when SUBSTEP = 3 else
 				  ENVX_OUT     when REGN_WR(3 downto 0) = x"8" else 
 				  OUTX_OUT     when REGN_WR(3 downto 0) = x"9" else
 				  SMP_DO;
 						
-	REGS_WE <= DBG_DAT_WR when ENABLE = '0' and DBG_REG(7) = '0' else
-				  '1' 		 when SMP_WE = '0' and SMP_A = x"00F3" and SUBSTEP = 3 and CE = '1' else
-				  '1' 		 when REGN_WR(3 downto 1) = "100" and SUBSTEP = 0 and CE = '1' else
+	REGS_WE <= '1' when IO_REG_WR /= "00" and IO_ADDR(16 downto 7) = "0"&x"01"&"0" else
+				  '1' when SMP_WE = '0' and SMP_A = x"00F3" and SUBSTEP = 3 and CE = '1' else
+				  '1' when REGN_WR(3 downto 1) = "100" and SUBSTEP = 0 and CE = '1' else
 				  '0';
 	
 	REGRAM : entity work.dpram generic map(7,8)
@@ -332,127 +336,114 @@ begin
 	INS <= IS_TBL(STEP,SUBSTEP);
 	
 	process(CLK, RST_N, RS, BRR_VOICE, STEP, SMP_A, SMP_WE, SMP_DO, KON_CNT, TDIR_ADDR, BRR_ADDR, BRR_OFFS,
-			  ECHO_WR_EN, ECHO_ADDR, EOUT, ENABLE, DBG_ADDR, DBG_REG, DBG_DAT_IN, DBG_DAT_WR)
+			  ECHO_WR_EN, ECHO_ADDR, EOUT, ENABLE, IO_ADDR, IO_REG_DAT, IO_REG_WR)
 		variable ADDR_INC : unsigned(1 downto 0);
 		variable LR: integer range 0 to 1;
 	begin
 		RAM_DO <= x"00";
-		if ENABLE = '0' then
-			RAM_A <= DBG_ADDR;
-			RAM_DO <= DBG_DAT_IN;
-			RAM_WE <= DBG_DAT_WR;
-			RAM_OE <= not DBG_DAT_WR;
-			if DBG_REG = x"80" then
-				RAM_CE <= '1';
-			else
-				RAM_CE <= '0';
-			end if;
-		else
-			case RS is
-				when RS_SRCNL =>
-					if KON_CNT(BRR_VOICE) = 0 then
-						ADDR_INC := "10";
-					else
-						ADDR_INC := "00";
-					end if;
-					
-					RAM_A <= std_logic_vector(unsigned(TDIR_ADDR) + ADDR_INC + 0);
-					RAM_WE <= '0';
-					RAM_OE <= '1';
-					RAM_CE <= '1';
-					
-				when RS_SRCNH =>
-					if KON_CNT(BRR_VOICE) = 0 then
-						ADDR_INC := "10";
-					else
-						ADDR_INC := "00";
-					end if;
-					
-					RAM_A <= std_logic_vector(unsigned(TDIR_ADDR) + ADDR_INC + 1);
-					RAM_WE <= '0';
-					RAM_OE <= '1';
-					RAM_CE <= '1';
-					
-				when RS_BRRH =>
-					RAM_A <= std_logic_vector(unsigned(BRR_ADDR(BRR_VOICE)));
-					RAM_WE <= '0';
-					RAM_OE <= '1';
-					RAM_CE <= '1';
-					
-				when RS_BRR1 =>
-					RAM_A <= std_logic_vector(unsigned(BRR_ADDR(BRR_VOICE)) + BRR_OFFS(BRR_VOICE) + 1);
-					RAM_WE <= '0';
-					RAM_OE <= '1';
-					RAM_CE <= '1';
-					
-				when RS_BRR2 =>
-					RAM_A <= std_logic_vector(unsigned(BRR_ADDR(BRR_VOICE)) + BRR_OFFS(BRR_VOICE) + 2);
-					RAM_WE <= '0';
-					RAM_OE <= '1';
-					RAM_CE <= '1';
+		case RS is
+			when RS_SRCNL =>
+				if KON_CNT(BRR_VOICE) = 0 then
+					ADDR_INC := "10";
+				else
+					ADDR_INC := "00";
+				end if;
 				
-				when RS_ECHORDL | RS_ECHORDH =>
-					if STEP = 22 then
-						ADDR_INC := "00";
-					else
-						ADDR_INC := "10";
-					end if;
-					
-					if RS = RS_ECHORDL then
-						RAM_A <= std_logic_vector(ECHO_ADDR + ADDR_INC + 0);
-					else
-						RAM_A <= std_logic_vector(ECHO_ADDR + ADDR_INC + 1);
-					end if;
-					RAM_WE <= '0';
-					RAM_OE <= '1';
+				RAM_A <= std_logic_vector(unsigned(TDIR_ADDR) + ADDR_INC + 0);
+				RAM_WE <= '0';
+				RAM_OE <= '1';
+				RAM_CE <= '1';
+				
+			when RS_SRCNH =>
+				if KON_CNT(BRR_VOICE) = 0 then
+					ADDR_INC := "10";
+				else
+					ADDR_INC := "00";
+				end if;
+				
+				RAM_A <= std_logic_vector(unsigned(TDIR_ADDR) + ADDR_INC + 1);
+				RAM_WE <= '0';
+				RAM_OE <= '1';
+				RAM_CE <= '1';
+				
+			when RS_BRRH =>
+				RAM_A <= std_logic_vector(unsigned(BRR_ADDR(BRR_VOICE)));
+				RAM_WE <= '0';
+				RAM_OE <= '1';
+				RAM_CE <= '1';
+				
+			when RS_BRR1 =>
+				RAM_A <= std_logic_vector(unsigned(BRR_ADDR(BRR_VOICE)) + BRR_OFFS(BRR_VOICE) + 1);
+				RAM_WE <= '0';
+				RAM_OE <= '1';
+				RAM_CE <= '1';
+				
+			when RS_BRR2 =>
+				RAM_A <= std_logic_vector(unsigned(BRR_ADDR(BRR_VOICE)) + BRR_OFFS(BRR_VOICE) + 2);
+				RAM_WE <= '0';
+				RAM_OE <= '1';
+				RAM_CE <= '1';
+			
+			when RS_ECHORDL | RS_ECHORDH =>
+				if STEP = 22 then
+					ADDR_INC := "00";
+				else
+					ADDR_INC := "10";
+				end if;
+				
+				if RS = RS_ECHORDL then
+					RAM_A <= std_logic_vector(ECHO_ADDR + ADDR_INC + 0);
+				else
+					RAM_A <= std_logic_vector(ECHO_ADDR + ADDR_INC + 1);
+				end if;
+				RAM_WE <= '0';
+				RAM_OE <= '1';
+				RAM_CE <= '1';
+				
+			when RS_ECHOWRL | RS_ECHOWRH =>
+				if STEP = 29 then
+					ADDR_INC := "00";
+					LR := 0;
+				else
+					ADDR_INC := "10";
+					LR := 1;
+				end if;
+				
+				if RS = RS_ECHOWRL then
+					RAM_A <= std_logic_vector(ECHO_ADDR + ADDR_INC + 0);
+					RAM_DO <= std_logic_vector(EOUT(LR)(7 downto 0));
+				else
+					RAM_A <= std_logic_vector(ECHO_ADDR + ADDR_INC + 1);
+					RAM_DO <= std_logic_vector(EOUT(LR)(15 downto 8));
+				end if;
+				
+				if ECHO_WR_EN = '1' then
 					RAM_CE <= '1';
-					
-				when RS_ECHOWRL | RS_ECHOWRH =>
-					if STEP = 29 then
-						ADDR_INC := "00";
-						LR := 0;
-					else
-						ADDR_INC := "10";
-						LR := 1;
-					end if;
-					
-					if RS = RS_ECHOWRL then
-						RAM_A <= std_logic_vector(ECHO_ADDR + ADDR_INC + 0);
-						RAM_DO <= std_logic_vector(EOUT(LR)(7 downto 0));
-					else
-						RAM_A <= std_logic_vector(ECHO_ADDR + ADDR_INC + 1);
-						RAM_DO <= std_logic_vector(EOUT(LR)(15 downto 8));
-					end if;
-	
-					
-					if ECHO_WR_EN = '1' then
-						RAM_CE <= '1';
-						RAM_OE <= '0';
-						RAM_WE <= '1';
-					else
-						RAM_CE <= '0';
-						RAM_OE <= '0';
-						RAM_WE <= '0';
-					end if;
-					
-				when RS_SMP =>
-					RAM_A <= SMP_A;
-					RAM_WE <= not SMP_WE;
-					RAM_OE <= SMP_WE;
-					RAM_DO <= SMP_DO;
-					if SMP_A(15 downto 4) = x"00F" then
-						RAM_CE <= '0';
-					else
-						RAM_CE <= '1';
-					end if;
-
-				when others =>
-					RAM_A <= (others => '0');
-					RAM_WE <= '0';
 					RAM_OE <= '0';
+					RAM_WE <= '1';
+				else
 					RAM_CE <= '0';
-			end case;
-		end if;
+					RAM_OE <= '0';
+					RAM_WE <= '0';
+				end if;
+				
+			when RS_SMP =>
+				RAM_A <= SMP_A;
+				RAM_WE <= not SMP_WE;
+				RAM_OE <= SMP_WE;
+				RAM_DO <= SMP_DO;
+				if SMP_A(15 downto 4) = x"00F" then
+					RAM_CE <= '0';
+				else
+					RAM_CE <= '1';
+				end if;
+
+			when others =>
+				RAM_A <= (others => '0');
+				RAM_WE <= '0';
+				RAM_OE <= '0';
+				RAM_CE <= '0';
+		end case;
 		
 		if RST_N = '0' then
 			BRR_NEXT_ADDR <= (others => '0');
@@ -671,20 +662,17 @@ begin
 			GS_STATE <= GS_IDLE;
 		elsif rising_edge(CLK) then
 			GTBL_DO <= GTBL(to_integer(GTBL_ADDR));
-			if ENABLE = '0' then 
-				if DBG_DAT_WR = '1' and DBG_REG(7) = '0' then 
-					if DBG_REG(6 downto 0) = "1101100" then		--5C FLG
-						RST_FLG <= DBG_DAT_IN(7);
-						MUTE_FLG <= DBG_DAT_IN(6);
-						ECEN_FLG <= DBG_DAT_IN(5);
-					elsif DBG_REG(6 downto 0) = "1001100" then	--4C KON
-						WKON <= DBG_DAT_IN;
-					elsif DBG_REG(6 downto 0) = "1011101" then	--5D DIR
-						TDIR <= DBG_DAT_IN;
-					elsif DBG_REG(6 downto 0) = "1101101" then	--6D ESA
-						TESA <= DBG_DAT_IN;
-					end if;
-				end if;
+			if REG_SET = '1' then 
+				--6C FLG
+				RST_FLG <= REG6C(7);
+				MUTE_FLG <= REG6C(6);
+				ECEN_FLG <= REG6C(5);
+				--4C KON
+				WKON <= REG4C;
+				--5D DIR
+				TDIR <= REG5D;
+				--6D ESA
+				TESA <= REG6D;
 			elsif CE = '1' then 
 				if SMP_EN_INT = '1' and SMP_A = x"00F3" and SMP_WE = '0' then
 					if RI(6 downto 0) = "1001100" then		--KON
@@ -1102,32 +1090,28 @@ begin
 	SDAT <= OUTPUT(31);
 	
 	
-	--debug
-	process( CLK, RST_N, DBG_ADDR, DBG_REG, REGS_DO, RAM_DI )
+	--spc mode
+	process( CLK )
 	begin
-		if DBG_REG(7) = '0' then
-			DBG_DAT_OUT <= REGS_DO;
-		else
-			case DBG_REG is
-				when x"80" => DBG_DAT_OUT <= RAM_DI;
-				when x"81" => DBG_DAT_OUT <= DBG_ADDR(7 downto 0);
-				when x"82" => DBG_DAT_OUT <= DBG_ADDR(15 downto 8);
-				when others => DBG_DAT_OUT <= x"55";
-			end case;
-		end if;
+		if rising_edge(CLK) then
+			IO_REG_WR <= IO_REG_WR(0)&IO_WR;
+			if IO_WR = '1' then
+				IO_REG_DAT <= IO_DAT(7 downto 0);
+			else
+				IO_REG_DAT <= IO_DAT(15 downto 8);
+			end if;
 			
-		if RST_N = '0' then
-			DBG_ADDR <= (others => '0');
-			DBG_DAT_WRr <= '0';
-		elsif rising_edge(CLK) then
-			DBG_DAT_WRr <= DBG_DAT_WR;
-			if DBG_DAT_WR = '1' and DBG_DAT_WRr = '0' then
-				case DBG_REG is
-					when x"81" => DBG_ADDR(7 downto 0) <= DBG_DAT_IN;
-					when x"82" => DBG_ADDR(15 downto 8) <= DBG_DAT_IN;
-					when x"83" => DBG_VMUTE <= DBG_DAT_IN;
+			if IO_WR = '1' and IO_ADDR(16 downto 8) = "0"&x"01" then
+				case IO_ADDR(7 downto 0) is
+					when x"4C" => REG4C <= IO_DAT(7 downto 0);
+					when x"5C" => REG5D <= IO_DAT(15 downto 8);
+					when x"6C" => REG6C <= IO_DAT(7 downto 0);
+					              REG6D <= IO_DAT(15 downto 8);
 					when others => null;
 				end case;
+				REG_SET <= '1';
+			elsif RST_N = '1' and REG_SET = '1' then
+				REG_SET <= '0';
 			end if;
 		end if;
 	end process;

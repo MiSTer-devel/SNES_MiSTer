@@ -22,11 +22,8 @@ entity SPC700_AddrGen is
         AX				: out std_logic_vector(15 downto 0);
 		  ALCarry		: out std_logic;
 		  
-		  DBG_REG		: in std_logic_vector(7 downto 0);
-		  DBG_DAT_IN	: in std_logic_vector(7 downto 0);
-		  DBG_DAT_WR	: in std_logic;
-		  
-		  DBG_NEXT_PC	: out std_logic_vector(15 downto 0)
+		  REG_DAT		: in std_logic_vector(15 downto 0);
+		  REG_SET		: in std_logic
     );
 end SPC700_AddrGen;
 
@@ -85,22 +82,16 @@ begin
 			PCr <= (others=>'0');
 			DR <= (others=>'0');
 		elsif rising_edge(CLK) then 
-			if EN = '0' then
-				if DBG_DAT_WR = '1' then
-					case DBG_REG is
-						when x"03" => PCr(7 downto 0) <= DBG_DAT_IN;
-						when x"04" => PCr(15 downto 8) <= DBG_DAT_IN;
-						when others => null;
-					end case;
-				end if;
+			if REG_SET = '1' then
+				PCr <= REG_DAT;
+			elsif EN = '0' then
+				
 			else
 				DR <= D_IN;
 				PCr <= NextPC;
 			end if;
 		end if;
 	end process;
-	
-	DBG_NEXT_PC <= NextPC;
 	
 
 	process(MuxCtrl, AL, X, Y, DR)

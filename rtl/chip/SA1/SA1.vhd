@@ -33,13 +33,7 @@ entity SA1 is
 		BWRAM_OE_N	: out std_logic;
 		BWRAM_WE_N	: out std_logic;
 		
-		IRQ_N			: out std_logic;
-				
-		BRK_OUT 		: out std_logic;
-		DBG_REG		: in std_logic_vector(7 downto 0);
-		DBG_DAT_IN	: in std_logic_vector(7 downto 0);
-		DBG_DAT_OUT	: out std_logic_vector(7 downto 0);
-		DBG_DAT_WR	: in std_logic
+		IRQ_N			: out std_logic
 	);
 end SA1;
 
@@ -209,11 +203,11 @@ signal BMAPS					: std_logic_vector(7 downto 0);
 signal BMAP						: std_logic_vector(6 downto 0);
 signal SBW46					: std_logic;
 signal BBF						: std_logic;
-signal SBWE						: std_logic_vector(7 downto 0);
-signal CBWE						: std_logic_vector(7 downto 0);
-signal BWPA						: std_logic_vector(7 downto 0);
-signal SIWP						: std_logic_vector(7 downto 0);
-signal CIWP						: std_logic_vector(7 downto 0);
+--signal SBWE						: std_logic_vector(7 downto 0);
+--signal CBWE						: std_logic_vector(7 downto 0);
+--signal BWPA						: std_logic_vector(7 downto 0);
+--signal SIWP						: std_logic_vector(7 downto 0);
+--signal CIWP						: std_logic_vector(7 downto 0);
 signal DMASD					: std_logic_vector(1 downto 0);
 signal DMADD					: std_logic;
 signal CDSEL					: std_logic;
@@ -222,7 +216,7 @@ signal DPRIO					: std_logic;
 signal DMAEN					: std_logic;
 signal CDMACB					: std_logic_vector(1 downto 0);
 signal CDMASIZE				: std_logic_vector(2 downto 0);
-signal CDMAEND					: std_logic;
+--signal CDMAEND					: std_logic;
 signal SDA						: std_logic_vector(23 downto 0);
 signal DDA						: std_logic_vector(17 downto 0);
 signal DTC						: std_logic_vector(15 downto 0);
@@ -248,12 +242,6 @@ signal IRAM_A					: std_logic_vector(10 downto 0);
 signal IRAM_DI					: std_logic_vector(7 downto 0);
 signal IRAM_DO					: std_logic_vector(7 downto 0);
 signal IRAM_WE					: std_logic;
-
---debug
-signal DBG_DAT_WRr			: std_logic;
-signal DBG_BWRAM_ADDR		: std_logic_vector(17 downto 0);
-signal DBG_IRAM_ADDR			: std_logic_vector(10 downto 0);
-signal P65_DBG_DAT_OUT		: std_logic_vector(7 downto 0);
 
 begin
 
@@ -311,13 +299,7 @@ port map (
 	ABORT_N		=> '1',
 	VPA      	=> P65_VPA,
 	VDA      	=> P65_VDA,
-	VPB      	=> P65_VPB,
-	
-	BRK_OUT     => P65_BRK,
-	DBG_REG     => DBG_REG,
-	DBG_DAT_IN  => DBG_DAT_IN,
-	DBG_DAT_OUT	=> P65_DBG_DAT_OUT,
-	DBG_DAT_WR	=> DBG_DAT_WR
+	VPB      	=> P65_VPB
 ); 
 
 P65_WR <= not P65_R_WN and (P65_VPA or P65_VDA);
@@ -574,8 +556,7 @@ begin
 	end if;
 end process;
 
-BWRAM_A <= DBG_BWRAM_ADDR						when ENABLE = '0' else 
-			  CC1_BWRAM_RD_ADDR					when CCDMA_SRC_BWRAM_SEL = '1' else 
+BWRAM_A <= CC1_BWRAM_RD_ADDR					when CCDMA_SRC_BWRAM_SEL = '1' else 
 			  SNES_BWRAM_MAP_A					when SNES_BWRAM_SEL = '1' else 
 			  SDA(17 downto 0)					when DMA_SRC_BWRAM_SEL = '1' and DMA_BWRAM_WAIT = '0' else 
 			  DDA(17 downto 0)					when DMA_DST_BWRAM_SEL = '1' and DMA_BWRAM_WAIT = '0' else 
@@ -601,8 +582,7 @@ BWRAM_OE_N <= '0'									when ENABLE = '0' else
 				  '1';
 
 --IRAM
-IRAM_A <= DBG_IRAM_ADDR							when ENABLE = '0' else 
-			 SNES_A(10 downto 0)					when SNES_IRAM_SEL = '1' and SNES_IRAM_ACCESS = '1' else 
+IRAM_A <= SNES_A(10 downto 0)					when SNES_IRAM_SEL = '1' and SNES_IRAM_ACCESS = '1' else 
 			 CC1_IRAM_RD_ADDR						when SNES_IRAM_SEL = '1' and SNES_CCDMA_IRAM_ACCESS = '1' else 
 			 SDA(10 downto 0)						when DMA_SRC_IRAM_SEL = '1' and DMA_IRAM_WAIT = '0' else 
 			 DDA(10 downto 0)						when DMA_DST_IRAM_SEL = '1' and DMA_IRAM_WAIT = '0' else 
@@ -711,7 +691,7 @@ begin
 		DMAEN <= '0';
 		CDMACB <= (others => '0');
 		CDMASIZE <= (others => '0');
-		CDMAEND <= '0';
+--		CDMAEND <= '0';
 		SDA <= (others => '0');
 		DDA <= (others => '0');
 		DTC <= (others => '0');
@@ -744,7 +724,7 @@ begin
 					when x"31" =>							--CDMA
 						CDMACB <= SNES_DI(1 downto 0);
 						CDMASIZE <= SNES_DI(4 downto 2);
-						CDMAEND <= SNES_DI(7);
+--						CDMAEND <= SNES_DI(7);
 						if SNES_DI(7) = '1' then
 							CC1DMA_EXEC <= '0';
 							CCDMA_RW <= '0';
@@ -801,7 +781,7 @@ begin
 					when x"31" =>							--CDMA
 						CDMACB <= P65_DO(1 downto 0);
 						CDMASIZE <= P65_DO(4 downto 2);
-						CDMAEND <= P65_DO(7);
+--						CDMAEND <= P65_DO(7);
 						if P65_DO(7) = '1' then
 							CC1DMA_EXEC <= '0';
 							CCDMA_RW <= '0';
@@ -1086,7 +1066,7 @@ begin
 		VCNT <= (others => '0');
 		BMAP <= (others => '0');
 		SBW46 <= '0';
-		CIWP <= (others => '0');
+--		CIWP <= (others => '0');
 		SNV <= (others => '0');
 		SIV <= (others => '0');
 		CXB <= "000";
@@ -1099,10 +1079,10 @@ begin
 		FBMAP <= '0';
 		BMAPS <= (others => '0');
 		BBF <= '0';
-		SBWE <= (others => '0');
-		CBWE <= (others => '0');
-		BWPA <= (others => '0');
-		SIWP <= (others => '0');
+--		SBWE <= (others => '0');
+--		CBWE <= (others => '0');
+--		BWPA <= (others => '0');
+--		SIWP <= (others => '0');
 		AM <= (others => '0');
 		MOF <= '0';
 		MA <= (others => '0');
@@ -1172,12 +1152,12 @@ begin
 						FBMAP <= SNES_DI(7);
 					when x"24" =>						--BMAPS
 						BMAPS <= SNES_DI;
-					when x"26" =>						--SBWE
-						SBWE <= SNES_DI;
-					when x"28" =>						--BWPA
-						BWPA <= SNES_DI;
-					when x"29" =>						--SIWP
-						SIWP <= SNES_DI;
+--					when x"26" =>						--SBWE
+--						SBWE <= SNES_DI;
+--					when x"28" =>						--BWPA
+--						BWPA <= SNES_DI;
+--					when x"29" =>						--SIWP
+--						SIWP <= SNES_DI;
 						
 					--it's contrary to the documentation, but some SMW hacks write inerrupt vectors here!
 					when x"0C" =>						--SNV
@@ -1275,10 +1255,10 @@ begin
 					when x"25" =>						--BMAP
 						BMAP <= P65_DO(6 downto 0) ;
 						SBW46 <= P65_DO(7);
-					when x"27" =>						--CBWE
-						CBWE <= P65_DO;
-					when x"2A" =>						--CIWP
-						CIWP <= P65_DO;
+--					when x"27" =>						--CBWE
+--						CBWE <= P65_DO;
+--					when x"2A" =>						--CIWP
+--						CIWP <= P65_DO;
 					when x"3F" =>						--BBF
 						BBF <= P65_DO(7);
 					when x"50" =>						--MCNT
@@ -1429,95 +1409,5 @@ begin
 		end if;
 	end if;
 end process;
-
-
---debug
-process( CLK, RST_N, DBG_REG, P65_DBG_DAT_OUT, SMSG, SA1RST, SA1WAIT, SNES_IRQ_EN, CDMA_IRQ_EN, CRV, CNV, CIV, CMSG, NMISEL, IRQSEL, SA1_IRQ_EN, TM_IRQ_EN, DMA_IRQ_EN, SA1_NMI_EN, SNV, SIV, 
-			HVEN, TMMODE, HCNT, VCNT, CXB, CBMAP, DXB, DBMAP, EXB, EBMAP, FXB, FBMAP, BMAPS, BMAP, SBW46, SBWE, CBWE, BWPA, SIWP, CIWP, 
-			DMASD, DMADD, CDEN, DPRIO, DMAEN, CDMACB, CDMASIZE, CDMAEND, SDA, DDA, DTC, H_CNT, V_CNT, BWRAM_DI, IRAM_DO )
-begin
-	if DBG_REG < x"C0" then
-		DBG_DAT_OUT <= P65_DBG_DAT_OUT;
-	else
-		case DBG_REG is
-			when x"C0" => DBG_DAT_OUT <= "0" & SA1WAIT & SA1RST & "0" & SMSG;
-			when x"C1" => DBG_DAT_OUT <= SNES_IRQ_EN & "0" & CDMA_IRQ_EN & "00000";
-			when x"C2" => DBG_DAT_OUT <= x"00";
-			when x"C3" => DBG_DAT_OUT <= CRV(7 downto 0);
-			when x"C4" => DBG_DAT_OUT <= CRV(15 downto 8);
-			when x"C5" => DBG_DAT_OUT <= CNV(7 downto 0);
-			when x"C6" => DBG_DAT_OUT <= CNV(15 downto 8);
-			when x"C7" => DBG_DAT_OUT <= CIV(7 downto 0);
-			when x"C8" => DBG_DAT_OUT <= CIV(15 downto 8);
-			when x"C9" => DBG_DAT_OUT <= "0" & IRQSEL & "0" & NMISEL & CMSG;
-			when x"CA" => DBG_DAT_OUT <= SA1_IRQ_EN & TM_IRQ_EN & DMA_IRQ_EN & SA1_NMI_EN & "0000";
-			when x"CB" => DBG_DAT_OUT <= x"00";
-			when x"CC" => DBG_DAT_OUT <= SNV(7 downto 0);
-			when x"CD" => DBG_DAT_OUT <= SNV(15 downto 8);
-			when x"CE" => DBG_DAT_OUT <= SIV(7 downto 0);
-			when x"CF" => DBG_DAT_OUT <= SIV(15 downto 8);
-			when x"D0" => DBG_DAT_OUT <= TMMODE & "00000" & HVEN;
-			when x"D1" => DBG_DAT_OUT <= HCNT(7 downto 0);
-			when x"D2" => DBG_DAT_OUT <= "0000000" & HCNT(8);
-			when x"D3" => DBG_DAT_OUT <= VCNT(7 downto 0);
-			when x"D4" => DBG_DAT_OUT <= "0000000" & VCNT(8);
-			when x"D5" => DBG_DAT_OUT <= CBMAP & "0000" & CXB;
-			when x"D6" => DBG_DAT_OUT <= DBMAP & "0000" & DXB;
-			when x"D7" => DBG_DAT_OUT <= EBMAP & "0000" & EXB;
-			when x"D8" => DBG_DAT_OUT <= FBMAP & "0000" & FXB;
-			when x"D9" => DBG_DAT_OUT <= BMAPS;
-			when x"DA" => DBG_DAT_OUT <= SBW46 & BMAP;
-			when x"DB" => DBG_DAT_OUT <= SBWE;
-			when x"DC" => DBG_DAT_OUT <= CBWE;
-			when x"DD" => DBG_DAT_OUT <= BWPA;
-			when x"DE" => DBG_DAT_OUT <= SIWP;
-			when x"DF" => DBG_DAT_OUT <= CIWP;
-			when x"E0" => DBG_DAT_OUT <= DMAEN & DPRIO & CDEN & "0" & "0" & DMADD & DMASD;
-			when x"E1" => DBG_DAT_OUT <= CDMAEND & "00" & CDMASIZE & CDMACB;
-			when x"E2" => DBG_DAT_OUT <= SDA(7 downto 0);
-			when x"E3" => DBG_DAT_OUT <= SDA(15 downto 8);
-			when x"E4" => DBG_DAT_OUT <= SDA(23 downto 16);
-			when x"E5" => DBG_DAT_OUT <= x"00";
-			when x"E6" => DBG_DAT_OUT <= DDA(7 downto 0);
-			when x"E7" => DBG_DAT_OUT <= DDA(15 downto 8);
-			when x"E8" => DBG_DAT_OUT <= "000000" & DDA(17 downto 16);
-			when x"E9" => DBG_DAT_OUT <= x"00";
-			when x"EA" => DBG_DAT_OUT <= DTC(7 downto 0);
-			when x"EB" => DBG_DAT_OUT <= DTC(15 downto 8);
-			when x"EC" => DBG_DAT_OUT <= x"00";
-			when x"ED" => DBG_DAT_OUT <= x"00";
-			when x"EE" => DBG_DAT_OUT <= x"00";
-			when x"EF" => DBG_DAT_OUT <= x"00";
-			when x"F0" => DBG_DAT_OUT <= std_logic_vector(H_CNT(7 downto 0));
-			when x"F1" => DBG_DAT_OUT <= "0000000" & H_CNT(8);
-			when x"F2" => DBG_DAT_OUT <= std_logic_vector(V_CNT(7 downto 0));
-			when x"F3" => DBG_DAT_OUT <= "0000000" & V_CNT(8);
-			
-			when x"FE" => DBG_DAT_OUT <= BWRAM_DI;
-			when x"FF" => DBG_DAT_OUT <= IRAM_DO;
-			when others => DBG_DAT_OUT <= x"00";
-		end case;
-	end if;
-	
-	if RST_N = '0' then
-		DBG_DAT_WRr <= '0';
-		DBG_BWRAM_ADDR <= (others => '0');
-		DBG_IRAM_ADDR <= (others => '0');
-	elsif rising_edge(CLK) then
-		DBG_DAT_WRr <= DBG_DAT_WR;
-		if DBG_DAT_WR = '1' and DBG_DAT_WRr = '0' then
-			case DBG_REG is
-				when x"F8" => DBG_BWRAM_ADDR(7 downto 0) <= DBG_DAT_IN;
-				when x"F9" => DBG_BWRAM_ADDR(15 downto 8) <= DBG_DAT_IN;
-				when x"FA" => DBG_BWRAM_ADDR(17 downto 16) <= DBG_DAT_IN(1 downto 0);
-				when x"FB" => DBG_IRAM_ADDR(7 downto 0) <= DBG_DAT_IN;
-				when x"FC" => DBG_IRAM_ADDR(10 downto 8) <= DBG_DAT_IN(2 downto 0);
-				when others => null;
-			end case;
-		end if;
-	end if;
-end process;
-
-BRK_OUT <= P65_BRK;
 	
 end rtl;

@@ -20,13 +20,7 @@ entity DSPn is
 		DP_SEL      : in std_logic;
 
 		VER			: in std_logic_vector(2 downto 0); -- 00-DSP1, 01-DSP2, 10-DSP3, 11-DSP4
-		REV			: in std_logic;                    --  1-DSP1B
-		
-		BRK_OUT		: out std_logic;
-		DBG_REG		: in std_logic_vector(7 downto 0);
-		DBG_DAT_IN	: in std_logic_vector(7 downto 0);
-		DBG_DAT_OUT	: out std_logic_vector(7 downto 0);
-		DBG_DAT_WR	: in std_logic
+		REV			: in std_logic                     --  1-DSP1B
 	);
 end DSPn;
 
@@ -552,82 +546,6 @@ begin
 				end if;
 			else
 				DO <= DR(7 downto 0);
-			end if;
-		end if;
-	end process;
-
-
-	--Debug
-	process(CLK, RST_N)
-	begin
-		if RST_N = '0' then
-			BRK_OUT <= '0';
-			DBG_RUN_LAST <= '0';
-		elsif rising_edge(CLK) then
-			if EN = '1' then
-				BRK_OUT <= '0';
-				if DBG_CTRL(0) = '1' then	--step
-					BRK_OUT <= '1';
-				elsif DBG_CTRL(2) = '1' and DBG_BRK_ADDR = PC then	--opcode address break
-					BRK_OUT <= '1';
-				end if;
-			end if;
-			
-			DBG_RUN_LAST <= DBG_CTRL(7);
-			if DBG_CTRL(7) = '1' and DBG_RUN_LAST = '0' then
-				BRK_OUT <= '0';
-			end if;
-		end if;
-	end process; 
-	
-	process( RST_N, CLK, DBG_REG, ACC, FLAGS, PC, RP, DP, TR, TRB, K, L, M, N, DR, SR, SP, IDB )
-	begin
-			case DBG_REG is
-				when x"00" => DBG_DAT_OUT <= ACC(ACC_A)(7 downto 0);
-				when x"01" => DBG_DAT_OUT <= ACC(ACC_A)(15 downto 8);
-				when x"02" => DBG_DAT_OUT <= ACC(ACC_B)(7 downto 0);
-				when x"03" => DBG_DAT_OUT <= ACC(ACC_B)(15 downto 8);
-				when x"04" => DBG_DAT_OUT <= "00"&FLAGS(ACC_A);
-				when x"05" => DBG_DAT_OUT <= "00"&FLAGS(ACC_B);
-				when x"06" => DBG_DAT_OUT <= PC(7 downto 0);
-				when x"07" => DBG_DAT_OUT <= "00000"&PC(10 downto 8);
-				when x"08" => DBG_DAT_OUT <= RP(7 downto 0);
-				when x"09" => DBG_DAT_OUT <= "000000"&RP(9 downto 8);
-				when x"0A" => DBG_DAT_OUT <= DP(7 downto 0);
-				when x"0B" => DBG_DAT_OUT <= TR(7 downto 0);
-				when x"0C" => DBG_DAT_OUT <= TR(15 downto 8);
-				when x"0D" => DBG_DAT_OUT <= TRB(7 downto 0);
-				when x"0E" => DBG_DAT_OUT <= TRB(15 downto 8);
-				when x"0F" => DBG_DAT_OUT <= K(7 downto 0);
-				when x"10" => DBG_DAT_OUT <= K(15 downto 8);
-				when x"11" => DBG_DAT_OUT <= L(7 downto 0);
-				when x"12" => DBG_DAT_OUT <= L(15 downto 8);
-				when x"13" => DBG_DAT_OUT <= M(7 downto 0);
-				when x"14" => DBG_DAT_OUT <= M(15 downto 8);
-				when x"15" => DBG_DAT_OUT <= N(7 downto 0);
-				when x"16" => DBG_DAT_OUT <= N(15 downto 8);
-				when x"17" => DBG_DAT_OUT <= DR(7 downto 0);
-				when x"18" => DBG_DAT_OUT <= DR(15 downto 8);
-				when x"19" => DBG_DAT_OUT <= SR(7 downto 0);
-				when x"1A" => DBG_DAT_OUT <= SR(15 downto 8);
-				when x"1B" => DBG_DAT_OUT <= "00000" & std_logic_vector(SP);
-				when x"1C" => DBG_DAT_OUT <= IDB(7 downto 0);
-				when x"1D" => DBG_DAT_OUT <= IDB(15 downto 8);
-				when others => DBG_DAT_OUT <= x"00";
-			end case;
-			
-		if RST_N = '0' then
-			DBG_DAT_WRr <= '0';
-		elsif rising_edge(CLK) then
-			DBG_DAT_WRr <= DBG_DAT_WR;
-			if DBG_DAT_WR = '1' and DBG_DAT_WRr = '0' then
-				case DBG_REG is
-					when x"80" => DBG_BRK_ADDR(7 downto 0) <= DBG_DAT_IN;
-					when x"81" => DBG_BRK_ADDR(10 downto 8) <= DBG_DAT_IN(2 downto 0);
-					when x"82" => null;
-					when x"83" => DBG_CTRL <= DBG_DAT_IN;
-					when others => null;
-				end case;
 			end if;
 		end if;
 	end process;

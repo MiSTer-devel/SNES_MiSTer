@@ -32,15 +32,7 @@ entity CX4 is
 		
 		BUS_RD_N		: out std_logic;
 		
-		MAPPER		: in std_logic;
-		
-		BRK_OUT		: out std_logic;
-		DBG_REG		: in std_logic_vector(7 downto 0);
-		DBG_DAT_IN	: in std_logic_vector(7 downto 0);
-		DBG_DAT_OUT	: out std_logic_vector(7 downto 0);
-		DBG_DAT_WR	: in std_logic;
-		
-		DBG_IR 		: out std_logic_vector(15 downto 0)
+		MAPPER		: in std_logic
 	);
 end CX4;
 
@@ -157,14 +149,6 @@ architecture rtl of CX4 is
 	signal DATA_ROM_Q : std_logic_vector(23 downto 0);
 	
 	signal BUS_RD_CNT : unsigned(1 downto 0);
-	
-	--debug
-	signal DBG_RUN_LAST : std_logic;
-	signal DBG_DAT_WRr : std_logic;
-	signal DBG_BRK_ADDR : std_logic_vector(23 downto 0);
-	signal DBG_RAM_ADDR : std_logic_vector(11 downto 0);
-	signal DBG_CTRL : std_logic_vector(7 downto 0) := (others => '0');
-	
 	
 	impure function BitToInt (v : in std_logic) return integer is
         variable ret : integer range 0 to 1;
@@ -1271,7 +1255,7 @@ begin
 	);
 	
 	DATA_RAM_WE_A <= '1' when (CPU_EN = '1' and INST = I_WRRAM) or (EN = '1' and DMA_RUN = '1' and RAM_SEL = '1' and DMA_STATE = '1') else '0';
-	DATA_RAM_ADDR_B <= ADDR(11 downto 0) when ENABLE = '1' else DBG_RAM_ADDR;
+	DATA_RAM_ADDR_B <= ADDR(11 downto 0);
 	DATA_RAM_DI_B <= DI;
 	DATA_RAM_WE_B <= '1' when ENABLE = '1' and RAMIO_WR = '1' and CPU_RUN = '0' else '0';
 	DATA_RAM : entity work.dpram_difclk generic map(12, 8, 12, 8)
@@ -1313,99 +1297,5 @@ begin
 		rdaddress	=> CACHE_ADDR_RD,
 		q				=> CACHE_Q_H
 	);
-	
-	
-	--Debug
-	process(CLK, RST_N)
-	begin
-		if RST_N = '0' then
-			BRK_OUT <= '0';
-			DBG_RUN_LAST <= '0';
-		elsif rising_edge(CLK) then
-			if CPU_EN = '1' then
-				BRK_OUT <= '0';
-				if DBG_CTRL(0) = '1' then
-					BRK_OUT <= '1';
-				elsif DBG_CTRL(2) = '1' then
-					if (BANK = '0' and DBG_BRK_ADDR(22 downto 0) = CACHE_PAGE(0)(14 downto 0) & PC) or
-						(BANK = '1' and DBG_BRK_ADDR(22 downto 0) = CACHE_PAGE(1)(14 downto 0) & PC) then
-						BRK_OUT <= '1';
-					end if;
-				end if;
-			end if;
-			
-			DBG_RUN_LAST <= DBG_CTRL(7);
-			if DBG_CTRL(7) = '1' and DBG_RUN_LAST = '0' then
-				BRK_OUT <= '0';
-			end if;
-		end if;
-	end process; 
-	
-	process(CLK, RST_N, DBG_REG, A, PC, BANK, FLAGS, SP, ROMB, RAMB, MAR, MBR, DPR, P,  
-			  CACHE_PAGE, CACHE_BANK, IR, WS1, WS2, EN, CACHE_RUN, DMA_RUN, CPU_RUN, DATA_RAM_Q_B)
-	begin
-		case DBG_REG is
-			when x"00" => DBG_DAT_OUT <= A(7 downto 0);
-			when x"01" => DBG_DAT_OUT <= A(15 downto 8);
-			when x"02" => DBG_DAT_OUT <= A(23 downto 16);
-			when x"03" => DBG_DAT_OUT <= x"00";
-			when x"04" => DBG_DAT_OUT <= PC;
-			when x"05" => DBG_DAT_OUT <= "0000000" & BANK;
-			when x"06" => DBG_DAT_OUT <= "0000" & FLAGS;
-			when x"07" => DBG_DAT_OUT <= "00000" & std_logic_vector(SP);
-			when x"08" => DBG_DAT_OUT <= ROMB(7 downto 0);
-			when x"09" => DBG_DAT_OUT <= ROMB(15 downto 8);
-			when x"0A" => DBG_DAT_OUT <= ROMB(23 downto 16);
-			when x"0B" => DBG_DAT_OUT <= x"00";
-			when x"0C" => DBG_DAT_OUT <= RAMB(7 downto 0);
-			when x"0D" => DBG_DAT_OUT <= RAMB(15 downto 8);
-			when x"0E" => DBG_DAT_OUT <= RAMB(23 downto 16);
-			when x"0F" => DBG_DAT_OUT <= x"00";
-			when x"10" => DBG_DAT_OUT <= MAR(7 downto 0);
-			when x"11" => DBG_DAT_OUT <= MAR(15 downto 8);
-			when x"12" => DBG_DAT_OUT <= MAR(23 downto 16);
-			when x"13" => DBG_DAT_OUT <= x"00";
-			when x"14" => DBG_DAT_OUT <= MBR;
-			when x"15" => DBG_DAT_OUT <= DPR(7 downto 0);
-			when x"16" => DBG_DAT_OUT <= "0000" & DPR(11 downto 8);
-			when x"17" => DBG_DAT_OUT <= P(7 downto 0);
-			when x"18" => DBG_DAT_OUT <= "0" & P(14 downto 8);
-			when x"19" => DBG_DAT_OUT <= CACHE_PAGE(0)(7 downto 0);
-			when x"1A" => DBG_DAT_OUT <= CACHE_PAGE(0)(15 downto 8);
-			when x"1B" => DBG_DAT_OUT <= CACHE_PAGE(1)(7 downto 0);
-			when x"1C" => DBG_DAT_OUT <= CACHE_PAGE(1)(15 downto 8);
-			when x"1D" => DBG_DAT_OUT <= "0000000" & CACHE_BANK;
-			when x"1E" => DBG_DAT_OUT <= IR(7 downto 0);
-			when x"1F" => DBG_DAT_OUT <= IR(15 downto 8);
-			when x"20" => DBG_DAT_OUT <= "0" & WS1 & "0" & WS2;
-			when x"21" => DBG_DAT_OUT <= "0000" & EN & CACHE_RUN & DMA_RUN & CPU_RUN;
-			
-			when x"80" => DBG_DAT_OUT <= DATA_RAM_Q_B;
-			when others => DBG_DAT_OUT <= x"00";
-		end case; 
-			
-		if RST_N = '0' then
-			DBG_BRK_ADDR <= (others => '0');
-			DBG_RAM_ADDR <= (others => '0');
-			DBG_CTRL <= (others => '0');
-			DBG_DAT_WRr <= '0';
-		elsif rising_edge(CLK) then
-			DBG_DAT_WRr <= DBG_DAT_WR;
-			if DBG_DAT_WR = '1' and DBG_DAT_WRr = '0' then
-				case DBG_REG is
-					when x"80" => DBG_BRK_ADDR(7 downto 0) <= DBG_DAT_IN;
-					when x"81" => DBG_BRK_ADDR(15 downto 8) <= DBG_DAT_IN;
-					when x"82" => DBG_BRK_ADDR(23 downto 16) <= DBG_DAT_IN;
-					when x"83" => DBG_CTRL <= DBG_DAT_IN;
-					when x"84" => DBG_RAM_ADDR(7 downto 0) <= DBG_DAT_IN;
-					when x"85" => DBG_RAM_ADDR(11 downto 8) <= DBG_DAT_IN(3 downto 0);
-					when others => null;
-				end case; 
-			end if;
-		end if;
-		
-	end process;
-	
-	DBG_IR <= IR;
 	
 end rtl;

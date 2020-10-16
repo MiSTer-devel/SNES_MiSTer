@@ -47,13 +47,7 @@ entity SDD1Map is
 		MAP_ACTIVE  : out std_logic;
 		MAP_CTRL		: in std_logic_vector(7 downto 0);
 		ROM_MASK		: in std_logic_vector(23 downto 0);
-		BSRAM_MASK	: in std_logic_vector(23 downto 0);
-		
-		BRK_OUT		: out std_logic;
-		DBG_REG		: in std_logic_vector(7 downto 0) := (others => '0');
-		DBG_DAT_IN	: in std_logic_vector(7 downto 0) := (others => '0');
-		DBG_DAT_OUT	: out std_logic_vector(7 downto 0);
-		DBG_DAT_WR	: in std_logic := '0'
+		BSRAM_MASK	: in std_logic_vector(23 downto 0)
 	);
 end SDD1Map;
 
@@ -87,10 +81,7 @@ begin
 
 		ROM_A			=> SDD1_ROM_A,
 		ROM_DO		=> ROM_Q,
-		ROM_RD_N		=> ROM_OE_N,
-		
-		DBG_REG		=> DBG_REG,
-		DBG_DAT_OUT	=> DBG_DAT_OUT
+		ROM_RD_N		=> ROM_OE_N
 	);
 
 	ROM_ADDR <= SDD1_ROM_A(22 downto 0) and ROM_MASK(22 downto 0);
@@ -107,6 +98,5 @@ begin
 	DO <= BSRAM_Q when BSRAM_CS_N = '0' else SDD1_DO;
 
 	IRQ_N <= '1';
-	BRK_OUT <= '0';
 
 end rtl;

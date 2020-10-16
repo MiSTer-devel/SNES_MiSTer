@@ -52,14 +52,7 @@ entity SPPU is
 		HSYNC			: out std_logic;
 		VSYNC			: out std_logic;
 		HDE 			: out std_logic;
-		VDE 			: out std_logic;
-		
-		--debug
-		DBG_REG		: in std_logic_vector(7 downto 0);
-		DBG_DAT_OUT	: out std_logic_vector(7 downto 0);
-		DBG_DAT_IN	: in std_logic_vector(7 downto 0);
-		DBG_DAT_WR	: in std_logic;
-		DBG_BRK		: out std_logic
+		VDE 			: out std_logic
 	);
 end SPPU;
 
@@ -280,20 +273,6 @@ signal SUB_MATH_R			: unsigned(4 downto 0);
 signal SUB_MATH_G			: unsigned(4 downto 0);
 signal SUB_MATH_B			: unsigned(4 downto 0);
 signal HIRES 				: std_logic;
-
---debug
-signal DBG_VRAM_ADDR 	: std_logic_vector(16 downto 0);
-signal DBG_CGRAM_ADDR 	: std_logic_vector(7 downto 0);
-signal DBG_OAM_ADDR 		: std_logic_vector(7 downto 0);
-signal DBG_DAT_WRr 		: std_logic;
-signal DBG_CTRL 			: std_logic_vector(7 downto 0) := (others => '0');
-signal DBG_RUN_LAST 		: std_logic;
-signal DBG_BRK_HCNT 		: std_logic_vector(8 downto 0) := (others => '1');
-signal DBG_BRK_VCNT 		: std_logic_vector(8 downto 0) := (others => '1'); 
-signal DBG_BG_EN 			: std_logic_vector(7 downto 0) := (others => '1');
-signal DBG_OBJ_EN 		: std_logic_vector(7 downto 0) := (others => '1');
-signal DBG_BRK_ADDR 		: std_logic_vector(15 downto 0) := (others => '1');
-signal FRAME_CNT			: unsigned(15 downto 0);
 	
 begin
 
@@ -350,8 +329,7 @@ port map(
 
 CGRAM_ADDR_CLR <= CGRAM_ADDR_CLR + 1 when rising_edge(CLK);
 
-CGRAM_ADDR <= DBG_CGRAM_ADDR when ENABLE = '0' else 
-				  CGRAM_FETCH_ADDR when BG_MATH = '1' and FORCE_BLANK = '0' else 
+CGRAM_ADDR <= CGRAM_FETCH_ADDR when BG_MATH = '1' and FORCE_BLANK = '0' else 
 				  CGADD(8 downto 1);
 CGRAM_D <= DI(6 downto 0) & CGRAM_Lsb;
 CGRAM_WE <= '1' when CGADD(0) = '1' and PAWR_N = '0' and PA = x"22" and SYSCLK_CE = '1' else '0';
@@ -804,12 +782,10 @@ VRAM1_WRITE <= '1' when PAWR_N = '0' and PA = x"18" and (BG_FORCE_BLANK = '1' or
 VRAM2_WRITE <= '1' when PAWR_N = '0' and PA = x"19" and (BG_FORCE_BLANK = '1' or IN_VBL = '1') else '0';			
 
 		
-VRAM_ADDRA <= DBG_VRAM_ADDR(16 downto 1) when ENABLE = '0' else
-				  BG_VRAM_ADDRA when BG_FETCH = '1' and BG_FORCE_BLANK = '0'else 
+VRAM_ADDRA <= BG_VRAM_ADDRA when BG_FETCH = '1' and BG_FORCE_BLANK = '0'else 
 				  OBJ_VRAM_ADDR when OBJ_FETCH = '1' and FORCE_BLANK = '0' else
 				  VMADD_TRANS;
-VRAM_ADDRB <= DBG_VRAM_ADDR(16 downto 1) when ENABLE = '0' else
-				  BG_VRAM_ADDRB when BG_FETCH = '1' and BG_FORCE_BLANK = '0'else 
+VRAM_ADDRB <= BG_VRAM_ADDRB when BG_FETCH = '1' and BG_FORCE_BLANK = '0'else 
 				  OBJ_VRAM_ADDR when OBJ_FETCH = '1' and FORCE_BLANK= '0' else
 				  VMADD_TRANS;			 
 				 
@@ -819,8 +795,8 @@ VRAM_DBO <= DI;
 
 VRAM_RD_N <= '0' when ENABLE = '0' else 
              '0' when BG_FORCE_BLANK = '0' and IN_VBL = '0' else
-			 '0' when PA /= x"18" and PA /= x"19" else
-			 '1';
+			    '0' when PA /= x"18" and PA /= x"19" else
+			    '1';
 VRAM_WRA_N <= '1' when ENABLE = '0' else not VRAM1_WRITE;
 VRAM_WRB_N <= '1' when ENABLE = '0' else not VRAM2_WRITE;
 
@@ -862,7 +838,6 @@ begin
 		FIELD <= '0';
 		IN_HBL <= '0';
 		IN_VBL <= '0';
-		FRAME_CNT <= (others => '0');
 	elsif rising_edge(CLK) then
 		if ENABLE = '1' and DOT_CLKR_CE = '1' then
 			if PAL = '0' then
@@ -889,7 +864,6 @@ begin
 				if V_CNT = LAST_LINE then
 					V_CNT <= (others => '0');
 					FIELD <= not FIELD;
-					FRAME_CNT <= FRAME_CNT + 1;
 				end if;
 			end if;
 
@@ -1434,8 +1408,7 @@ port map(
 	q_b			=> OAM_Q
 );
 OAM_D <= DI & OAM_latch;
-OAM_ADDR_A <= DBG_OAM_ADDR when ENABLE = '0' else 
-				  OAM_ADDR(8 downto 1);
+OAM_ADDR_A <= OAM_ADDR(8 downto 1);
 OAM_ADDR_B <= OAM_ADDR(8 downto 2);
 OAM_WE <= ENABLE when (OAM_ADDR(9) = '0' or (IN_VBL = '0' and FORCE_BLANK = '0')) and OAM_ADDR(0) = '1' and PAWR_N = '0' and PA = x"04" and SYSCLK_CE = '1' else '0';
 
@@ -1447,8 +1420,7 @@ port map(
 	wren		=> HOAM_WE,
 	q			=> HOAM_Q
 );
-HOAM_ADDR <= DBG_OAM_ADDR(4 downto 0) when ENABLE = '0' else 
-				 OAM_ADDR(8 downto 4) when IN_VBL = '0' and FORCE_BLANK = '0' else
+HOAM_ADDR <= OAM_ADDR(8 downto 4) when IN_VBL = '0' and FORCE_BLANK = '0' else
 				 OAM_ADDR(4 downto 0);
 HOAM_WE <= ENABLE when (OAM_ADDR(9) = '1' or (IN_VBL = '0' and FORCE_BLANK = '0')) and PAWR_N = '0' and PA = x"04" and SYSCLK_CE = '1' else '0';
 
@@ -1798,7 +1770,7 @@ end process;
 
 
 process( RST_N, CLK, WH0, WH1, WH2, WH3, W12SEL, W34SEL, WOBJSEL, WBGLOG, WOBJLOG, CGWSEL, CGADSUB, TMW, TSW, TM, TS, BG_MODE, BG3PRIO, M7EXTBG,
-			WINDOW_X, SPR_PIX_DATA, BG1_PIX_DATA, BG2_PIX_DATA, BG3_PIX_DATA, BG4_PIX_DATA, DBG_BG_EN, DBG_OBJ_EN, DOT_CLK)
+			WINDOW_X, SPR_PIX_DATA, BG1_PIX_DATA, BG2_PIX_DATA, BG3_PIX_DATA, BG4_PIX_DATA, DOT_CLK)
 variable PAL1,PAL2,PAL3,PAL4,OBJ_PAL : std_logic_vector(7 downto 0);
 variable PRIO1,PRIO2,PRIO3,PRIO4 : std_logic;
 variable BGPR0EN, BGPR1EN : std_logic_vector(3 downto 0);
@@ -1880,31 +1852,31 @@ begin
 	PRIO4 := BG4_PIX_DATA(5);
 	
 	if DOT_CLK = '1' then
-		BGPR0EN(0) := TS(0) and (not sub_dis(0)) and (not PRIO1) and DBG_BG_EN(0);
-		BGPR0EN(1) := TS(1) and (not sub_dis(1)) and (not PRIO2) and DBG_BG_EN(1);
-		BGPR0EN(2) := TS(2) and (not sub_dis(2)) and (not PRIO3) and DBG_BG_EN(2);
-		BGPR0EN(3) := TS(3) and (not sub_dis(3)) and (not PRIO4) and DBG_BG_EN(3);
-		BGPR1EN(0) := TS(0) and (not sub_dis(0)) and (    PRIO1) and DBG_BG_EN(4);
-		BGPR1EN(1) := TS(1) and (not sub_dis(1)) and (    PRIO2) and DBG_BG_EN(5);
-		BGPR1EN(2) := TS(2) and (not sub_dis(2)) and (    PRIO3) and DBG_BG_EN(6);
-		BGPR1EN(3) := TS(3) and (not sub_dis(3)) and (    PRIO4) and DBG_BG_EN(7);
-		OBJPR0EN := TS(4) and (not sub_dis(4)) and (not OBJ_PRIO(0)) and (not OBJ_PRIO(1)) and DBG_OBJ_EN(0);
-		OBJPR1EN := TS(4) and (not sub_dis(4)) and (    OBJ_PRIO(0)) and (not OBJ_PRIO(1)) and DBG_OBJ_EN(0);
-		OBJPR2EN := TS(4) and (not sub_dis(4)) and (not OBJ_PRIO(0)) and (    OBJ_PRIO(1)) and DBG_OBJ_EN(0);
-		OBJPR3EN := TS(4) and (not sub_dis(4)) and (    OBJ_PRIO(0)) and (    OBJ_PRIO(1)) and DBG_OBJ_EN(0);
+		BGPR0EN(0) := TS(0) and (not sub_dis(0)) and (not PRIO1);
+		BGPR0EN(1) := TS(1) and (not sub_dis(1)) and (not PRIO2);
+		BGPR0EN(2) := TS(2) and (not sub_dis(2)) and (not PRIO3);
+		BGPR0EN(3) := TS(3) and (not sub_dis(3)) and (not PRIO4);
+		BGPR1EN(0) := TS(0) and (not sub_dis(0)) and (    PRIO1);
+		BGPR1EN(1) := TS(1) and (not sub_dis(1)) and (    PRIO2);
+		BGPR1EN(2) := TS(2) and (not sub_dis(2)) and (    PRIO3);
+		BGPR1EN(3) := TS(3) and (not sub_dis(3)) and (    PRIO4);
+		OBJPR0EN := TS(4) and (not sub_dis(4)) and (not OBJ_PRIO(0)) and (not OBJ_PRIO(1));
+		OBJPR1EN := TS(4) and (not sub_dis(4)) and (    OBJ_PRIO(0)) and (not OBJ_PRIO(1));
+		OBJPR2EN := TS(4) and (not sub_dis(4)) and (not OBJ_PRIO(0)) and (    OBJ_PRIO(1));
+		OBJPR3EN := TS(4) and (not sub_dis(4)) and (    OBJ_PRIO(0)) and (    OBJ_PRIO(1));
 	else
-		BGPR0EN(0) := TM(0) and (not main_dis(0)) and (not PRIO1) and DBG_BG_EN(0);
-		BGPR0EN(1) := TM(1) and (not main_dis(1)) and (not PRIO2) and DBG_BG_EN(1);
-		BGPR0EN(2) := TM(2) and (not main_dis(2)) and (not PRIO3) and DBG_BG_EN(2);
-		BGPR0EN(3) := TM(3) and (not main_dis(3)) and (not PRIO4) and DBG_BG_EN(3);
-		BGPR1EN(0) := TM(0) and (not main_dis(0)) and (    PRIO1) and DBG_BG_EN(4);
-		BGPR1EN(1) := TM(1) and (not main_dis(1)) and (    PRIO2) and DBG_BG_EN(5);
-		BGPR1EN(2) := TM(2) and (not main_dis(2)) and (    PRIO3) and DBG_BG_EN(6);
-		BGPR1EN(3) := TM(3) and (not main_dis(3)) and (    PRIO4) and DBG_BG_EN(7);
-		OBJPR0EN := TM(4) and (not main_dis(4)) and (not OBJ_PRIO(0)) and (not OBJ_PRIO(1)) and DBG_OBJ_EN(0);
-		OBJPR1EN := TM(4) and (not main_dis(4)) and (    OBJ_PRIO(0)) and (not OBJ_PRIO(1)) and DBG_OBJ_EN(0);
-		OBJPR2EN := TM(4) and (not main_dis(4)) and (not OBJ_PRIO(0)) and (    OBJ_PRIO(1)) and DBG_OBJ_EN(0);
-		OBJPR3EN := TM(4) and (not main_dis(4)) and (    OBJ_PRIO(0)) and (    OBJ_PRIO(1)) and DBG_OBJ_EN(0);
+		BGPR0EN(0) := TM(0) and (not main_dis(0)) and (not PRIO1);
+		BGPR0EN(1) := TM(1) and (not main_dis(1)) and (not PRIO2);
+		BGPR0EN(2) := TM(2) and (not main_dis(2)) and (not PRIO3);
+		BGPR0EN(3) := TM(3) and (not main_dis(3)) and (not PRIO4);
+		BGPR1EN(0) := TM(0) and (not main_dis(0)) and (    PRIO1);
+		BGPR1EN(1) := TM(1) and (not main_dis(1)) and (    PRIO2);
+		BGPR1EN(2) := TM(2) and (not main_dis(2)) and (    PRIO3);
+		BGPR1EN(3) := TM(3) and (not main_dis(3)) and (    PRIO4);
+		OBJPR0EN := TM(4) and (not main_dis(4)) and (not OBJ_PRIO(0)) and (not OBJ_PRIO(1));
+		OBJPR1EN := TM(4) and (not main_dis(4)) and (    OBJ_PRIO(0)) and (not OBJ_PRIO(1));
+		OBJPR2EN := TM(4) and (not main_dis(4)) and (not OBJ_PRIO(0)) and (    OBJ_PRIO(1));
+		OBJPR3EN := TM(4) and (not main_dis(4)) and (    OBJ_PRIO(0)) and (    OBJ_PRIO(1));
 	end if;
 	
 	if BG_MODE = "000" then	-- MODE0
@@ -2325,153 +2297,4 @@ V224 <= not OVERSCAN;
 FIELD_OUT <= FIELD;
 INTERLACE <= BGINTERLACE;
 
-
---debug 
-process( RST_N, CLK )
-begin
-	if RST_N = '0' then
-		DBG_BRK <= '0';
-		DBG_RUN_LAST <= '0';
-	elsif rising_edge(CLK) then
-		if ENABLE = '1' and DOT_CLKR_CE = '1' then
-			DBG_BRK <= '0';
-			if DBG_CTRL(0) = '1' then			--dot step
-				DBG_BRK <= '1';
-			elsif DBG_CTRL(2) = '1' then		--HV counters break
-				if H_CNT = unsigned(DBG_BRK_HCNT) and V_CNT = unsigned(DBG_BRK_VCNT) then
-					DBG_BRK <= '1';
-				end if;
-			end if;
-		end if;
-		
-		DBG_RUN_LAST <= DBG_CTRL(7);			--run
-		if DBG_CTRL(7) = '1' and DBG_RUN_LAST = '0' then
-			DBG_BRK <= '0';
-		end if;
-	end if;
-end process; 
-	
-process( CLK, RST_N, DBG_REG, FORCE_BLANK, MB, OBJSIZE, OBJNAME, OBJADDR, OAMADD, OAM_PRIO, BG_SIZE, BG3PRIO, BG_MODE,
-			MOSAIC_SIZE, BG_MOSAIC_EN, BG_SC_ADDR, BG_SC_SIZE, BG_NBA, TM, TS, BG_HOFS, BG_VOFS, WH0, WH1, WH2, WH3,
-			W12SEL, W34SEL, WOBJSEL, WBGLOG, WOBJLOG, TMW, TSW, CGWSEL, CGADSUB, VMAIN_ADDRINC, VMAIN_ADDRTRANS,
-			OPHCT, OPVCT, H_CNT, V_CNT, FIELD, VMADD, OBJ_TIME_OFL, OBJ_RANGE_OFL, M7SEL, M7A, M7B, M7C, M7D, M7X, M7Y, 
-			M7HOFS, M7VOFS, CGADD, FRAME_CNT, VRAM_DAI, VRAM_DBI, CGRAM_Q, OAM_Q, HOAM_Q)
-begin
-	case DBG_REG is
-		when x"00" => DBG_DAT_OUT <= FORCE_BLANK & "000" & MB;
-		when x"01" => DBG_DAT_OUT <= OBJSIZE & OBJNAME & OBJADDR;
-		when x"02" => DBG_DAT_OUT <= OAMADD(7 downto 0);
-		when x"03" => DBG_DAT_OUT <= OAM_PRIO & "000000" & OAMADD(8);
-		when x"04" => DBG_DAT_OUT <= BG_SIZE & BG3PRIO & BG_MODE;
-		when x"05" => DBG_DAT_OUT <= MOSAIC_SIZE & BG_MOSAIC_EN;
-		when x"06" => DBG_DAT_OUT <= BG_SC_ADDR(BG1)&BG_SC_SIZE(BG1);
-		when x"07" => DBG_DAT_OUT <= BG_SC_ADDR(BG2)&BG_SC_SIZE(BG2);
-		when x"08" => DBG_DAT_OUT <= BG_SC_ADDR(BG3)&BG_SC_SIZE(BG3);
-		when x"09" => DBG_DAT_OUT <= BG_SC_ADDR(BG4)&BG_SC_SIZE(BG4);
-		when x"0A" => DBG_DAT_OUT <= BG_NBA(BG2)&BG_NBA(BG1);
-		when x"0B" => DBG_DAT_OUT <= BG_NBA(BG4)&BG_NBA(BG3);
-		when x"0C" => DBG_DAT_OUT <= TM;
-		when x"0D" => DBG_DAT_OUT <= TS;
-		when x"0E" => DBG_DAT_OUT <= BG_HOFS(BG1)(7 downto 0);
-		when x"0F" => DBG_DAT_OUT <= "000000" & BG_HOFS(BG1)(9 downto 8);
-		when x"10" => DBG_DAT_OUT <= BG_VOFS(BG1)(7 downto 0);
-		when x"11" => DBG_DAT_OUT <= "000000" & BG_VOFS(BG1)(9 downto 8);
-		when x"12" => DBG_DAT_OUT <= BG_HOFS(BG2)(7 downto 0);
-		when x"13" => DBG_DAT_OUT <= "000000" & BG_HOFS(BG2)(9 downto 8);
-		when x"14" => DBG_DAT_OUT <= BG_VOFS(BG2)(7 downto 0);
-		when x"15" => DBG_DAT_OUT <= "000000" & BG_VOFS(BG2)(9 downto 8);
-		when x"16" => DBG_DAT_OUT <= BG_HOFS(BG3)(7 downto 0);
-		when x"17" => DBG_DAT_OUT <= "000000" & BG_HOFS(BG3)(9 downto 8);
-		when x"18" => DBG_DAT_OUT <= BG_VOFS(BG3)(7 downto 0);
-		when x"19" => DBG_DAT_OUT <= "000000" & BG_VOFS(BG3)(9 downto 8);
-		when x"1A" => DBG_DAT_OUT <= BG_HOFS(BG4)(7 downto 0);
-		when x"1B" => DBG_DAT_OUT <= "000000" & BG_HOFS(BG4)(9 downto 8);
-		when x"1C" => DBG_DAT_OUT <= BG_VOFS(BG4)(7 downto 0);
-		when x"1D" => DBG_DAT_OUT <= "000000" & BG_VOFS(BG4)(9 downto 8);
-		when x"1E" => DBG_DAT_OUT <= WH0;
-		when x"1F" => DBG_DAT_OUT <= WH1;
-		when x"20" => DBG_DAT_OUT <= WH2;
-		when x"21" => DBG_DAT_OUT <= WH3;
-		when x"22" => DBG_DAT_OUT <= W12SEL;
-		when x"23" => DBG_DAT_OUT <= W34SEL;
-		when x"24" => DBG_DAT_OUT <= WOBJSEL;
-		when x"25" => DBG_DAT_OUT <= WBGLOG;
-		when x"26" => DBG_DAT_OUT <= WOBJLOG;
-		when x"27" => DBG_DAT_OUT <= TMW;
-		when x"28" => DBG_DAT_OUT <= TSW;
-		when x"29" => DBG_DAT_OUT <= CGWSEL;
-		when x"2A" => DBG_DAT_OUT <= CGADSUB;
-		when x"2B" => DBG_DAT_OUT <= VMAIN_ADDRINC & "000" & VMAIN_ADDRTRANS & "00";
-		when x"2C" => DBG_DAT_OUT <= OPHCT(7 downto 0);
-		when x"2D" => DBG_DAT_OUT <= "0000000" & OPHCT(8);
-		when x"2E" => DBG_DAT_OUT <= OPVCT(7 downto 0);
-		when x"2F" => DBG_DAT_OUT <= "0000000" & OPVCT(8);
-		when x"30" => DBG_DAT_OUT <= std_logic_vector(H_CNT(7 downto 0));
-		when x"31" => DBG_DAT_OUT <= "0000000" & H_CNT(8);
-		when x"32" => DBG_DAT_OUT <= std_logic_vector(V_CNT(7 downto 0));
-		when x"33" => DBG_DAT_OUT <= "0000000" & V_CNT(8);
-		when x"34" => DBG_DAT_OUT <= "0000000" & FIELD;
-		when x"35" => DBG_DAT_OUT <= std_logic_vector(VMADD(7 downto 0));
-		when x"36" => DBG_DAT_OUT <= "0" & std_logic_vector(VMADD(14 downto 8)); 
-		when x"37" => DBG_DAT_OUT <= "00000" & OBJ_TIME_OFL & OBJ_RANGE_OFL & "0";
-		when x"38" => DBG_DAT_OUT <= M7SEL;
-		when x"39" => DBG_DAT_OUT <= M7A(7 downto 0);
-		when x"3A" => DBG_DAT_OUT <= M7A(15 downto 8);
-		when x"3B" => DBG_DAT_OUT <= M7B(7 downto 0);
-		when x"3C" => DBG_DAT_OUT <= M7B(15 downto 8);
-		when x"3D" => DBG_DAT_OUT <= M7C(7 downto 0);
-		when x"3E" => DBG_DAT_OUT <= M7C(15 downto 8);
-		when x"3F" => DBG_DAT_OUT <= M7D(7 downto 0);
-		when x"40" => DBG_DAT_OUT <= M7D(15 downto 8);
-		when x"41" => DBG_DAT_OUT <= M7X(7 downto 0);
-		when x"42" => DBG_DAT_OUT <= "000" & M7X(12 downto 8);
-		when x"43" => DBG_DAT_OUT <= M7Y(7 downto 0);
-		when x"44" => DBG_DAT_OUT <= "000" & M7Y(12 downto 8);
-		when x"45" => DBG_DAT_OUT <= M7HOFS(7 downto 0);
-		when x"46" => DBG_DAT_OUT <= "000" & M7HOFS(12 downto 8);
-		when x"47" => DBG_DAT_OUT <= M7VOFS(7 downto 0);
-		when x"48" => DBG_DAT_OUT <= "000" & M7VOFS(12 downto 8);
-		when x"49" => DBG_DAT_OUT <= std_logic_vector(CGADD(7 downto 0));
-		when x"4A" => DBG_DAT_OUT <= "0000000" & CGADD(8);
-		when x"4B" => DBG_DAT_OUT <= std_logic_vector(FRAME_CNT(7 downto 0));
-		when x"4C" => DBG_DAT_OUT <= std_logic_vector(FRAME_CNT(15 downto 8));
-		
-		when x"80" => DBG_DAT_OUT <= VRAM_DAI;
-		when x"81" => DBG_DAT_OUT <= VRAM_DBI;
-		when x"82" => DBG_DAT_OUT <= CGRAM_Q(7 downto 0);
-		when x"83" => DBG_DAT_OUT <= "0" & CGRAM_Q(14 downto 8);
-		when x"84" => DBG_DAT_OUT <= OAM_Q(7 downto 0);
-		when x"85" => DBG_DAT_OUT <= OAM_Q(15 downto 8);
-		when x"86" => DBG_DAT_OUT <= HOAM_Q;
-		when others => DBG_DAT_OUT <= x"00";
-	end case; 
-	
-	if RST_N = '0' then
-		DBG_VRAM_ADDR <= (others => '0');
-		DBG_CGRAM_ADDR <= (others => '0');
-		DBG_OAM_ADDR <= (others => '0');
-		DBG_DAT_WRr <= '0';
-	elsif rising_edge(CLK) then
-		DBG_DAT_WRr <= DBG_DAT_WR;
-		if DBG_DAT_WR = '1' and DBG_DAT_WRr = '0' then
-			case DBG_REG is
-				when x"80" => DBG_VRAM_ADDR(7 downto 0) <= DBG_DAT_IN;
-				when x"81" => DBG_VRAM_ADDR(15 downto 8) <= DBG_DAT_IN;
-				when x"82" => DBG_VRAM_ADDR(16) <= DBG_DAT_IN(0);
-				when x"83" => DBG_CGRAM_ADDR <= DBG_DAT_IN;
-				when x"84" => DBG_OAM_ADDR <= DBG_DAT_IN;
-				when x"85" => DBG_CTRL <= DBG_DAT_IN;
-				when x"86" => DBG_BRK_HCNT(7 downto 0) <= DBG_DAT_IN;
-				when x"87" => DBG_BRK_HCNT(8) <= DBG_DAT_IN(0);
-				when x"88" => DBG_BRK_VCNT(7 downto 0) <= DBG_DAT_IN;
-				when x"89" => DBG_BRK_VCNT(8) <= DBG_DAT_IN(0);
-				when x"8A" => DBG_BG_EN <= DBG_DAT_IN;
-				when x"8B" => DBG_OBJ_EN <= DBG_DAT_IN;
-				when others => null;
-			end case;
-		end if;
-	end if;
-end process;
-	
-	
 end rtl;

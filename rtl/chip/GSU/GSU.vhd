@@ -33,13 +33,7 @@ entity GSU is
 		RAM_DI		: in std_logic_vector(7 downto 0);
 		RAM_DO		: out std_logic_vector(7 downto 0);
 		RAM_WE_N		: out std_logic;
-		RAM_CE_N		: out std_logic;
-		
-		BRK_OUT		: out std_logic;
-		DBG_REG		: in std_logic_vector(7 downto 0);
-		DBG_DAT_IN	: in std_logic_vector(7 downto 0);
-		DBG_DAT_OUT	: out std_logic_vector(7 downto 0);
-		DBG_DAT_WR	: in std_logic
+		RAM_CE_N		: out std_logic
 	);
 end GSU;
 
@@ -182,14 +176,6 @@ architecture rtl of GSU is
 	signal INT_ROM_A 			: std_logic_vector(23 downto 0);
 	signal SNES_CACHE_ADDR 	: std_logic_vector(8 downto 0);
 	signal ROM_RD_CNT 		: unsigned(1 downto 0);
-	
-	--debug
-	signal DBG_RUN_LAST 		: std_logic;
-	signal DBG_DAT_WRr 		: std_logic;
-	signal DBG_BRK_ADDR 		: std_logic_vector(23 downto 0) := (others => '1');
-	signal DBG_RAM_ADDR 		: std_logic_vector(16 downto 0);
-	signal DBG_CACHE_ADDR 	: std_logic_vector(8 downto 0);
-	signal DBG_CTRL 			: std_logic_vector(7 downto 0) := (others => '0');
 
 begin
 
@@ -374,8 +360,7 @@ begin
 				
 	ROM_A <= INT_ROM_A(20 downto 0) when INT_ROM_A(22) = '1' else INT_ROM_A(21 downto 16) & INT_ROM_A(14 downto 0);
 	
-	RAM_A <= DBG_RAM_ADDR when ENABLE = '0' else
-				SNES_RAM_A when GSU_RAM_ACCESS = '0' else 
+	RAM_A <= SNES_RAM_A when GSU_RAM_ACCESS = '0' else 
 				CACHE_SRC_ADDR(16 downto 0) when RAMST = RAMST_CACHE and GSU_RAM_ACCESS = '1' else 
 				RAMBR(0) & RAMADDR(15 downto 1) & (RAMADDR(0) xor RAM_BYTES) when (RAMST = RAMST_LOAD or RAMST = RAMST_SAVE) and GSU_RAM_ACCESS = '1' else
 				PBR(0) & R(15) when RAMST = RAMST_FETCH and GSU_RAM_ACCESS = '1' else 
@@ -566,7 +551,7 @@ begin
 					  x"00";
 	BRAM_CACHE_WE_A <= '1' when ROM_CACHE_EN = '1' or RAM_CACHE_EN = '1' else '0';
 	
-	BRAM_CACHE_ADDR_B <= DBG_CACHE_ADDR when ENABLE = '0' else SNES_CACHE_ADDR;
+	BRAM_CACHE_ADDR_B <= SNES_CACHE_ADDR;
 	BRAM_CACHE_DI_B <= DI;
 	BRAM_CACHE_WE_B <= '0' when ENABLE = '0' else 
 					  MMIO_CACHE_WR when EN = '0' else 
@@ -1224,121 +1209,5 @@ begin
 	PCF_RAM_A <= GetCharOffset(PIX_CACHE(PC1).OFFSET, (SCMR_HT or POR_OBJ&POR_OBJ), SCMR_MD, BPP_CNT, SCBR);
 	
 	RPIX_RAM_A <= GetCharOffset(PC_Y & PC_X(7 downto 3), (SCMR_HT or POR_OBJ&POR_OBJ), SCMR_MD, BPP_CNT, SCBR);
-
-	
-	--Debug
-	process(CLK, RST_N)
-	begin
-		if RST_N = '0' then
-			BRK_OUT <= '0';
-			DBG_RUN_LAST <= '0';
-		elsif rising_edge(CLK) then
-			if EN = '1' and (ROM_FETCH_EN = '1' or RAM_FETCH_EN = '1' or CACHE_FETCH_EN = '1') then
-				BRK_OUT <= '0';
-				if DBG_CTRL(0) = '1' then
-					BRK_OUT <= '1';
-				elsif DBG_CTRL(2) = '1' then
-					if DBG_BRK_ADDR(23 downto 0) = PBR & R(15) then
-						BRK_OUT <= '1';
-					end if;
-				end if;
-			end if;
-			
-			DBG_RUN_LAST <= DBG_CTRL(7);
-			if DBG_CTRL(7) = '1' and DBG_RUN_LAST = '0' then
-				BRK_OUT <= '0';
-			end if;
-		end if;
-	end process; 
-	
-	process(CLK, RST_N, DBG_REG, R, CBR, PBR, ROMBR, RAMBR, SFR, MS0, IRQ_OFF, CLS, BRAMR, SCBR, SCMR_HT, SCMR_MD, 
-			  RAN, RON, ROMDR, RAMDR, CACHE_VALID, RAM_DI, BRAM_CACHE_Q_B, PCN, PCF_RW, BPP_CNT,
-			  ROM_CACHE_EN, RAM_CACHE_EN, RAM_LOAD_EN, ROM_FETCH_EN, RAM_FETCH_EN, CACHE_FETCH_EN, ROM_NEED_WAIT, RAM_NEED_WAIT)
-	begin
-		case DBG_REG is
-			when x"00" => DBG_DAT_OUT <= R(0)(7 downto 0);
-			when x"01" => DBG_DAT_OUT <= R(0)(15 downto 8);
-			when x"02" => DBG_DAT_OUT <= R(1)(7 downto 0);
-			when x"03" => DBG_DAT_OUT <= R(1)(15 downto 8);
-			when x"04" => DBG_DAT_OUT <= R(2)(7 downto 0);
-			when x"05" => DBG_DAT_OUT <= R(2)(15 downto 8);
-			when x"06" => DBG_DAT_OUT <= R(3)(7 downto 0);
-			when x"07" => DBG_DAT_OUT <= R(3)(15 downto 8);
-			when x"08" => DBG_DAT_OUT <= R(4)(7 downto 0);
-			when x"09" => DBG_DAT_OUT <= R(5)(15 downto 8);
-			when x"0A" => DBG_DAT_OUT <= R(5)(7 downto 0);
-			when x"0B" => DBG_DAT_OUT <= R(5)(15 downto 8);
-			when x"0C" => DBG_DAT_OUT <= R(6)(7 downto 0);
-			when x"0D" => DBG_DAT_OUT <= R(6)(15 downto 8);
-			when x"0E" => DBG_DAT_OUT <= R(7)(7 downto 0);
-			when x"0F" => DBG_DAT_OUT <= R(7)(15 downto 8);
-			when x"10" => DBG_DAT_OUT <= R(8)(7 downto 0);
-			when x"11" => DBG_DAT_OUT <= R(8)(15 downto 8);
-			when x"12" => DBG_DAT_OUT <= R(9)(7 downto 0);
-			when x"13" => DBG_DAT_OUT <= R(9)(15 downto 8);
-			when x"14" => DBG_DAT_OUT <= R(10)(7 downto 0);
-			when x"15" => DBG_DAT_OUT <= R(10)(15 downto 8);
-			when x"16" => DBG_DAT_OUT <= R(11)(7 downto 0);
-			when x"17" => DBG_DAT_OUT <= R(11)(15 downto 8);
-			when x"18" => DBG_DAT_OUT <= R(12)(7 downto 0);
-			when x"19" => DBG_DAT_OUT <= R(12)(15 downto 8);
-			when x"1A" => DBG_DAT_OUT <= R(13)(7 downto 0);
-			when x"1B" => DBG_DAT_OUT <= R(13)(15 downto 8);
-			when x"1C" => DBG_DAT_OUT <= R(14)(7 downto 0);
-			when x"1D" => DBG_DAT_OUT <= R(14)(15 downto 8);
-			when x"1E" => DBG_DAT_OUT <= R(15)(7 downto 0);
-			when x"1F" => DBG_DAT_OUT <= R(15)(15 downto 8);
-			when x"20" => DBG_DAT_OUT <= CBR(7 downto 0);
-			when x"21" => DBG_DAT_OUT <= CBR(15 downto 8);
-			when x"22" => DBG_DAT_OUT <= PBR;
-			when x"23" => DBG_DAT_OUT <= ROMBR;
-			when x"24" => DBG_DAT_OUT <= RAMBR;
-			when x"25" => DBG_DAT_OUT <= SFR(7 downto 0);
-			when x"26" => DBG_DAT_OUT <= SFR(15 downto 8);
-			when x"27" => DBG_DAT_OUT <= IRQ_OFF & "0" & MS0 & "00000";
-			when x"28" => DBG_DAT_OUT <= "0000000" & CLS;
-			when x"29" => DBG_DAT_OUT <= BRAMR;
-			when x"2A" => DBG_DAT_OUT <= SCBR;
-			when x"2B" => DBG_DAT_OUT <= "00" & SCMR_HT(1) & RAN & RON & SCMR_HT(0) & SCMR_MD;
-			when x"2C" => DBG_DAT_OUT <= ROMDR;
-			when x"2D" => DBG_DAT_OUT <= RAMDR(7 downto 0);
-			when x"2E" => DBG_DAT_OUT <= RAMDR(15 downto 8);
-			when x"2F" => DBG_DAT_OUT <= CACHE_VALID(7 downto 0);
-			when x"30" => DBG_DAT_OUT <= CACHE_VALID(15 downto 8);
-			when x"31" => DBG_DAT_OUT <= CACHE_VALID(23 downto 16);
-			when x"32" => DBG_DAT_OUT <= CACHE_VALID(31 downto 24);
-			when x"33" => DBG_DAT_OUT <= ROM_CACHE_EN & RAM_CACHE_EN & RAM_LOAD_EN & ROM_FETCH_EN & RAM_FETCH_EN & CACHE_FETCH_EN & ROM_NEED_WAIT & RAM_NEED_WAIT;
-			when x"34" => DBG_DAT_OUT <= "000" & PCN & PCF_RW & std_logic_vector(BPP_CNT);
-			
-			when x"80" => DBG_DAT_OUT <= RAM_DI;
-			when x"81" => DBG_DAT_OUT <= BRAM_CACHE_Q_B;
-			when others => DBG_DAT_OUT <= x"00";
-		end case; 
-			
-		if RST_N = '0' then
-			DBG_RAM_ADDR <= (others => '0');
-			DBG_CACHE_ADDR <= (others => '0');
-			DBG_DAT_WRr <= '0';
-		elsif rising_edge(CLK) then
-			DBG_DAT_WRr <= DBG_DAT_WR;
-			if DBG_DAT_WR = '1' and DBG_DAT_WRr = '0' then
-				case DBG_REG is
-					when x"80" => DBG_BRK_ADDR(7 downto 0) <= DBG_DAT_IN;
-					when x"81" => DBG_BRK_ADDR(15 downto 8) <= DBG_DAT_IN;
-					when x"82" => DBG_BRK_ADDR(23 downto 16) <= DBG_DAT_IN;
-					when x"83" => DBG_CTRL <= DBG_DAT_IN;
-					when x"84" => DBG_RAM_ADDR(7 downto 0) <= DBG_DAT_IN;
-					when x"85" => DBG_RAM_ADDR(15 downto 8) <= DBG_DAT_IN;
-					when x"86" => DBG_RAM_ADDR(16) <= DBG_DAT_IN(0);
-					when x"87" => DBG_CACHE_ADDR(7 downto 0) <= DBG_DAT_IN;
-					when x"88" => DBG_CACHE_ADDR(8) <= DBG_DAT_IN(0);
-					when others => null;
-				end case; 
-			end if;
-		end if;
-		
-	end process;
-	
-
 	
 end rtl;

@@ -28,9 +28,7 @@ entity AddrGen is
 		  AB     		: out std_logic_vector(7 downto 0);
 		  DX				: out std_logic_vector(15 downto 0);
 		  AALCarry 		: out std_logic;
-		  JumpNoOfl		: out std_logic;
-		  
-		  DBG_NEXT_PC	: out std_logic_vector(15 downto 0)
+		  JumpNoOfl		: out std_logic
     );
 end AddrGen;
 
@@ -99,9 +97,7 @@ begin
 	end process;
 	
 	JumpNoOfl <= (not (PCr(8) xor NewPCWithOffset(8))) and (not LOAD_PC(0)) and (not LOAD_PC(1)) and LOAD_PC(2);
-	
-	DBG_NEXT_PC <= NextPC;
-	
+		
 	
 	AALCtrl <= ADDR_CTRL(7 downto 5);
 	AAHCtrl <= ADDR_CTRL(4 downto 2);

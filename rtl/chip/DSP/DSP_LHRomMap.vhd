@@ -160,10 +160,12 @@ begin
 					end if;
 					DSP_SEL <= '0';
 					DSP_A0 <= '1';
-				when others =>
-					CART_ADDR <= "0" & (not CA(23) and not MAP_CTRL(7)) & CA(21 downto 0);
-					BRAM_ADDR <= CA(19 downto 0);
-					BSRAM_SEL <= '0';
+				when others =>					-- SpecialLoROM														
+					CART_ADDR <= "00" & (CA(23) and not CA(21)) & CA(21 downto 16) & CA(14 downto 0);--00-1F:8000-FFFF; 20-3F/A0-BF:8000-FFFF; 80-9F:8000-FFFF
+					BRAM_ADDR <= CA(20 downto 16) & CA(14 downto 0);
+					if CA(22 downto 20) = "111" and CA(15) = '0' and ROMSEL_N = '0' and BSRAM_MASK(10) = '1' then
+						BSRAM_SEL <= '1';
+					end if;
 					DSP_SEL <= '0';
 					DSP_A0 <= '1';
 			end case;

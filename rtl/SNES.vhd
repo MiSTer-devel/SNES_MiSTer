@@ -19,6 +19,7 @@ entity SNES is
 		CA       	: out std_logic_vector(23 downto 0);
 		CPURD_N		: out std_logic;
 		CPUWR_N		: out std_logic;
+		CPURD_CYC_N	: out std_logic;
 		DOT_CLK_CE	: out std_logic;
 
 		PA				: out std_logic_vector(7 downto 0);
@@ -410,6 +411,7 @@ begin
 	CA <= INT_CA;
 	CPURD_N <= INT_CPURD_N;
 	CPUWR_N <= INT_CPUWR_N;
+	CPURD_CYC_N <= INT_CPURD_CYC_N;
 	
 	PA <= INT_PA;
 	PARD_N <= INT_PARD_N;

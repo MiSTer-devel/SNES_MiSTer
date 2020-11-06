@@ -38,8 +38,8 @@ module emu
 	output        CE_PIXEL,
 
 	//Video aspect ratio for HDMI. Most retro systems have ratio 4:3.
-	output  [7:0] VIDEO_ARX,
-	output  [7:0] VIDEO_ARY,
+	output [11:0] VIDEO_ARX,
+	output [11:0] VIDEO_ARY,
 
 	output  [7:0] VGA_R,
 	output  [7:0] VGA_G,
@@ -49,6 +49,7 @@ module emu
 	output        VGA_DE,    // = ~(VBlank | HBlank)
 	output        VGA_F1,
 	output [1:0]  VGA_SL,
+	output        VGA_SCALER, // Force VGA scaler
 
 	output        LED_USER,  // 1 - ON, 0 - OFF.
 
@@ -133,9 +134,12 @@ assign LED_USER  = cart_download | spc_download | (status[23] & bk_pending);
 assign LED_DISK  = 0;
 assign LED_POWER = 0;
 assign BUTTONS   = osd_btn;
+assign VGA_SCALER= 0;
 
-assign VIDEO_ARX = status[31:30] == 2 ? 8'd16 : (status[30] ? 8'd8 : 8'd64);
-assign VIDEO_ARY = status[31:30] == 2 ? 8'd9  : (status[30] ? 8'd7 : 8'd49);
+wire [1:0] ar = status[33:32];
+
+assign VIDEO_ARX = (!ar) ? 12'd64 : (ar - 1'd1);
+assign VIDEO_ARY = (!ar) ? 12'd49 : 12'd0;
 
 assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = 0;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
@@ -219,54 +223,54 @@ wire reset = RESET | buttons[1] | status[0] | cart_download | spc_download | bk_
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX 
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX   XX 
 
 `include "build_id.v"
 parameter CONF_STR = {
-    "SNES;;",
-    "FS0,SFCSMCBINBS ;",
-	 "FS1,SPC;",
-    "-;",
-    "OEF,Video Region,Auto,NTSC,PAL;",
-    "O13,ROM Header,Auto,No Header,LoROM,HiROM,ExHiROM;",
-    "-;",
-    "C,Cheats;",
-    "H2OO,Cheats Enabled,Yes,No;",
-    "-;",
-    "D0RC,Load Backup RAM;",
-    "D0RD,Save Backup RAM;",
-    "D0ON,Autosave,Off,On;",
-    "D0-;",
+	"SNES;;",
+	"FS0,SFCSMCBINBS ;",
+	"FS1,SPC;",
+	"-;",
+	"OEF,Video Region,Auto,NTSC,PAL;",
+	"O13,ROM Header,Auto,No Header,LoROM,HiROM,ExHiROM;",
+	"-;",
+	"C,Cheats;",
+	"H2OO,Cheats Enabled,Yes,No;",
+	"-;",
+	"D0RC,Load Backup RAM;",
+	"D0RD,Save Backup RAM;",
+	"D0ON,Autosave,Off,On;",
+	"D0-;",
 
-	 "P1,Audio & Video;",
-    "P1-;",
-    "P1OUV,Aspect Ratio,4:3,8:7,16:9;",
-    "P1O9B,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
-    "P1OG,Pseudo Transparency,Blend,Off;",
-    "P1-;",
-    "P1OJK,Stereo Mix,None,25%,50%,100%;", 
+	"P1,Audio & Video;",
+	"P1-;",
+	"P1o01,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
+	"P1O9B,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
+	"P1OG,Pseudo Transparency,Blend,Off;",
+	"P1-;",
+	"P1OJK,Stereo Mix,None,25%,50%,100%;", 
 
-	 "P2,Hardware;",
-    "P2-;",
-    "P2OH,Multitap,Disabled,Port2;",
-    "P2O8,Serial,OFF,SNAC;",
-    "P2-;",
-    "P2OPQ,Super Scope,Disabled,Joy1,Joy2,Mouse;",
-    "D4P2OR,Super Scope Btn,Joy,Mouse;",
-    "D4P2OST,Cross,Small,Big,None;",
-    "P2-;",
-    "D1P2OI,SuperFX Speed,Normal,Turbo;",
-    "D3P2O4,CPU Speed,Normal,Turbo;",
-    "P2-;",
-    "P2OLM,Initial WRAM,9966(SNES2),00FF(SNES1),55(SD2SNES),FF;",
+	"P2,Hardware;",
+	"P2-;",
+	"P2OH,Multitap,Disabled,Port2;",
+	"P2O8,Serial,OFF,SNAC;",
+	"P2-;",
+	"P2OPQ,Super Scope,Disabled,Joy1,Joy2,Mouse;",
+	"D4P2OR,Super Scope Btn,Joy,Mouse;",
+	"D4P2OST,Cross,Small,Big,None;",
+	"P2-;",
+	"D1P2OI,SuperFX Speed,Normal,Turbo;",
+	"D3P2O4,CPU Speed,Normal,Turbo;",
+	"P2-;",
+	"P2OLM,Initial WRAM,9966(SNES2),00FF(SNES1),55(SD2SNES),FF;",
 
-    "-;",
-    "O56,Mouse,None,Port1,Port2;",
-    "O7,Swap Joysticks,No,Yes;",
-    "-;",
-    "R0,Reset;",
-    "J1,A(SS Fire),B(SS Cursor),X(SS TurboSw),Y(SS Pause),LT(SS Cursor),RT(SS Fire),Select,Start;",
-    "V,v",`BUILD_DATE
+	"-;",
+	"O56,Mouse,None,Port1,Port2;",
+	"O7,Swap Joysticks,No,Yes;",
+	"-;",
+	"R0,Reset;",
+	"J1,A(SS Fire),B(SS Cursor),X(SS TurboSw),Y(SS Pause),LT(SS Cursor),RT(SS Fire),Select,Start;",
+	"V,v",`BUILD_DATE
 };
 
 wire  [1:0] buttons;

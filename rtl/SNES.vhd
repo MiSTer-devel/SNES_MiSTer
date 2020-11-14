@@ -119,6 +119,7 @@ architecture rtl of SNES is
 	signal INT_SYSCLKF_CE	: std_logic;
 	signal INT_SYSCLKR_CE	: std_logic;
 
+	signal BUSA_DO	: std_logic_vector(7 downto 0);
 	signal BUSB_DO	: std_logic_vector(7 downto 0);
 	signal BUSA_SEL : std_logic;
 	signal BUSB_SEL : std_logic;
@@ -235,7 +236,8 @@ begin
 					'1' when INT_CA(23 downto 16) >= x"40" and INT_CA(23 downto 16) <= x"7D" else 
 					'1' when INT_CA(23 downto 16) >= x"C0" else
 					'0';
-
+	BUSA_DO <= x"00" when INT_CA(22) = '0' and (INT_CA(15 downto 8) = x"40" or INT_CA(15 downto 8) = x"42" or INT_CA(15 downto 8) = x"43") else DI;
+	
 	BUSB_SEL <= '1' when INT_PA(7) = '0' or INT_PA(7 downto 2) = "100000" else '0';
 	BUSB_DO <= PPU_DO when INT_PA(7 downto 6) = "00" else 
 				  SMP_CPU_DO when INT_PA(7 downto 6) = "01" else
@@ -243,12 +245,12 @@ begin
 				  x"FF";
 
 	CPU_DI <= WRAM_DO when INT_RAMSEL_N = '0' else
-				 DI when BUSA_SEL = '1' else
+				 BUSA_DO when BUSA_SEL = '1' else
 				 BUSB_DO when BUSB_SEL = '1' else
 				 DI;
 
 	-- WRAM
-	WRAM_DI <= DI when BUSA_SEL = '1' else
+	WRAM_DI <= BUSA_DO when BUSA_SEL = '1' else
 				  BUSB_DO when INT_PARD_N = '0' else
 				  CPU_DO;
 
@@ -281,7 +283,7 @@ begin
 	
 
 	-- PPU
-	PPU_DI <= DI when BUSA_SEL = '1' else
+	PPU_DI <= BUSA_DO when BUSA_SEL = '1' else
 				 WRAM_DO when INT_RAMSEL_N = '0' else
 				 CPU_DO;
  
@@ -328,7 +330,7 @@ begin
 	);
 
 
-	SMP_CPU_DI <= DI when BUSA_SEL = '1' else
+	SMP_CPU_DI <= BUSA_DO when BUSA_SEL = '1' else
 					  WRAM_DO when INT_RAMSEL_N = '0' else
 					  CPU_DO;
 			 
@@ -413,4 +415,3 @@ begin
 	JOY2_P6 <= JPIO67(7);
 
 end rtl;
-

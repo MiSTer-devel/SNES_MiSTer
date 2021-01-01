@@ -1,4 +1,6 @@
-# SNES for MiSTer by [srg320](https://github.com/srg320)
+# [Super Nintendo Entertainment System](https://en.wikipedia.org/wiki/Super_Nintendo_Entertainment_System) for [MiSTer Platform](https://github.com/MiSTer-devel/Main_MiSTer/wiki)
+
+Written by [srg320](https://github.com/srg320)
 
 ## Installing
 copy *.rbf to root of SD card. Put some ROMs (*.SCF, *.SMC, *.BIN) into SNES folder

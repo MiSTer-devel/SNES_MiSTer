@@ -83,6 +83,10 @@ always @(posedge CLK) begin
 	reg [15:0] hde_d;
 	reg [8:0] xm,xp,ym,yp;
 	reg reload_pressed;
+	reg [16:0] jy1,jy2;
+
+	jy1 <= {8'd0, j_y} * vtotal;
+	jy2 <= jy1;
 	
 	old_ms <= MOUSE[24];
 	if(MOUSE_XY) begin
@@ -98,9 +102,8 @@ always @(posedge CLK) begin
 	end
 	else begin
 		lg_x <= j_x;
-		if(j_y < 8) lg_y <= 0;
-		else if((j_y - 9'd8) > vtotal) lg_y <= vtotal;
-		else lg_y <= j_y - 9'd8;
+		lg_y <= jy2[16:8];
+		if(jy2[16:8] > vtotal) lg_y <= vtotal;
 	end
 
 	old_pix <= CLKPIX;

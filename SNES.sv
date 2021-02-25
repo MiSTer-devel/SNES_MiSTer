@@ -881,14 +881,7 @@ wire       scandoubler = ~interlace && (scale || forced_scandoubler);
 video_mixer #(.LINE_LENGTH(520), .GAMMA(1)) video_mixer
 (
 	.*,
-
-	.clk_vid(CLK_VIDEO),
-	.ce_pix_out(CE_PIXEL),
-
-	.scanlines(0),
 	.hq2x(scale==1),
-	.mono(0),
-
 	.VGA_DE(vga_de),
 	.R((LG_TARGET && GUN_MODE && (!status[29] | LG_T)) ? {8{LG_TARGET[0]}} : R),
 	.G((LG_TARGET && GUN_MODE && (!status[29] | LG_T)) ? {8{LG_TARGET[1]}} : G),

@@ -38,8 +38,9 @@ module emu
 	output        CE_PIXEL,
 
 	//Video aspect ratio for HDMI. Most retro systems have ratio 4:3.
-	output [11:0] VIDEO_ARX,
-	output [11:0] VIDEO_ARY,
+	//if VIDEO_ARX[12] or VIDEO_ARY[12] is set then [11:0] contains scaled size instead of aspect ratio.
+	output [12:0] VIDEO_ARX,
+	output [12:0] VIDEO_ARY,
 
 	output  [7:0] VGA_R,
 	output  [7:0] VGA_G,
@@ -50,6 +51,36 @@ module emu
 	output        VGA_F1,
 	output [1:0]  VGA_SL,
 	output        VGA_SCALER, // Force VGA scaler
+
+	input  [11:0] HDMI_WIDTH,
+	input  [11:0] HDMI_HEIGHT,
+
+`ifdef USE_FB
+	// Use framebuffer in DDRAM (USE_FB=1 in qsf)
+	// FB_FORMAT:
+	//    [2:0] : 011=8bpp(palette) 100=16bpp 101=24bpp 110=32bpp
+	//    [3]   : 0=16bits 565 1=16bits 1555
+	//    [4]   : 0=RGB  1=BGR (for 16/24/32 modes)
+	//
+	// FB_STRIDE either 0 (rounded to 256 bytes) or multiple of pixel size (in bytes)
+	output        FB_EN,
+	output  [4:0] FB_FORMAT,
+	output [11:0] FB_WIDTH,
+	output [11:0] FB_HEIGHT,
+	output [31:0] FB_BASE,
+	output [13:0] FB_STRIDE,
+	input         FB_VBL,
+	input         FB_LL,
+	output        FB_FORCE_BLANK,
+
+	// Palette control for 8bit modes.
+	// Ignored for other video modes.
+	output        FB_PAL_CLK,
+	output  [7:0] FB_PAL_ADDR,
+	output [23:0] FB_PAL_DOUT,
+	input  [23:0] FB_PAL_DIN,
+	output        FB_PAL_WR,
+`endif
 
 	output        LED_USER,  // 1 - ON, 0 - OFF.
 
@@ -80,6 +111,7 @@ module emu
 	output        SD_CS,
 	input         SD_CD,
 
+`ifdef USE_DDRAM
 	//High latency DDR3 RAM interface
 	//Use for non-critical time purposes
 	output        DDRAM_CLK,
@@ -92,7 +124,9 @@ module emu
 	output [63:0] DDRAM_DIN,
 	output  [7:0] DDRAM_BE,
 	output        DDRAM_WE,
+`endif
 
+`ifdef USE_SDRAM
 	//SDRAM interface with lower latency
 	output        SDRAM_CLK,
 	output        SDRAM_CKE,
@@ -105,6 +139,20 @@ module emu
 	output        SDRAM_nCAS,
 	output        SDRAM_nRAS,
 	output        SDRAM_nWE,
+`endif
+
+`ifdef DUAL_SDRAM
+	//Secondary SDRAM
+	input         SDRAM2_EN,
+	output        SDRAM2_CLK,
+	output [12:0] SDRAM2_A,
+	output  [1:0] SDRAM2_BA,
+	inout  [15:0] SDRAM2_DQ,
+	output        SDRAM2_nCS,
+	output        SDRAM2_nCAS,
+	output        SDRAM2_nRAS,
+	output        SDRAM2_nWE,
+`endif
 
 	input         UART_CTS,
 	output        UART_RTS,
@@ -124,6 +172,7 @@ module emu
 	input         OSD_STATUS
 );
 
+
 assign ADC_BUS  = 'Z;
 assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 
@@ -136,13 +185,30 @@ assign LED_POWER = 0;
 assign BUTTONS   = osd_btn;
 assign VGA_SCALER= 0;
 
-wire [1:0] ar = status[33:32];
-
-assign VIDEO_ARX = (!ar) ? 12'd64 : (ar - 1'd1);
-assign VIDEO_ARY = (!ar) ? 12'd49 : 12'd0;
-
 assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = 0;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
+
+wire [1:0] ar       = status[33:32];
+wire       vcrop_en = status[39];
+wire [3:0] vcopt    = status[38:35];
+reg        en216p;
+reg  [4:0] voff;
+always @(posedge CLK_VIDEO) begin
+	en216p <= ((HDMI_WIDTH == 1920) && (HDMI_HEIGHT == 1080) && !forced_scandoubler && !scale);
+	voff <= (vcopt < 6) ? {vcopt,1'b0} : ({vcopt,1'b0} - 5'd24);
+end
+
+wire vga_de;
+video_freak video_freak
+(
+	.*,
+	.VGA_DE_IN(vga_de),
+	.ARX((!ar) ? 12'd64 : (ar - 1'd1)),
+	.ARY((!ar) ? 12'd49 : 12'd0),
+	.CROP_SIZE((en216p & vcrop_en) ? 10'd216 : 10'd0),
+	.CROP_OFF(voff),
+	.SCALE(status[41:40])
+);
 
 ///////////////////////  CLOCK/RESET  ///////////////////////////////////
 
@@ -223,7 +289,7 @@ wire reset = RESET | buttons[1] | status[0] | cart_download | spc_download | bk_
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX   XX 
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX   XXXXXXXXXXX
 
 `include "build_id.v"
 parameter CONF_STR = {
@@ -246,6 +312,12 @@ parameter CONF_STR = {
 	"P1-;",
 	"P1o01,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"P1O9B,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
+	"P1-;",
+	"d5P1o7,Vertical Crop,Disabled,216p(5x);",
+	"d5P1o36,Crop Offset,0,2,4,8,10,12,-12,-10,-8,-6,-4,-2;",
+	"P1o89,Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
+	"P1oA,Force 256px,Off,On;",
+	"P1-;",
 	"P1OG,Pseudo Transparency,Blend,Off;",
 	"P1-;",
 	"P1OJK,Stereo Mix,None,25%,50%,100%;", 
@@ -258,6 +330,7 @@ parameter CONF_STR = {
 	"P2OPQ,Super Scope,Disabled,Joy1,Joy2,Mouse;",
 	"D4P2OR,Super Scope Btn,Joy,Mouse;",
 	"D4P2OST,Cross,Small,Big,None;",
+	"D4P2o2,Gun Type,Super Scope,Justifier;",
 	"P2-;",
 	"D1P2OI,SuperFX Speed,Normal,Turbo;",
 	"D3P2O4,CPU Speed,Normal,Turbo;",
@@ -275,7 +348,7 @@ parameter CONF_STR = {
 
 wire  [1:0] buttons;
 wire [63:0] status;
-wire [15:0] status_menumask = {!GUN_MODE, ~turbo_allow, ~gg_available, ~GSU_ACTIVE, ~bk_ena};
+wire [15:0] status_menumask = {en216p, !GUN_MODE, ~turbo_allow, ~gg_available, ~GSU_ACTIVE, ~bk_ena};
 wire        forced_scandoubler;
 reg  [31:0] sd_lba;
 reg         sd_rd = 0;
@@ -353,6 +426,7 @@ hps_io #(.STRLEN($size(CONF_STR)>>3), .WIDE(1)) hps_io
 
 wire       GUN_BTN = status[27];
 wire [1:0] GUN_MODE = status[26:25];
+wire       GUN_TYPE = status[34];
 wire       GSU_TURBO = status[18];
 wire       BLEND = ~status[16];
 wire [1:0] mouse_mode = status[6:5];
@@ -515,19 +589,19 @@ main main
 	.ARAM_CE_N(ARAM_CE_N),
 	.ARAM_WE_N(ARAM_WE_N),
 
-	.R(R),
-	.G(G),
-	.B(B),
+	.R(R_out),
+	.G(G_out),
+	.B(B_out),
 
 	.FIELD(FIELD),
 	.INTERLACE(INTERLACE),
 	.HIGH_RES(HIGH_RES),
-	.DOTCLK(DOTCLK),
+	.DOTCLK(DOTCLK_out),
 	
-	.HBLANKn(HBlank_n),
-	.VBLANKn(VBlank_n),
-	.HSYNC(HSYNC),
-	.VSYNC(VSYNC),
+	.HBLANKn(HBlank_out),
+	.VBLANKn(VBlank_out),
+	.HSYNC(HSYNC_out),
+	.VSYNC(VSYNC_out),
 
 	.JOY1_DI(JOY1_DI),
 	.JOY2_DI(GUN_MODE ? LG_DO : JOY2_DI),
@@ -741,14 +815,35 @@ dpram_dif #(BSRAM_BITS,8,BSRAM_BITS-1,16) bsram
 
 ////////////////////////////  VIDEO  ////////////////////////////////////
 
-wire [7:0] R,G,B;
+wire [7:0] R_out,G_out,B_out;
+wire HSYNC_out;
+wire VSYNC_out;
+wire HBlank_out;
+wire VBlank_out;
+wire DOTCLK_out;
+
+always @(posedge clk_sys) begin
+	DOTCLK <= DOTCLK_out;
+	if(DOTCLK ^ DOTCLK_out) begin
+		R <= R_out;
+		G <= G_out;
+		B <= B_out;
+		HSYNC  <= HSYNC_out;
+		VSYNC  <= VSYNC_out;
+		HBlank <= ~HBlank_out;
+		VBlank <= ~VBlank_out;
+	end
+end
+
+
+reg  [7:0] R,G,B;
 wire FIELD,INTERLACE;
-wire HSync, HSYNC;
-wire VSync, VSYNC;
-wire HBlank_n;
-wire VBlank_n;
+reg  HSync, HSYNC;
+reg  VSync, VSYNC;
+reg  HBlank;
+reg  VBlank;
 wire HIGH_RES;
-wire DOTCLK;
+reg  DOTCLK;
 
 reg interlace;
 reg ce_pix;
@@ -758,18 +853,18 @@ always @(posedge CLK_VIDEO) begin
 	reg tmp_hres, frame_hres;
 	reg old_dotclk;
 	
-	tmp_hres <= tmp_hres | HIGH_RES;
+	if(~HBlank & ~VBlank) tmp_hres <= tmp_hres | HIGH_RES;
 
 	old_vsync <= VSync;
 	if(~old_vsync & VSync) begin
-		frame_hres <= tmp_hres | ~scandoubler;
-		tmp_hres <= HIGH_RES;
+		frame_hres <= (tmp_hres | ~scandoubler) & ~status[42];
+		tmp_hres <= 0;
 		interlace <= INTERLACE;
 	end
 
 	pcnt <= pcnt + 1'd1;
 	old_dotclk <= DOTCLK;
-	if(~old_dotclk & DOTCLK & HBlank_n & VBlank_n) pcnt <= 1;
+	if(~old_dotclk & DOTCLK & ~HBlank & ~VBlank) pcnt <= 1;
 
 	ce_pix <= !pcnt[1:0] & (frame_hres | ~pcnt[2]);
 	
@@ -786,16 +881,8 @@ wire       scandoubler = ~interlace && (scale || forced_scandoubler);
 video_mixer #(.LINE_LENGTH(520), .GAMMA(1)) video_mixer
 (
 	.*,
-
-	.clk_vid(CLK_VIDEO),
-	.ce_pix_out(CE_PIXEL),
-
-	.scanlines(0),
 	.hq2x(scale==1),
-	.mono(0),
-
-	.HBlank(~HBlank_n),
-	.VBlank(~VBlank_n),
+	.VGA_DE(vga_de),
 	.R((LG_TARGET && GUN_MODE && (!status[29] | LG_T)) ? {8{LG_TARGET[0]}} : R),
 	.G((LG_TARGET && GUN_MODE && (!status[29] | LG_T)) ? {8{LG_TARGET[1]}} : G),
 	.B((LG_TARGET && GUN_MODE && (!status[29] | LG_T)) ? {8{LG_TARGET[2]}} : B)
@@ -867,12 +954,13 @@ lightgun lightgun
 	.T(LG_T), // always from joysticks
 	.P(ps2_mouse[2] | ((GUN_MODE[0]&joy0[7]) | (GUN_MODE[1]&joy1[7]))), // always from joysticks and mouse
 
-	.HDE(HBlank_n),
-	.VDE(VBlank_n),
+	.HDE(~HBlank),
+	.VDE(~VBlank),
 	.CLKPIX(DOTCLK),
 	
 	.TARGET(LG_TARGET),
 	.SIZE(status[28]),
+	.GUN_TYPE(GUN_TYPE),
 
 	.PORT_LATCH(JOY_STRB),
 	.PORT_CLK(JOY2_CLK),

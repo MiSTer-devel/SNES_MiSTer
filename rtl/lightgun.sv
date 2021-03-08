@@ -15,6 +15,7 @@ module lightgun
 	
 	output [2:0] TARGET,
 	input        SIZE,
+	input        GUN_TYPE,
 
 	input        PORT_LATCH,
 	input        PORT_CLK,
@@ -24,13 +25,17 @@ module lightgun
 
 parameter CROSS_SZ = 8'd3;
 
-assign PORT_DO = {1'b1, JOY_LATCH0[7]};
+assign PORT_DO = {1'b1, GUN_TYPE ? JUSTIFIER_LATCH[31] : JOY_LATCH0[7]};
 assign TARGET  = {{2{~Ttr & ~offscreen & draw}}, Ttr & ~offscreen & draw};
 
 reg Ttr; // 0 - one-shot fire. 1 - continous fire.
 reg Fb = 0, Pb = 0;
 
+reg [2:0] reload_pend;
+reg [2:0] reload;
+
 reg [7:0] JOY_LATCH0;
+reg [31:0] JUSTIFIER_LATCH;
 always @(posedge CLK) begin
 	reg old_clk, old_f, old_p, old_t, old_latch;
 	old_clk <= PORT_CLK;
@@ -52,8 +57,14 @@ always @(posedge CLK) begin
 	old_p <= P;
 	if(~old_p & P) Pb <= 1;
 	
-	if(PORT_LATCH) JOY_LATCH0 <= ~{Fb,C,Ttr,Pb,2'b00,offscreen,1'b0};
-	else if (~old_clk & PORT_CLK) JOY_LATCH0 <= JOY_LATCH0 << 1;
+	if(PORT_LATCH) begin
+		JOY_LATCH0 <= ~{Fb,C,Ttr,Pb,2'b00,offscreen,1'b0};
+		JUSTIFIER_LATCH <= ~{24'b000000000000111001010101, reload ? 1'b1 : (reload_pend ? 1'b0 : F), 1'b0, P, 1'b0, 4'b1000};
+	end
+	else if (~old_clk & PORT_CLK) begin
+		JOY_LATCH0 <= JOY_LATCH0 << 1;
+		JUSTIFIER_LATCH <= JUSTIFIER_LATCH << 1;
+	end
 end
 
 reg  [8:0] lg_x, lg_y, x, y;
@@ -71,6 +82,11 @@ always @(posedge CLK) begin
 	reg [8:0] vtotal;
 	reg [15:0] hde_d;
 	reg [8:0] xm,xp,ym,yp;
+	reg reload_pressed;
+	reg [16:0] jy1,jy2;
+
+	jy1 <= {8'd0, j_y} * vtotal;
+	jy2 <= jy1;
 	
 	old_ms <= MOUSE[24];
 	if(MOUSE_XY) begin
@@ -86,9 +102,8 @@ always @(posedge CLK) begin
 	end
 	else begin
 		lg_x <= j_x;
-		if(j_y < 8) lg_y <= 0;
-		else if((j_y - 9'd8) > vtotal) lg_y <= vtotal;
-		else lg_y <= j_y - 9'd8;
+		lg_y <= jy2[16:8];
+		if(jy2[16:8] > vtotal) lg_y <= vtotal;
 	end
 
 	old_pix <= CLKPIX;
@@ -113,11 +128,20 @@ always @(posedge CLK) begin
 			xp <= lg_x + CROSS_SZ;
 			ym <= lg_y - CROSS_SZ;
 			yp <= lg_y + CROSS_SZ;
-			offscreen <= !lg_y[7:1] || lg_y >= (vtotal-1'd1) || !lg_x[7:1] || &lg_x[7:1];
+			offscreen <= !lg_y[7:1] || lg_y >= (vtotal-1'd1) || !lg_x[7:1] || &lg_x[7:1] || reload_pend || reload;
+			
+			if(reload_pend && !reload) begin
+				reload_pend <= reload_pend - 3'd1;
+				if (reload_pend == 3'd1) reload <= 3'd5;
+			end
+			else if (reload) reload <= reload - 3'd1;
 		end
 	end
+	
+	reload_pressed <= C;
+	if (GUN_TYPE && C && ~reload_pressed) reload_pend <= 3'd5;
 
-	PORT_P6 <= ~(HDE && VDE && x == hcnt && y == vcnt);
+	PORT_P6 <= ~(HDE && VDE && x == hcnt && y == vcnt) || offscreen;
 	draw <= (((SIZE || ($signed(hcnt) >= $signed(xm) && hcnt <= xp)) && y == vcnt) || 
 	         ((SIZE || ($signed(vcnt) >= $signed(ym) && vcnt <= yp)) && x == hcnt));
 end

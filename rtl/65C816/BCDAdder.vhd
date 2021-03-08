@@ -114,7 +114,7 @@ begin
 		CO		=> BIN_CO
 	);
 	
-	BCD_CO <= (BIN_S(3) and BIN_S(2)) or (BIN_S(3) and BIN_S(1)) or (BIN_CO xor not ADD);
+	BCD_CO <= (((BIN_S(3) and BIN_S(2)) or (BIN_S(3) and BIN_S(1))) and ADD) or (not BIN_CO and not ADD);
 	BCD_B <= not ADD & ((BCD_CO and BCD) xor not ADD) & ((BCD_CO and BCD) xor not ADD) & not ADD;
 	
 	bcd_corr_adder : entity work.adder4

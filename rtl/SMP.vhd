@@ -131,7 +131,7 @@ architecture rtl of SMP is
 	x"ff"
 	);
 	
-	signal SMP_REG_DAT : std_logic_vector(63 downto 0);
+	signal SMP_REG_DAT : std_logic_vector(111 downto 0);
 	signal SPC_REG_DAT : std_logic_vector(55 downto 0);
 	signal REG_SET : std_logic;
 
@@ -149,18 +149,20 @@ begin
 			end if;
 			
 			if REG_SET = '1' then
-				CPUI(0) <= SMP_REG_DAT(15 downto 8); 
-				CPUI(1) <= SMP_REG_DAT(23 downto 16);
-				CPUI(2) <= SMP_REG_DAT(31 downto 24);
-				CPUI(3) <= SMP_REG_DAT(39 downto 32);
+				CPUI(0) <= SMP_REG_DAT(23 downto 16); 
+				CPUI(1) <= SMP_REG_DAT(31 downto 24);
+				CPUI(2) <= SMP_REG_DAT(39 downto 32);
+				CPUI(3) <= SMP_REG_DAT(47 downto 40);
 			elsif SPC700_CE = '1' then
-				if RESET_PORT(0) = '1' then
-					CPUI(0) <= (others=>'0');
-					CPUI(1) <= (others=>'0');
-				end if;
-				if RESET_PORT(1) = '1' then
-					CPUI(2) <= (others=>'0');
-					CPUI(3) <= (others=>'0');
+				if SPC700_A = x"00F1" and SPC700_R_WN = '0' then
+					if SPC700_D_OUT(4) = '1' then
+						CPUI(0) <= (others=>'0');
+						CPUI(1) <= (others=>'0');
+					end if;
+					if SPC700_D_OUT(5) = '1' then
+						CPUI(2) <= (others=>'0');
+						CPUI(3) <= (others=>'0');
+					end if;
 				end if;
 			end if;
 		end if;
@@ -198,7 +200,7 @@ begin
 			RAM_WRITE_EN <= '1';
 			IPL_EN <= '1';
 			TM_EN <= (others=>'0');
-			RESET_PORT <= (others=>'1');
+			RESET_PORT <= (others=>'0');
 			CPUO <= (others=> (others=> '0'));
 			T0OUT <= (others=>'0');
 			T1OUT <= (others=>'0');
@@ -218,17 +220,24 @@ begin
 		elsif rising_edge(CLK) then
 			TIMER_CE <= '0';
 			if REG_SET = '1' then
-				TM_EN <= SMP_REG_DAT(2 downto 0);
-				RESET_PORT <= SMP_REG_DAT(5 downto 4);
-				IPL_EN <= SMP_REG_DAT(7); 
-				T0DIV <= SMP_REG_DAT(47 downto 40);
-				T1DIV <= SMP_REG_DAT(55 downto 48);
-				T2DIV <= SMP_REG_DAT(63 downto 56);
+--				TIMERS_DISABLE <= SMP_REG_DAT(0);
+--				RAM_WRITE_EN <= SMP_REG_DAT(1);
+--				TIMERS_ENABLE <= SMP_REG_DAT(3);
+--				TM_SPEED <= SMP_REG_DAT(5 downto 4);
+--				CLK_SPEED <= SMP_REG_DAT(7 downto 6);
+				TM_EN <= SMP_REG_DAT(10 downto 8);
+				RESET_PORT <= SMP_REG_DAT(13 downto 12);
+				IPL_EN <= SMP_REG_DAT(15); 
+				T0DIV <= SMP_REG_DAT(55 downto 48);
+				T1DIV <= SMP_REG_DAT(63 downto 56);
+				T2DIV <= SMP_REG_DAT(71 downto 64);
+				AUX(0) <= SMP_REG_DAT(87 downto 80);
+				AUX(1) <= SMP_REG_DAT(95 downto 88);
+				T0OUT <= SMP_REG_DAT(75 downto 72);
+				T1OUT <= SMP_REG_DAT(99 downto 96);
+				T2OUT <= SMP_REG_DAT(107 downto 104);
 			elsif SPC700_CE = '1' then
 				TIMER_CE <= '1';
-				
-				RESET_PORT <= "00";
-				
 				if SPC700_A(15 downto 4) = x"00F" then
 					if SPC700_R_WN = '0' then
 						case SPC700_A(3 downto 0) is
@@ -356,16 +365,20 @@ begin
 			if IO_WR = '1' then
 				if IO_ADDR(16 downto 4) = "0"&x"02F" then
 					case IO_ADDR(3 downto 1) is
-						when "000" =>
-							SMP_REG_DAT(7 downto 0) <= IO_DAT(15 downto 8);
+						when "000" => 
+							SMP_REG_DAT(15 downto 0) <= IO_DAT;
 						when "010" =>
-							SMP_REG_DAT(23 downto 8) <= IO_DAT;
+							SMP_REG_DAT(31 downto 16) <= IO_DAT;
 						when "011" =>
-							SMP_REG_DAT(39 downto 24) <= IO_DAT;
+							SMP_REG_DAT(47 downto 32) <= IO_DAT;
 						when "101" => 
-							SMP_REG_DAT(55 downto 40) <= IO_DAT;
+							SMP_REG_DAT(63 downto 48) <= IO_DAT;
 						when "110" => 
-							SMP_REG_DAT(63 downto 56) <= IO_DAT(7 downto 0);
+							SMP_REG_DAT(79 downto 64) <= IO_DAT;
+						when "100" => 
+							SMP_REG_DAT(95 downto 80) <= IO_DAT;
+						when "111" => 
+							SMP_REG_DAT(111 downto 96) <= IO_DAT;
 						when others => null;
 					end case;
 				elsif IO_ADDR(16 downto 8) = "0"&x"00" then

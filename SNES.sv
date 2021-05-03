@@ -172,6 +172,7 @@ module emu
 	input         OSD_STATUS
 );
 
+//`define DEBUG_BUILD
 
 assign ADC_BUS  = 'Z;
 assign {UART_RTS, UART_TXD, UART_DTR} = 0;
@@ -369,6 +370,7 @@ wire  [7:0] ioctl_index;
 
 wire [11:0] joy0,joy1,joy2,joy3,joy4;
 wire [24:0] ps2_mouse;
+wire [10:0] ps2_key;
 
 wire  [7:0] joy0_x,joy0_y,joy1_x,joy1_y;
 
@@ -394,7 +396,8 @@ hps_io #(.STRLEN($size(CONF_STR)>>3), .WIDE(1)) hps_io
 	.joystick_3(joy3),
 	.joystick_4(joy4),
 	.ps2_mouse(ps2_mouse),
-
+	.ps2_key(ps2_key),
+	
 	.status(status),
 	.status_menumask(status_menumask),
 	.status_in({status[63:5],1'b0,status[3:0]}),
@@ -627,6 +630,14 @@ main main
 	
 	.TURBO(status[4] & turbo_allow),
 	.TURBO_ALLOW(turbo_allow),
+	
+`ifdef DEBUG_BUILD
+	.DBG_BG_EN(DBG_BG_EN),
+	.DBG_CPU_EN(DBG_CPU_EN),
+`else
+	.DBG_BG_EN(5'b11111),
+	.DBG_CPU_EN(1'b1),
+`endif
 
 	.AUDIO_L(AUDIO_L),
 	.AUDIO_R(AUDIO_R)
@@ -1072,4 +1083,31 @@ always @(posedge clk_sys) begin
 	end
 end
  
+//debug
+`ifdef DEBUG_BUILD
+reg [4:0] DBG_BG_EN = '1;
+reg       DBG_CPU_EN = 1;
+
+wire       pressed = ps2_key[9];
+wire [8:0] code    = ps2_key[8:0];
+
+always @(posedge clk_sys) begin
+	reg old_state = 0;
+
+	old_state <= ps2_key[10];
+
+	if((ps2_key[10] != old_state) && pressed) begin
+		casex(code)
+			'h005: begin DBG_BG_EN[0] <= ~DBG_BG_EN[0]; end 	// F1
+			'h006: begin DBG_BG_EN[1] <= ~DBG_BG_EN[1] ; end 	// F2
+			'h004: begin DBG_BG_EN[2] <= ~DBG_BG_EN[2] ; end 	// F3
+			'h00C: begin DBG_BG_EN[3] <= ~DBG_BG_EN[3] ; end 	// F4
+			'h003: begin DBG_BG_EN[4] <= ~DBG_BG_EN[4] ; end 	// F5
+			'h177: begin DBG_CPU_EN <= ~DBG_CPU_EN; end 	// Pause
+		endcase
+	end
+end
+`endif
+
+
 endmodule

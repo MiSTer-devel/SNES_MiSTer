@@ -96,6 +96,9 @@ entity SNES is
 		IO_WR 		: in std_logic;
 		
 		TURBO			: in std_logic;
+		
+		DBG_BG_EN	: in std_logic_vector(4 downto 0);
+		DBG_CPU_EN	: in std_logic;
 
 		AUDIO_L		: out std_logic_vector(15 downto 0);
 		AUDIO_R		: out std_logic_vector(15 downto 0)
@@ -229,7 +232,8 @@ begin
 		JOY1_CLK		=> JOY1_CLK,
 		JOY2_CLK		=> JOY2_CLK,
 
-		TURBO			=> TURBO
+		TURBO			=> TURBO,
+		DBG_CPU_EN	=> DBG_CPU_EN
 	);
 
 	BUSA_SEL <= '1' when INT_CA(22) = '0' and INT_CA(15 downto 8) /= x"21" else
@@ -326,7 +330,9 @@ begin
 		HDE			=> HDE,
 		VDE			=> VDE,
 		HSYNC			=> HSYNC,
-		VSYNC			=> VSYNC
+		VSYNC			=> VSYNC,
+		
+		BG_EN			=> DBG_BG_EN
 	);
 
 

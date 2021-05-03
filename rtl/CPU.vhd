@@ -41,7 +41,9 @@ entity SCPU is
 		JOY1_CLK			: out std_logic;
 		JOY2_CLK			: out std_logic;
 
-		TURBO				: in std_logic
+		TURBO				: in std_logic;
+		
+		DBG_CPU_EN		: in std_logic
 	);
 end SCPU;
 
@@ -348,7 +350,7 @@ begin
 	port map (
 		CLK         => CLK,
 		RST_N       => RST_N,
-		CE       	=> INT_CLKF_CE,
+		CE       	=> INT_CLKF_CE and DBG_CPU_EN,
 		
 		WE          => P65_R_WN,
 		D_IN     	=> P65_DI,
@@ -361,7 +363,6 @@ begin
 		VPA      	=> P65_VPA,
 		VDA      	=> P65_VDA
 	); 
-
 
 	process(P65_A, P65_VPA, P65_VDA)
 	begin

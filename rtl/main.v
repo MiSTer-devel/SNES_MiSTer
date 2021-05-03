@@ -86,6 +86,9 @@ module main (
 	input      [16:0] IO_ADDR,
 	input      [15:0] IO_DAT,
 	input             IO_WR,
+	
+	input       [4:0] DBG_BG_EN,
+	input             DBG_CPU_EN,
 
    input             TURBO,
    output            TURBO_ALLOW,
@@ -204,6 +207,9 @@ SNES SNES
 	.io_addr(IO_ADDR),
 	.io_dat(IO_DAT),
 	.io_wr(IO_WR),
+	
+	.DBG_BG_EN(DBG_BG_EN),
+	.DBG_CPU_EN(DBG_CPU_EN),
 	
 	.turbo(TURBO),
 

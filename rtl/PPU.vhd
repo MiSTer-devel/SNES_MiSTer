@@ -52,7 +52,9 @@ entity SPPU is
 		HSYNC			: out std_logic;
 		VSYNC			: out std_logic;
 		HDE 			: out std_logic;
-		VDE 			: out std_logic
+		VDE 			: out std_logic;
+		
+		BG_EN			: in std_logic_vector(4 downto 0)
 	);
 end SPPU;
 
@@ -174,7 +176,6 @@ signal OUT_X				: unsigned(7 downto 0);
 signal OUT_Y				: unsigned(7 downto 0);
 signal BG_MOSAIC_X 		: unsigned(3 downto 0);
 signal BG_MOSAIC_Y 		: unsigned(3 downto 0);
-signal BG_MOSAIC_Y_NEXT	: unsigned(3 downto 0);
 signal BF 					: BgFetch_r;
 signal BG3_OPT_DATA0 	: std_logic_vector(15 downto 0);
 signal BG3_OPT_DATA1 	: std_logic_vector(15 downto 0);
@@ -962,7 +963,7 @@ HIRES <= '1' when BG_MODE = "101" or BG_MODE = "110" else '0';
 BF <= BF_TBL(to_integer(unsigned(BG_MODE)), to_integer(H_CNT(2 downto 0)));
 
 process( RST_N, CLK, BF, BG_MODE, BG_SIZE, BG_SC_ADDR, BG_SC_SIZE, BG_NBA, BG_HOFS, BG_VOFS, H_CNT, V_CNT, IN_VBL, FORCE_BLANK,
-			BG_DATA, BG_TILE_INFO, BG3_OPT_DATA0, BG3_OPT_DATA1, BG_MOSAIC_Y, BG_MOSAIC_Y_NEXT ,BG_MOSAIC_EN, FIELD, HIRES, BGINTERLACE, VRAM_DAI,
+			BG_DATA, BG_TILE_INFO, BG3_OPT_DATA0, BG3_OPT_DATA1, BG_MOSAIC_Y ,BG_MOSAIC_EN, FIELD, HIRES, BGINTERLACE, VRAM_DAI,
 			M7_SCREEN_X, M7_TEMP_X, M7_TEMP_Y, M7_TILE_N, M7_TILE_COL, M7_TILE_ROW, M7SEL, M7HOFS, M7VOFS, M7X, M7Y, M7A, M7B, M7C, M7D)
 variable SCREEN_X : unsigned(8 downto 0);
 variable SCREEN_Y : unsigned(7 downto 0);
@@ -970,7 +971,6 @@ variable OPTH_EN, OPTV_EN : std_logic;
 variable IS_OPT : std_logic;
 variable OPT_HOFS, OPT_VOFS : unsigned(9 downto 0);
 variable MOSAIC_Y : unsigned(7 downto 0);
-variable M7_MOSAIC_Y : unsigned(7 downto 0);
 variable TILE_INFO_N : unsigned(9 downto 0);
 variable TILE_INFO_HFLIP : std_logic;
 variable TILE_INFO_VFLIP : std_logic;
@@ -1015,10 +1015,8 @@ begin
 
 	if BG_MOSAIC_EN(BF.BG) = '0' then
 		MOSAIC_Y    := SCREEN_Y;
-		M7_MOSAIC_Y := SCREEN_Y+1;
 	else
 		MOSAIC_Y    := SCREEN_Y   - BG_MOSAIC_Y;
-		M7_MOSAIC_Y := SCREEN_Y+1 - BG_MOSAIC_Y_NEXT;
 	end if;
 	
 	-- MODE 0-6
@@ -1168,9 +1166,9 @@ begin
 	end if;
 	
 	if M7SEL(1) = '0' then
-		M7_Y := signed(resize(M7_MOSAIC_Y, 9));
+		M7_Y := signed(resize(MOSAIC_Y, 9));
 	else
-		M7_Y := signed(resize(not M7_MOSAIC_Y, 9));
+		M7_Y := signed(resize(not MOSAIC_Y, 9));
 	end if;
 				
 	MPY <= resize(signed(M7A) * signed(M7B(15 downto 8)), MPY'length);
@@ -1220,7 +1218,7 @@ begin
 				M7_SCREEN_X <= (others => '0');
 			end if;
 			
-			if H_CNT = LAST_DOT then
+			if H_CNT = M7_FETCH_START-1 then
 				M7_TEMP_X <= (resize(signed(M7X), M7_TEMP_X'length) sll 8) + 
 								 (resize(signed(M7A) * signed(ORG_X), M7_TEMP_X'length) and x"FFFFC0") + 
 								 (resize(signed(M7B) * signed(ORG_Y), M7_TEMP_X'length) and x"FFFFC0") + 
@@ -1247,7 +1245,6 @@ begin
 		BG3_OPT_DATA0 <= (others => '0');
 		BG3_OPT_DATA1 <= (others => '0');
 		BG_MOSAIC_Y <= (others => '0');
-		BG_MOSAIC_Y_NEXT <= (others => '0');
 		BG_FORCE_BLANK <= '1';
 	elsif rising_edge(CLK) then 
 		if ENABLE = '1' and DOT_CLKR_CE = '1' then
@@ -1257,18 +1254,14 @@ begin
 				BG3_OPT_DATA1 <= (others => '0');
 			end if;
 			
-			if H_CNT = LAST_DOT-1 and V_CNT >= 1 and V_CNT <= LAST_VIS_LINE then
+			if H_CNT = LAST_DOT and V_CNT >= 1 and V_CNT <= LAST_VIS_LINE then
 				if BG_MOSAIC_Y = unsigned(MOSAIC_SIZE) then
-					BG_MOSAIC_Y_NEXT <= (others => '0');
+					BG_MOSAIC_Y <= (others => '0');
 				else
-					BG_MOSAIC_Y_NEXT <= BG_MOSAIC_Y + 1;
+					BG_MOSAIC_Y <= BG_MOSAIC_Y + 1;
 				end if;
-			elsif H_CNT = LAST_DOT-1 and V_CNT = LAST_LINE then
-				BG_MOSAIC_Y_NEXT <= (others => '0');
-			end if;
-
-			if H_CNT = LAST_DOT then
-				BG_MOSAIC_Y <= BG_MOSAIC_Y_NEXT;
+			elsif H_CNT = LAST_DOT and V_CNT = LAST_LINE then
+				BG_MOSAIC_Y <= (others => '0');
 			end if;
 
 			if BG_FETCH = '0' then
@@ -1770,7 +1763,7 @@ end process;
 
 
 process( RST_N, CLK, WH0, WH1, WH2, WH3, W12SEL, W34SEL, WOBJSEL, WBGLOG, WOBJLOG, CGWSEL, CGADSUB, TMW, TSW, TM, TS, BG_MODE, BG3PRIO, M7EXTBG,
-			WINDOW_X, SPR_PIX_DATA, BG1_PIX_DATA, BG2_PIX_DATA, BG3_PIX_DATA, BG4_PIX_DATA, DOT_CLK)
+			WINDOW_X, SPR_PIX_DATA, BG1_PIX_DATA, BG2_PIX_DATA, BG3_PIX_DATA, BG4_PIX_DATA, DOT_CLK, BG_EN)
 variable PAL1,PAL2,PAL3,PAL4,OBJ_PAL : std_logic_vector(7 downto 0);
 variable PRIO1,PRIO2,PRIO3,PRIO4 : std_logic;
 variable BGPR0EN, BGPR1EN : std_logic_vector(3 downto 0);
@@ -1852,31 +1845,31 @@ begin
 	PRIO4 := BG4_PIX_DATA(5);
 	
 	if DOT_CLK = '1' then
-		BGPR0EN(0) := TS(0) and (not sub_dis(0)) and (not PRIO1);
-		BGPR0EN(1) := TS(1) and (not sub_dis(1)) and (not PRIO2);
-		BGPR0EN(2) := TS(2) and (not sub_dis(2)) and (not PRIO3);
-		BGPR0EN(3) := TS(3) and (not sub_dis(3)) and (not PRIO4);
-		BGPR1EN(0) := TS(0) and (not sub_dis(0)) and (    PRIO1);
-		BGPR1EN(1) := TS(1) and (not sub_dis(1)) and (    PRIO2);
-		BGPR1EN(2) := TS(2) and (not sub_dis(2)) and (    PRIO3);
-		BGPR1EN(3) := TS(3) and (not sub_dis(3)) and (    PRIO4);
-		OBJPR0EN := TS(4) and (not sub_dis(4)) and (not OBJ_PRIO(0)) and (not OBJ_PRIO(1));
-		OBJPR1EN := TS(4) and (not sub_dis(4)) and (    OBJ_PRIO(0)) and (not OBJ_PRIO(1));
-		OBJPR2EN := TS(4) and (not sub_dis(4)) and (not OBJ_PRIO(0)) and (    OBJ_PRIO(1));
-		OBJPR3EN := TS(4) and (not sub_dis(4)) and (    OBJ_PRIO(0)) and (    OBJ_PRIO(1));
+		BGPR0EN(0) := TS(0) and (not sub_dis(0)) and (not PRIO1) and BG_EN(0);
+		BGPR0EN(1) := TS(1) and (not sub_dis(1)) and (not PRIO2) and BG_EN(1);
+		BGPR0EN(2) := TS(2) and (not sub_dis(2)) and (not PRIO3) and BG_EN(2);
+		BGPR0EN(3) := TS(3) and (not sub_dis(3)) and (not PRIO4) and BG_EN(3);
+		BGPR1EN(0) := TS(0) and (not sub_dis(0)) and (    PRIO1) and BG_EN(0);
+		BGPR1EN(1) := TS(1) and (not sub_dis(1)) and (    PRIO2) and BG_EN(1);
+		BGPR1EN(2) := TS(2) and (not sub_dis(2)) and (    PRIO3) and BG_EN(2);
+		BGPR1EN(3) := TS(3) and (not sub_dis(3)) and (    PRIO4) and BG_EN(3);
+		OBJPR0EN := TS(4) and (not sub_dis(4)) and (not OBJ_PRIO(0)) and (not OBJ_PRIO(1)) and BG_EN(4);
+		OBJPR1EN := TS(4) and (not sub_dis(4)) and (    OBJ_PRIO(0)) and (not OBJ_PRIO(1)) and BG_EN(4);
+		OBJPR2EN := TS(4) and (not sub_dis(4)) and (not OBJ_PRIO(0)) and (    OBJ_PRIO(1)) and BG_EN(4);
+		OBJPR3EN := TS(4) and (not sub_dis(4)) and (    OBJ_PRIO(0)) and (    OBJ_PRIO(1)) and BG_EN(4);
 	else
-		BGPR0EN(0) := TM(0) and (not main_dis(0)) and (not PRIO1);
-		BGPR0EN(1) := TM(1) and (not main_dis(1)) and (not PRIO2);
-		BGPR0EN(2) := TM(2) and (not main_dis(2)) and (not PRIO3);
-		BGPR0EN(3) := TM(3) and (not main_dis(3)) and (not PRIO4);
-		BGPR1EN(0) := TM(0) and (not main_dis(0)) and (    PRIO1);
-		BGPR1EN(1) := TM(1) and (not main_dis(1)) and (    PRIO2);
-		BGPR1EN(2) := TM(2) and (not main_dis(2)) and (    PRIO3);
-		BGPR1EN(3) := TM(3) and (not main_dis(3)) and (    PRIO4);
-		OBJPR0EN := TM(4) and (not main_dis(4)) and (not OBJ_PRIO(0)) and (not OBJ_PRIO(1));
-		OBJPR1EN := TM(4) and (not main_dis(4)) and (    OBJ_PRIO(0)) and (not OBJ_PRIO(1));
-		OBJPR2EN := TM(4) and (not main_dis(4)) and (not OBJ_PRIO(0)) and (    OBJ_PRIO(1));
-		OBJPR3EN := TM(4) and (not main_dis(4)) and (    OBJ_PRIO(0)) and (    OBJ_PRIO(1));
+		BGPR0EN(0) := TM(0) and (not main_dis(0)) and (not PRIO1) and BG_EN(0);
+		BGPR0EN(1) := TM(1) and (not main_dis(1)) and (not PRIO2) and BG_EN(1);
+		BGPR0EN(2) := TM(2) and (not main_dis(2)) and (not PRIO3) and BG_EN(2);
+		BGPR0EN(3) := TM(3) and (not main_dis(3)) and (not PRIO4) and BG_EN(3);
+		BGPR1EN(0) := TM(0) and (not main_dis(0)) and (    PRIO1) and BG_EN(0);
+		BGPR1EN(1) := TM(1) and (not main_dis(1)) and (    PRIO2) and BG_EN(1);
+		BGPR1EN(2) := TM(2) and (not main_dis(2)) and (    PRIO3) and BG_EN(2);
+		BGPR1EN(3) := TM(3) and (not main_dis(3)) and (    PRIO4) and BG_EN(3);
+		OBJPR0EN := TM(4) and (not main_dis(4)) and (not OBJ_PRIO(0)) and (not OBJ_PRIO(1)) and BG_EN(4);
+		OBJPR1EN := TM(4) and (not main_dis(4)) and (    OBJ_PRIO(0)) and (not OBJ_PRIO(1)) and BG_EN(4);
+		OBJPR2EN := TM(4) and (not main_dis(4)) and (not OBJ_PRIO(0)) and (    OBJ_PRIO(1)) and BG_EN(4);
+		OBJPR3EN := TM(4) and (not main_dis(4)) and (    OBJ_PRIO(0)) and (    OBJ_PRIO(1)) and BG_EN(4);
 	end if;
 	
 	if BG_MODE = "000" then	-- MODE0

@@ -1218,7 +1218,7 @@ begin
 				M7_SCREEN_X <= (others => '0');
 			end if;
 			
-			if H_CNT = M7_FETCH_START-1 then
+			if H_CNT = M7_XY_LATCH then
 				M7_TEMP_X <= (resize(signed(M7X), M7_TEMP_X'length) sll 8) + 
 								 (resize(signed(M7A) * signed(ORG_X), M7_TEMP_X'length) and x"FFFFC0") + 
 								 (resize(signed(M7B) * signed(ORG_Y), M7_TEMP_X'length) and x"FFFFC0") + 

@@ -52,6 +52,23 @@ entity DSP_LHRomMap is
 		ROM_MASK		: in std_logic_vector(23 downto 0);
 		BSRAM_MASK	: in std_logic_vector(23 downto 0);
 
+        MSU_TRACKOUT          : out std_logic_vector(15 downto 0);
+        MSU_TRACKREQUEST      : out std_logic;
+        MSU_TRACKMOUNTING     : in  std_logic;
+        MSU_TRACKFINISHED     : in  std_logic;
+        MSU_TRIG_PLAY         : out std_logic;
+        MSU_TRIG_PAUSE        : out std_logic;
+        MSU_VOLUME_OUT		  : out std_logic_vector(7 downto 0);
+        MSU_REPEAT_OUT		  : out std_logic;
+        MSU_AUDIO_PLAYING_IN  : in  std_logic;
+        MSU_AUDIO_PLAYING_OUT : out std_logic;
+        MSU_TRACKMISSING      : in  std_logic;
+        MSU_DATA_ADDR		  : out std_logic_vector(31 downto 0);
+        MSU_DATA_IN           : in  std_logic_vector(7 downto 0);
+        MSU_DATA_BUSY		  : in  std_logic;
+        MSU_DATA_SEEK		  : out std_logic;
+        MSU_DATA_REQ		  : out std_logic;
+
 		EXT_RTC		: in std_logic_vector(64 downto 0)
 	);
 end DSP_LHRomMap;
@@ -77,21 +94,61 @@ architecture rtl of DSP_LHRomMap is
 	
 	signal SRTC_DO 		: std_logic_vector(7 downto 0);
 	signal SRTC_SEL		: std_logic;
+
+	signal MSU_SEL          : std_logic;
+    signal MSU_DO           : std_logic_vector(7 downto 0);
 	
 	signal OPENBUS   		: std_logic_vector(7 downto 0);
 
 	signal MAP_DSP_VER	: std_logic_vector(2 downto 0);
 	signal MAP_DSP_SEL	: std_logic;
 	signal MAP_OBC1_SEL 	: std_logic;
+	signal MAP_MSU_SEL		: std_logic;
 	signal DSP_CLK	  		: integer;
 	signal ROM_RD	  		: std_logic;
+
+    component MSU is
+        port (
+            CLK             : in  std_logic;
+            RST_N           : in  std_logic;
+            ENABLE          : in  std_logic;
+
+            RD_N            : in  std_logic;
+            WR_N            : in  std_logic;
+            ADDR            : in  std_logic_vector(23 downto 0);
+            DIN             : in  std_logic_vector(7 downto 0);
+            DOUT            : out std_logic_vector(7 downto 0);
+
+            track_out       : out std_logic_vector(15 downto 0);
+            track_request   : out std_logic;
+            track_mounting  : in  std_logic;
+            track_finished  : in  std_logic;
+            trig_play       : out std_logic;
+            trig_pause		: out std_logic;
+
+            volume_out		 : out std_logic_vector(7 downto 0);
+
+            msu_status_audio_busy 		: out std_logic;
+            msu_status_audio_repeat 	: out std_logic;
+            msu_status_audio_playing_in : in  std_logic;
+            msu_status_audio_playing_out: out std_logic;
+
+            msu_status_track_missing_in : in std_logic;
+
+            msu_data_addr			: out std_logic_vector(31 downto 0);
+            msu_data_in				: in std_logic_vector(7 downto 0);
+            msu_status_data_busy 	: in std_logic;
+            msu_data_seek			: out std_logic;
+            msu_data_req			: out std_logic
+        );
+    end component;
 		
 begin
 	
 	MAP_DSP_VER <= MAP_CTRL(3) & MAP_CTRL(5 downto 4);
 	MAP_DSP_SEL <= not MAP_CTRL(6) and (MAP_CTRL(7) or not (MAP_CTRL(5) or MAP_CTRL(4)));	--8..B
 	MAP_OBC1_SEL <= MAP_CTRL(7) and MAP_CTRL(6) and not MAP_CTRL(5) and not MAP_CTRL(4);	--C
-	MAP_ACTIVE <= MAP_DSP_SEL or MAP_OBC1_SEL;
+	MAP_ACTIVE <= MAP_DSP_SEL or MAP_OBC1_SEL or MSU_SEL;
 
 	CEGen : entity work.CEGen
 	port map(
@@ -112,6 +169,7 @@ begin
 		SRTC_SEL <= '0';
 		BSRAM_SEL <= '0';
 		NO_BSRAM_SEL <= '0';
+		MSU_SEL <= '0';
 		if ROM_MASK(23) = '0' then
 			case MAP_CTRL(1 downto 0) is
 				when "00" =>							-- LoROM/ExLoROM
@@ -171,13 +229,15 @@ begin
 				when others =>					-- SpecialLoROM														
 					CART_ADDR <= "00" & (CA(23) and not CA(21)) & CA(21 downto 16) & CA(14 downto 0);--00-1F:8000-FFFF; 20-3F/A0-BF:8000-FFFF; 80-9F:8000-FFFF
 					BRAM_ADDR <= CA(20 downto 16) & CA(14 downto 0);
+					BSRAM_SEL <= '0';
 					if CA(22 downto 20) = "111" and CA(15) = '0' and ROMSEL_N = '0' and BSRAM_MASK(10) = '1' then
 						BSRAM_SEL <= '1';
 					end if;
 					DSP_SEL <= '0';
 					DSP_A0 <= '1';
 			end case;
-		else												--96Mbit 
+		else												--96Mbit
+			BSRAM_SEL <= '0';
 			if CA(15) = '0' then
 				CART_ADDR <= "10" & CA(23) & CA(21 downto 16) & CA(14 downto 0);
 			else
@@ -187,6 +247,7 @@ begin
 			if CA(22 downto 21) = "01" and CA(15 downto 13) = "011" and BSRAM_MASK(10) = '1' then
 				BSRAM_SEL <= '1';
 			end if;
+			MSU_SEL <= '1';
 			DSP_SEL <= '0';
 			DSP_A0 <= '1';
 		end if;
@@ -218,6 +279,40 @@ begin
 		REV			=> not MAP_CTRL(2)
 	);
 	end generate;
+
+    MSU_instance : component MSU
+    port map(
+        CLK           => MCLK,
+        RST_N		  => RST_N,
+        ENABLE		  => ENABLE,
+
+        RD_N		  => CPURD_N,
+        WR_N		  => CPUWR_N,
+
+        ADDR		  => CA,
+        DIN			  => DI,
+        DOUT		  => MSU_DO,
+
+        track_out     => MSU_TRACKOUT,
+        track_request => MSU_TRACKREQUEST,
+        track_mounting=> MSU_TRACKMOUNTING,
+        track_finished=> MSU_TRACKFINISHED,
+        trig_play     => MSU_TRIG_PLAY,
+        trig_pause    => MSU_TRIG_PAUSE,
+
+        volume_out => MSU_VOLUME_OUT,
+
+        msu_status_audio_repeat => MSU_REPEAT_OUT,
+        msu_status_audio_playing_in => MSU_AUDIO_PLAYING_IN,
+        msu_status_audio_playing_out => MSU_AUDIO_PLAYING_OUT,
+        msu_status_track_missing_in => MSU_TRACKMISSING,
+
+        msu_data_addr => MSU_DATA_ADDR,
+        msu_data_in => MSU_DATA_IN,
+        msu_status_data_busy => MSU_DATA_BUSY,
+        msu_data_seek => MSU_DATA_SEEK,
+        msu_data_req => MSU_DATA_REQ
+    );
 
 	OBC1 : entity work.OBC1
 	port map(
@@ -283,7 +378,9 @@ begin
 			DSP_DO when DSP_SEL = '1' or DP_SEL = '1' else
 			SRTC_DO when SRTC_SEL = '1' else
 			BSRAM_Q when BSRAM_SEL = '1' or OBC1_SEL = '1' else
-			OPENBUS;
+			-- @dentnz testing
+			MSU_DO; -- when MSU_SEL = '1' else
+			--OPENBUS;
 
 	IRQ_N <= '1';
 

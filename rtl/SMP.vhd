@@ -200,7 +200,7 @@ begin
 			RAM_WRITE_EN <= '1';
 			IPL_EN <= '1';
 			TM_EN <= (others=>'0');
-			RESET_PORT <= (others=>'0');
+			--RESET_PORT <= (others=>'0');
 			CPUO <= (others=> (others=> '0'));
 			T0OUT <= (others=>'0');
 			T1OUT <= (others=>'0');
@@ -226,7 +226,7 @@ begin
 --				TM_SPEED <= SMP_REG_DAT(5 downto 4);
 --				CLK_SPEED <= SMP_REG_DAT(7 downto 6);
 				TM_EN <= SMP_REG_DAT(10 downto 8);
-				RESET_PORT <= SMP_REG_DAT(13 downto 12);
+				--RESET_PORT <= SMP_REG_DAT(13 downto 12);
 				IPL_EN <= SMP_REG_DAT(15); 
 				T0DIV <= SMP_REG_DAT(55 downto 48);
 				T1DIV <= SMP_REG_DAT(63 downto 56);
@@ -249,7 +249,7 @@ begin
 								TIMERS_DISABLE <= SPC700_D_OUT(0);
 							when x"1" =>
 								IPL_EN <= SPC700_D_OUT(7);
-								RESET_PORT <= SPC700_D_OUT(5 downto 4);
+								--RESET_PORT <= SPC700_D_OUT(5 downto 4);
 								TM_EN <= SPC700_D_OUT(2 downto 0);
 								if SPC700_D_OUT(0) = '1' and TM_EN(0) = '0' then
 									T0OUT <= (others=>'0');

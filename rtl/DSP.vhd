@@ -209,7 +209,7 @@ architecture rtl of DSP is
 	signal RAM_CE 			: std_logic;
 	
 	--debug
-	signal DBG_VMUTE 		: std_logic_vector(7 downto 0) := (others => '0');
+	constant DBG_VMUTE 	: std_logic_vector(7 downto 0) := (others => '0');
 	signal IO_REG_DAT		: std_logic_vector(7 downto 0);
 	signal IO_REG_WR 		: std_logic_vector(1 downto 0) := (others => '0');
 	signal REG4C			: std_logic_vector(7 downto 0);

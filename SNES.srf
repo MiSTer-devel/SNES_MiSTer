@@ -18,6 +18,9 @@
 { "" "" "" "Ignored filter at sys_top.sdc(14): vip\|output_inst\|vid_clk could not be matched with a net" {  } {  } 0 332174 "" 0 0 "Design Software" 0 -1 0 ""}
 { "" "" "" "Ignored create_generated_clock at sys_top.sdc(13): Argument <targets> is an empty collection" {  } {  } 0 332049 "" 0 0 "Design Software" 0 -1 0 ""}
 { "" "" "" "Ignored filter at sys_top.sdc(22): VID_CLK could not be matched with a clock" {  } {  } 0 332174 "" 0 0 "Design Software" 0 -1 0 ""}
+{ "" "" "" "Found RAM instances implemented as ROM because the write logic is disabled. One instance is listed below as an example." {  } {  } 0 18550 "" 0 0 "Design Software" 0 -1 0 ""}
+{ "" "" "" "LOCKED port on the PLL is not properly connected on instance \"pll_audio:pll_audio\|pll_audio_0002:pll_audio_inst\|altera_pll:altera_pll_i\|general\[0\].gpll\". The LOCKED port on the PLL should be connected when the FBOUTCLK port is connected. Although it is unnecessary to connect the LOCKED signal, any logic driven off of an output clock of the PLL will not know when the PLL is locked and ready." {  } {  } 0 21300 "" 0 0 "Design Software" 0 -1 0 ""}
+{ "" "" "" "Memory depth (1024) in the design file differs from memory depth (550) in the Memory Initialization File \"C:/Work/MiSTer/SNES_MiSTer/rtl/chip/bsx/bsx121-124.mif\" -- setting initial value for remaining addresses to 0" {  } {  } 0 127005 "" 0 0 "Design Software" 0 -1 0 ""}
 { "" "" "" "*" {  } {  } 0 21074 "" 0 0 "Design Software" 0 -1 0 ""}
 { "" "" "" "*" {  } {  } 0 276027 "" 0 0 "Design Software" 0 -1 0 ""}
 { "" "" "" "RST" {  } {  } 0 9999 "" 0 0 "Design Software" 0 -1 0 ""}

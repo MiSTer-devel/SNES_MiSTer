@@ -42,6 +42,7 @@ architecture rtl of SMP is
 	type Port_t is array (0 to 3) of std_logic_vector(7 downto 0);
 	signal CPUI : Port_t;
 	signal CPUO : Port_t;
+	signal PAWR_N_OLD : std_logic;
 	
 	signal CLK_SPEED : std_logic_vector(1 downto 0);
 	signal TM_SPEED : std_logic_vector(1 downto 0);
@@ -143,8 +144,10 @@ begin
 	begin
 		if RST_N = '0' then
 			CPUI <= (others => (others => '0'));
+			PAWR_N_OLD <= '1';
 		elsif rising_edge(CLK) then
-			if PAWR_N = '0' and CS = '1' and CS_N = '0' and SYSCLKF_CE = '1' then
+			PAWR_N_OLD <= PAWR_N;
+			if PAWR_N = '0' and PAWR_N_OLD = '1' and CS = '1' and CS_N = '0' then
 				CPUI(to_integer(unsigned(PA))) <= CPU_DI;
 			end if;
 			

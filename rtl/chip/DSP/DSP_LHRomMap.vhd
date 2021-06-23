@@ -62,6 +62,7 @@ architecture rtl of DSP_LHRomMap is
 	signal ROM_SEL 		: std_logic;
 	signal BRAM_ADDR 		: std_logic_vector(19 downto 0);
 	signal BSRAM_SEL 		: std_logic;
+	signal NO_BSRAM_SEL	: std_logic;
 	signal DP_SEL    		: std_logic;
 	
 	signal DSP_SEL	  		: std_logic;
@@ -109,18 +110,21 @@ begin
 		DSP_SEL <= '0';
 		OBC1_SEL <= '0';
 		BSRAM_SEL <= '0';
+		NO_BSRAM_SEL <= '0';
 		if ROM_MASK(23) = '0' then
 			case MAP_CTRL(1 downto 0) is
 				when "00" =>							-- LoROM/ExLoROM
 					CART_ADDR <= '0' & not CA(23) & CA(22 downto 16) & CA(14 downto 0);
 					BRAM_ADDR <= CA(20 downto 16) & CA(14 downto 0);
 					if MAP_CTRL(3) = '0' then
-						if CA(22 downto 20) = "111" and ROMSEL_N = '0' and BSRAM_MASK(10) = '1' then
+						if CA(22 downto 20) = "111" and ROMSEL_N = '0' then
 							if ROM_MASK(20) = '1' or BSRAM_MASK(15) = '1' or MAP_CTRL(7) = '1' then
-								BSRAM_SEL <= not CA(15);
+								BSRAM_SEL <= not CA(15) and BSRAM_MASK(10);
+								NO_BSRAM_SEL <= not CA(15) and not MAP_CTRL(7) and not BSRAM_MASK(10);
 							else
 								BRAM_ADDR <= CA(19 downto 0);
-								BSRAM_SEL <= '1';
+								BSRAM_SEL <= BSRAM_MASK(10);
+								NO_BSRAM_SEL <= not MAP_CTRL(7) and not BSRAM_MASK(10);
 							end if;
 						end if;
 						if (CA(22 downto 21) = "01" and CA(15) = '1' and ROM_MASK(20) = '0') or		--20-3F/A0-BF:8000-FFFF
@@ -185,7 +189,7 @@ begin
 	end process;
 	
 	SRTC_SEL <= '1' when CA(22) = '0' and CA(15 downto 1) = x"280"&"000" else '0';
-	ROM_SEL <= not ROMSEL_N and not DSP_SEL and not DP_SEL and not SRTC_SEL and not BSRAM_SEL and not OBC1_SEL;
+	ROM_SEL <= not ROMSEL_N and not DSP_SEL and not DP_SEL and not SRTC_SEL and not BSRAM_SEL and not OBC1_SEL and not NO_BSRAM_SEL;
 	
 
 	DSP_CS_N <= not DSP_SEL;

@@ -1013,6 +1013,10 @@ begin
 					R(15) <= std_logic_vector(unsigned(R(15)) + 1);
 				end if;
 				
+				if OP.OP = OP_LMULT then
+					R(4) <= MULR;
+				end if;
+				
 				if OP.OP = OP_BRA then
 					case OP_N is
 						when x"5" => COND := '1';								--BRA
@@ -1080,10 +1084,6 @@ begin
 							when others => null;	
 						end case;
 					end if;
-				end if;
-				
-				if OP.OP = OP_LMULT then
-					R(4) <= MULR;
 				end if;
 			end if;
 		end if;

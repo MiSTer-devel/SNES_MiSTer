@@ -388,8 +388,8 @@ hps_io #(.CONF_STR(CONF_STR), .WIDE(1)) hps_io
 	.forced_scandoubler(forced_scandoubler),
 	.new_vmode(new_vmode),
 
-	.joystick_analog_0({joy0_y, joy0_x}),
-	.joystick_analog_1({joy1_y, joy1_x}),
+	.joystick_l_analog_0({joy0_y, joy0_x}),
+	.joystick_l_analog_1({joy1_y, joy1_x}),
 	.joystick_0(joy0),
 	.joystick_1(joy1),
 	.joystick_2(joy2),

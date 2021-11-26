@@ -335,6 +335,7 @@ always@(posedge clk_sys) begin
 
 	old_strobe <= io_strobe;
 	coef_wr <= 0;
+	shadowmask_wr <= 0;
 
 	if(~io_uio) begin
 		has_cmd <= 0;
@@ -452,6 +453,7 @@ always@(posedge clk_sys) begin
 					 3: arc2y <= io_din[12:0];
 				endcase
 			end
+			if(cmd == 'h3E) {shadowmask_wr,shadowmask_data} <= {1'b1, io_din};
 		end
 	end
 
@@ -1079,6 +1081,31 @@ scanlines #(1) HDMI_scanlines
 	.de_out(hdmi_de_sl)
 );
 
+wire [23:0] hdmi_data_mask;
+wire        hdmi_de_mask, hdmi_vs_mask, hdmi_hs_mask;
+
+reg [15:0] shadowmask_data;
+reg        shadowmask_wr = 0;
+
+shadowmask HDMI_shadowmask
+(
+	.clk(clk_hdmi),
+	.clk_sys(clk_sys),
+
+	.cmd_wr(shadowmask_wr),
+	.cmd_in(shadowmask_data),
+
+	.din(hdmi_data_sl),
+	.hs_in(hdmi_hs_sl),
+	.vs_in(hdmi_vs_sl),
+	.de_in(hdmi_de_sl),
+	
+	.dout(hdmi_data_mask),
+	.hs_out(hdmi_hs_mask),
+	.vs_out(hdmi_vs_mask),
+	.de_out(hdmi_de_mask)
+);
+
 wire [23:0] hdmi_data_osd;
 wire        hdmi_de_osd, hdmi_vs_osd, hdmi_hs_osd;
 
@@ -1091,10 +1118,10 @@ osd hdmi_osd
 	.io_din(io_din),
 
 	.clk_video(clk_hdmi),
-	.din(hdmi_data_sl),
-	.hs_in(hdmi_hs_sl),
-	.vs_in(hdmi_vs_sl),
-	.de_in(hdmi_de_sl),
+	.din(hdmi_data_mask),
+	.hs_in(hdmi_hs_mask),
+	.vs_in(hdmi_vs_mask),
+	.de_in(hdmi_de_mask),
 
 	.dout(hdmi_data_osd),
 	.hs_out(hdmi_hs_osd),

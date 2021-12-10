@@ -1566,7 +1566,7 @@ begin
 					
 					TILES_OAM_CNT <= TILES_OAM_CNT + 1;
 					TILES_CNT <= CUR_TILES_CNT + 1;
-					if CUR_TILES_CNT = W(5 downto 3) or (TILE_X + 8) >= 256 then
+					if CUR_TILES_CNT = W(5 downto 3) or ((TILE_X + 8) >= 256 and OAM_OBJ_X /= 256) then
 						NEW_RANGE_CNT := RANGE_CNT - 1;
 						TILES_CNT <= (others => '0');
 						RANGE_CNT <= NEW_RANGE_CNT;

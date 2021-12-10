@@ -676,10 +676,12 @@ begin
 						when x"03" =>
 --							WRMPYB <= P65_DO;
 							RDMPY <= (others => '0');
-							RDDIV <= P65_DO & WRMPYA;
-							MATH_TEMP <= "000000000000000" & P65_DO;
-							MATH_CLK_CNT <= (others => '0');
-							MUL_REQ <= '1';
+							if MUL_REQ = '0' then
+								RDDIV <= P65_DO & WRMPYA;
+								MATH_TEMP <= "000000000000000" & P65_DO;
+								MATH_CLK_CNT <= (others => '0');
+								MUL_REQ <= '1';
+							end if;
 						when x"04" =>
 							WRDIVA(7 downto 0) <= P65_DO;
 						when x"05" =>
@@ -687,10 +689,12 @@ begin
 						when x"06" =>
 --							WRDIVB <= P65_DO;
 							RDMPY <= WRDIVA;
-							RDDIV <= (others => '0');
-							MATH_TEMP <= P65_DO & "000000000000000";
-							MATH_CLK_CNT <= (others => '0');
-							DIV_REQ <= '1';
+							if DIV_REQ = '0' then
+								RDDIV <= (others => '1');
+								MATH_TEMP <= P65_DO & "000000000000000";
+								MATH_CLK_CNT <= (others => '0');
+								DIV_REQ <= '1';
+							end if;
 						when others => null;
 					end case;
 				end if;

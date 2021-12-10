@@ -3,7 +3,7 @@
 Written by [srg320](https://github.com/srg320)
 
 ## Installing
-copy *.rbf to root of SD card. Put some ROMs (*.SCF, *.SMC, *.BIN) into SNES folder
+copy \*.rbf to root of SD card. Put some ROMs (\*.SFC, \*.SMC, \*.BIN) into SNES folder
 
 ## Features
 * Cycle accurate SNES replica.

@@ -559,7 +559,7 @@ begin
 	
 	
 	--Memory buses
-	R14_CHANGE <= '1' when MC.DREG(1) = '1' and DST_REG = 14 else '0';
+	R14_CHANGE <= '1' when DST_REG = 14 and (MC.DREG(1) = '1' or MC.DREG(0) = '1') and MC.LAST_CYCLE = '1' else '0';
 	
 	process(CLK, RST_N)
 	variable ROM_CYCLES : unsigned(2 downto 0);

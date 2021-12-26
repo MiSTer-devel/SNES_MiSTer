@@ -1,7 +1,7 @@
 derive_pll_clocks
 
-create_generated_clock -name GSU_CASHE_CLK -source [get_pins -compatibility_mode {*|pll|pll_inst|altera_pll_i|*[2].*|divclk}] \
-							  -invert [get_pins {emu|main|GSUMap|GSU|CACHE|ram|altsyncram_component|auto_generated|*|clk0}]
+create_generated_clock -name GSU_CACHE_CLK -source [get_pins -compatibility_mode {*|pll|pll_inst|altera_pll_i|*[2].*|divclk}] \
+							  -invert [get_pins {emu|main|GSUMap|GSU|CACHE|altsyncram_component|auto_generated|*|clk0}]
 
 create_generated_clock -name CX4_MEM_CLK -source [get_pins -compatibility_mode {*|pll|pll_inst|altera_pll_i|*[2].*|divclk}] \
 							  -invert [get_pins {emu|main|CX4Map|CX4|DATA_RAM|altsyncram_component|auto_generated|*|clk0 \
@@ -9,7 +9,7 @@ create_generated_clock -name CX4_MEM_CLK -source [get_pins -compatibility_mode {
 
 derive_clock_uncertainty
 
-set_clock_groups -asynchronous -group [get_clocks { GSU_CASHE_CLK CX4_MEM_CLK }] 
+set_clock_groups -asynchronous -group [get_clocks { GSU_CACHE_CLK CX4_MEM_CLK }] 
 
 
 set_max_delay 23 -from [get_registers { emu|hps_io|* \

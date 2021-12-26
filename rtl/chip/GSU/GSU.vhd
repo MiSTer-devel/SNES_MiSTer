@@ -533,13 +533,15 @@ begin
 		end if;
 	end process; 
 	
-	CACHE : entity work.dpram generic map(9, 8)
+	CACHE : entity work.dpram_difclk generic map(9, 8, 9, 8)
 	port map(
-		clock			=> not CLK,
+		clock0		=> not CLK,
 		address_a	=> BRAM_CACHE_ADDR_A,
 		data_a		=> BRAM_CACHE_DI_A,
 		wren_a		=> BRAM_CACHE_WE_A,
 		q_a			=> BRAM_CACHE_Q_A,
+		
+		clock1		=> CLK,
 		address_b	=> BRAM_CACHE_ADDR_B,
 		data_b		=> BRAM_CACHE_DI_B,
 		wren_b		=> BRAM_CACHE_WE_B,
@@ -553,9 +555,7 @@ begin
 	
 	BRAM_CACHE_ADDR_B <= SNES_CACHE_ADDR;
 	BRAM_CACHE_DI_B <= DI;
-	BRAM_CACHE_WE_B <= '0' when ENABLE = '0' else 
-					  MMIO_CACHE_WR when EN = '0' else 
-					  '0';
+	BRAM_CACHE_WE_B <= MMIO_CACHE_WR when ENABLE = '1' and FLAG_GO = '0' else '0';
 	
 	
 	--Memory buses

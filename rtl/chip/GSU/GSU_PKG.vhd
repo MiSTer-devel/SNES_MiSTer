@@ -57,7 +57,7 @@ package GSU_PKG is
 	type MicrocodeTbl_t is array(0 to NUM_MCODES-1, 0 to 3) of Microcode_r;
 	constant MC_TBL: MicrocodeTbl_t := (
 	-- 0 STOP
-	(('1','1','0',"000",'0','1',"00","000","000"),
+	(('1','1','0',"000",'0','0',"00","000","000"),
 	 ('X','X','X',"XXX",'X','X',"XX","XXX","XXX"),
 	 ('X','X','X',"XXX",'X','X',"XX","XXX","XXX"),
 	 ('X','X','X',"XXX",'X','X',"XX","XXX","XXX")),

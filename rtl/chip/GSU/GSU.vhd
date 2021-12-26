@@ -403,7 +403,8 @@ begin
 	RAM_LOAD_EN  <= '1' when RAMST = RAMST_LOAD and RAM_ACCESS_CNT = 0 and RAM_BYTES = RAM_WORD and RAN = '1' else '0';
 	
 	ROM_NEED_WAIT <= '1' when (R14_CHANGE = '1' or MC.ROMWAIT = '1') and (ROMST = ROMST_LOAD or ROMST = ROMST_CACHE or (ROMST = ROMST_FETCH and ROM_ACCESS_CNT /= 0) or RON = '0') else '0';
-	RAM_NEED_WAIT <= '1' when (MC.RAMWAIT = '1' and (RAMST = RAMST_SAVE or RAMST = RAMST_PCF or RAN = '0')) or
+	RAM_NEED_WAIT <= '1' when (OP.OP = OP_STOP and (RAMST = RAMST_SAVE or RAMST = RAMST_PCF)) or 
+	                          (MC.RAMWAIT = '1' and (RAMST = RAMST_SAVE or RAMST = RAMST_PCF or RAN = '0')) or
 									  RAMST = RAMST_LOAD or RAMST = RAMST_CACHE or (RAMST = RAMST_FETCH and RAM_ACCESS_CNT /= 0) or RAMST = RAMST_RPIX else '0';
 	
 	process(CLK, RST_N)

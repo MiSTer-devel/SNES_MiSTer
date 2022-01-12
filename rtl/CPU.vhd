@@ -676,7 +676,7 @@ begin
 						when x"03" =>
 --							WRMPYB <= P65_DO;
 							RDMPY <= (others => '0');
-							if MUL_REQ = '0' then
+							if MUL_REQ = '0' and DIV_REQ = '0' then
 								RDDIV <= P65_DO & WRMPYA;
 								MATH_TEMP <= "000000000000000" & P65_DO;
 								MATH_CLK_CNT <= (others => '0');
@@ -689,8 +689,7 @@ begin
 						when x"06" =>
 --							WRDIVB <= P65_DO;
 							RDMPY <= WRDIVA;
-							if DIV_REQ = '0' then
-								RDDIV <= (others => '1');
+							if DIV_REQ = '0' and MUL_REQ = '0' then
 								MATH_TEMP <= P65_DO & "000000000000000";
 								MATH_CLK_CNT <= (others => '0');
 								DIV_REQ <= '1';

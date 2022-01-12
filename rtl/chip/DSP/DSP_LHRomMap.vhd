@@ -109,6 +109,7 @@ begin
 		DP_SEL <= '0';
 		DSP_SEL <= '0';
 		OBC1_SEL <= '0';
+		SRTC_SEL <= '0';
 		BSRAM_SEL <= '0';
 		NO_BSRAM_SEL <= '0';
 		if ROM_MASK(23) = '0' then
@@ -164,6 +165,9 @@ begin
 					end if;
 					DSP_SEL <= '0';
 					DSP_A0 <= '1';
+					if CA(22) = '0' and CA(15 downto 1) = x"280"&"000" and MAP_CTRL(3) = '1' then
+						SRTC_SEL <= '1';
+					end if;
 				when others =>					-- SpecialLoROM														
 					CART_ADDR <= "00" & (CA(23) and not CA(21)) & CA(21 downto 16) & CA(14 downto 0);--00-1F:8000-FFFF; 20-3F/A0-BF:8000-FFFF; 80-9F:8000-FFFF
 					BRAM_ADDR <= CA(20 downto 16) & CA(14 downto 0);
@@ -188,7 +192,6 @@ begin
 		end if;
 	end process;
 	
-	SRTC_SEL <= '1' when CA(22) = '0' and CA(15 downto 1) = x"280"&"000" else '0';
 	ROM_SEL <= not ROMSEL_N and not DSP_SEL and not DP_SEL and not SRTC_SEL and not BSRAM_SEL and not OBC1_SEL and not NO_BSRAM_SEL;
 	
 

@@ -33,3 +33,5 @@ set_max_delay 23 -from [get_registers { emu|sdram|* }] \
 													 emu|vram*|* }] 
 
 set_false_path -to [get_registers { emu|sdram|ds emu|sdram|data[*]}]
+
+set_false_path -from {emu|en216p}

@@ -119,13 +119,14 @@ architecture rtl of DSP_LHRomMap is
 		ADDR            : in  std_logic_vector(23 downto 0);
 		DIN             : in  std_logic_vector(7 downto 0);
 		DOUT            : out std_logic_vector(7 downto 0);
+		MSU_SEL         : out std_logic;
 
 		track_out       : out std_logic_vector(15 downto 0);
 		track_request   : out std_logic;
 		track_mounting  : in  std_logic;
 		track_finished  : in  std_logic;
 		trig_play       : out std_logic;
-		trig_pause		: out std_logic;
+		trig_pause		 : out std_logic;
 
 		volume_out		 : out std_logic_vector(7 downto 0);
 
@@ -170,7 +171,6 @@ begin
 		SRTC_SEL <= '0';
 		BSRAM_SEL <= '0';
 		NO_BSRAM_SEL <= '0';
-		MSU_SEL <= '0';
 		if ROM_MASK(23) = '0' then
 			case MAP_CTRL(1 downto 0) is
 				when "00" =>							-- LoROM/ExLoROM
@@ -248,7 +248,6 @@ begin
 			if CA(22 downto 21) = "01" and CA(15 downto 13) = "011" and BSRAM_MASK(10) = '1' then
 				BSRAM_SEL <= '1';
 			end if;
-			MSU_SEL <= MSU_ENABLE;
 			DSP_SEL <= '0';
 			DSP_A0 <= '1';
 		end if;
@@ -291,6 +290,7 @@ begin
 		ADDR   => CA,
 		DIN    => DI,
 		DOUT   => MSU_DO,
+		MSU_SEL=> MSU_SEL,
 
 		track_out      => MSU_TRACKOUT,
 		track_request  => MSU_TRACKREQUEST,

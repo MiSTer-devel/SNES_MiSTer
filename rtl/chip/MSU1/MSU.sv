@@ -11,8 +11,10 @@ module MSU(
     input      [23:0] ADDR,
     input       [7:0] DIN,
     output reg  [7:0] DOUT,
+	 
+	 output            MSU_SEL,
 
-(*keep*) output reg  [15:0] track_out,
+    output reg  [15:0] track_out,
     output            track_request,
     input  reg        track_mounting,
     input             track_finished,
@@ -97,7 +99,8 @@ reg  [7:0] MSU_VOLUME;                    // $2006
 reg [31:0] MSU_ADDR;
 
 // Make sure we are aware of which bank ADDR is currently in
-(*keep*) wire IO_BANK_SEL = (ADDR[23:16]>=8'h00 && ADDR[23:16]<=8'h3F) || (ADDR[23:16]>=8'h80 && ADDR[23:16]<=8'hBF);
+wire IO_BANK_SEL = (ADDR[23:16]>=8'h00 && ADDR[23:16]<=8'h3F) || (ADDR[23:16]>=8'h80 && ADDR[23:16]<=8'hBF);
+assign MSU_SEL = ENABLE && IO_BANK_SEL && (ADDR[15:4] == 'h200);
 
 // Rising and falling edge detection
 reg RD_N_1 = 1'b1;

@@ -111,12 +111,6 @@ always @(posedge clk_sys) begin
 
 	reg         cd_out48_last = 1;
 	reg         send_old = 0;
-	reg         rec_old = 0;
-	reg  [2:0]  cnt = 0;
-	// Ext message payload
-	reg  [39:0] ext_data;
-	// Has an ext message been received
-	reg         rec = 0;
 	reg         reset_old = 0;
 	reg         msu_audio_req_old = 0;
 	reg         msu_audio_jump_sector_old = 0;
@@ -128,10 +122,7 @@ always @(posedge clk_sys) begin
 		msu_trackmounting <= 0;
 		send <= 0;
 		command <= 0;
-		rec <= 0;
 		msu_audio_ack <= 0;
-		// Don't want old messages/command responses hanging around
-		ext_data <= 0;
 		msu_audio_download_old <= 0;
 	end
 	
@@ -183,53 +174,36 @@ always @(posedge clk_sys) begin
 		end
 	end
 
-	// Incoming messaging - 49th bit has toggled
+	cd_out48_last <= cd_out[48];
 	if (cd_out[48] != cd_out48_last) begin
-		cd_out48_last <= cd_out[48];
-		ext_data <= cd_out[39:0];
-		rec <= 1;
-		cnt <= 7;
-	end else if (cnt) begin
-		// Get another 7 bytes
-		cnt <= cnt - 1'd1;
-	end else begin
-		rec <= 0;
-	end
-
-	rec_old <= rec;
-	if (rec_old && !rec) begin
-		if(ext_data == 'h001) begin
+		if(cd_out == 'h001) begin
 			msu_enable <= 1;
 		end
-		else if(ext_data == 'h002) begin
+		else if(cd_out == 'h002) begin
 			msu_enable <= 0;
 		end
-		else if(ext_data == 'h101) begin
+		else if(cd_out == 'h101) begin
 			//    // Handle ack to go low
 			//    msu_trackmissing <= 0;
 			//    msu_trackmounting <= 0;
 			//    //ext_ack <= 0;
-			//    ext_data <= 0;
 		end
-		else if(ext_data == 'h201) begin
+		else if(cd_out == 'h201) begin
 			// Track has finished mounting
 			msu_trackmissing <= 0;
 			msu_trackmounting <= 0;
 			msu_audio_ack <= 0;
-			ext_data <= 0;
 		end
-		else if(ext_data == 'h301) begin
+		else if(cd_out == 'h301) begin
 			//    // Handle beginning of sector
 			//    msu_trackmissing <= 0;
 			//    msu_trackmounting <= 0;
-			//    ext_data <= 0;
 		end
-		else if(ext_data == 'h401) begin
+		else if(cd_out == 'h401) begin
 			// Handle track missing
 			msu_trackmissing <= 1;
 			msu_trackmounting <= 0;
 			msu_audio_ack <= 0;
-			ext_data <= 0;
 		end
 	end
 end

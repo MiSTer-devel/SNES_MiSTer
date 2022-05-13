@@ -658,6 +658,7 @@ main main
 	.MSU_TRIG_PAUSE(msu_trig_pause),
 	.MSU_AUDIO_PLAYING_IN(msu_audio_play),
 	.MSU_AUDIO_PLAYING_OUT(msu_audio_playing_out),
+	.MSU_ENABLE(msu_enable),
 
 	.AUDIO_L(MAIN_AUDIO_L),
 	.AUDIO_R(MAIN_AUDIO_R)
@@ -667,8 +668,8 @@ main main
 wire signed [16:0] AUDIO_MIX_L = $signed({MAIN_AUDIO_L[15], MAIN_AUDIO_L}) + $signed({msu_audio_l[15], msu_audio_l});
 wire signed [16:0] AUDIO_MIX_R = $signed({MAIN_AUDIO_R[15], MAIN_AUDIO_R}) + $signed({msu_audio_r[15], msu_audio_r});
 
-assign AUDIO_L = AUDIO_MIX_L[16:1];
-assign AUDIO_R = AUDIO_MIX_R[16:1];
+assign AUDIO_L = msu_enable ? AUDIO_MIX_L[16:1] : MAIN_AUDIO_L;
+assign AUDIO_R = msu_enable ? AUDIO_MIX_R[16:1] : MAIN_AUDIO_R;
 
 reg RESET_N = 0;
 reg RFSH = 0;
@@ -1137,6 +1138,7 @@ end
 
 ///////////////////////////  MSU1  ///////////////////////////////////
 
+wire msu_enable;
 wire msu_audio_download = ioctl_download & ioctl_index[5:0] == 6'h02;
 //wire [31:0] msu_audio_img_size = msu_audio_download ? img_size : 0;
 //wire msu_data_download = ioctl_download & ioctl_index[5:0] == 6'h03;
@@ -1150,6 +1152,8 @@ hps_ext hps_ext
 	.EXT_BUS(EXT_BUS),
 
 	.reset(reset),
+
+	.msu_enable(msu_enable),
 
 	.msu_trackmounting(msu_trackmounting),
 	.msu_trackmissing(msu_trackmissing),

@@ -25,6 +25,8 @@ module hps_ext
 
 	input             reset,
 
+	output reg        msu_enable,
+
 	output reg        msu_trackmounting,
 	output reg        msu_trackmissing,
 	input      [15:0] msu_trackout,
@@ -196,7 +198,13 @@ always @(posedge clk_sys) begin
 
 	rec_old <= rec;
 	if (rec_old && !rec) begin
-		if(ext_data == 'h101) begin
+		if(ext_data == 'h001) begin
+			msu_enable <= 1;
+		end
+		else if(ext_data == 'h002) begin
+			msu_enable <= 0;
+		end
+		else if(ext_data == 'h101) begin
 			//    // Handle ack to go low
 			//    msu_trackmissing <= 0;
 			//    msu_trackmounting <= 0;

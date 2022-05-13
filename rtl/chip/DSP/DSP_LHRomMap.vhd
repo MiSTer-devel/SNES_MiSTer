@@ -68,6 +68,7 @@ entity DSP_LHRomMap is
 		MSU_DATA_BUSY		    : in  std_logic;
 		MSU_DATA_SEEK		    : out std_logic;
 		MSU_DATA_REQ		    : out std_logic;
+		MSU_ENABLE			    : in  std_logic;
 
 		EXT_RTC		          : in  std_logic_vector(64 downto 0)
 	);
@@ -161,7 +162,7 @@ begin
 
 	DSP_CLK <= 760000 when MAP_CTRL(3) = '0' else 1000000;
 
-	process( CA, MAP_CTRL, ROMSEL_N, RAMSEL_N, BSRAM_MASK, ROM_MASK )
+	process( CA, MAP_CTRL, ROMSEL_N, RAMSEL_N, BSRAM_MASK, ROM_MASK, MSU_ENABLE )
 	begin
 		DP_SEL <= '0';
 		DSP_SEL <= '0';
@@ -247,7 +248,7 @@ begin
 			if CA(22 downto 21) = "01" and CA(15 downto 13) = "011" and BSRAM_MASK(10) = '1' then
 				BSRAM_SEL <= '1';
 			end if;
-			MSU_SEL <= '1';
+			MSU_SEL <= MSU_ENABLE;
 			DSP_SEL <= '0';
 			DSP_A0 <= '1';
 		end if;
@@ -282,7 +283,7 @@ begin
 	port map(
 		CLK    => MCLK,
 		RST_N  => RST_N,
-		ENABLE => ENABLE,
+		ENABLE => ENABLE and MSU_ENABLE,
 
 		RD_N   => CPURD_N,
 		WR_N   => CPUWR_N,
@@ -376,9 +377,8 @@ begin
 			DSP_DO when DSP_SEL = '1' or DP_SEL = '1' else
 			SRTC_DO when SRTC_SEL = '1' else
 			BSRAM_Q when BSRAM_SEL = '1' or OBC1_SEL = '1' else
-			-- @dentnz testing
-			MSU_DO; -- when MSU_SEL = '1' else
-			--OPENBUS;
+			MSU_DO when MSU_SEL = '1' else
+			OPENBUS;
 
 	IRQ_N <= '1';
 

@@ -49,10 +49,10 @@ initial begin
     trig_play = 0;
     trig_pause = 0;
 
-    track_mounting_falling = 0;
+    //track_mounting_falling = 0;
     track_mounting_old = 0;
-    track_mounting_falling_old = 0;
-    track_mounting_falling_rising = 0;
+    //track_mounting_falling_old = 0;
+    //track_mounting_falling_rising = 0;
 
     msu_data_addr = 0;
     msu_data_req <= 0;
@@ -93,7 +93,7 @@ reg [31:0] MSU_SEEK;                      // $2000 - $2003
 reg [15:0] MSU_TRACK;                     // $2004 - $2005
 reg  [7:0] MSU_VOLUME;                    // $2006
 // Just here to keep track of what was put into the MSU_CONTROL register
-(*keep*) reg  [7:0] MSU_CONTROL;          // $2007
+//(*keep*) reg  [7:0] MSU_CONTROL;          // $2007
 reg [31:0] MSU_ADDR;
 
 // Make sure we are aware of which bank ADDR is currently in
@@ -112,10 +112,10 @@ reg msu_status_busy_1 = 1'b0;
 reg msu_status_data_busy_out = 1'b0;
 
 // track mounting with respect to audio busy
-reg track_mounting_falling = 0;
+//reg track_mounting_falling = 0;
 reg track_mounting_old = 0;
-reg track_mounting_falling_old = 0;
-reg track_mounting_falling_rising = 0;
+//reg track_mounting_falling_old = 0;
+//reg track_mounting_falling_rising = 0;
 
 always @(posedge CLK or negedge RST_N) begin
     if (~RST_N) begin
@@ -129,7 +129,7 @@ always @(posedge CLK or negedge RST_N) begin
         track_request <= 0;
         // MSU volume at full after a reset
         MSU_VOLUME <= 8'hff;
-        MSU_CONTROL <= 0;
+        //MSU_CONTROL <= 0;
         msu_status_audio_playing_out <= 0;
         msu_status_audio_playing_in_old <= 0;
         msu_status_audio_repeat <= 0;
@@ -140,7 +140,7 @@ always @(posedge CLK or negedge RST_N) begin
         trig_play <= 0;
         trig_pause <= 0;
         track_mounting_old <= 0;
-        track_mounting_falling_old <= 0;
+        //track_mounting_falling_old <= 0;
 
         msu_data_req <= 0;
         msu_data_seek <= 0;
@@ -249,7 +249,7 @@ always @(posedge CLK or negedge RST_N) begin
                 // MSU Audio state control. (MSU_CONTROL).
                 16'h2007: begin
                     if (!msu_status_audio_busy) begin
-                        MSU_CONTROL <= DIN;
+                        //MSU_CONTROL <= DIN;
                         msu_status_audio_repeat <= DIN[1];
                         // We can only play/pause a track that has been set and mounted. Not on missing track either
                         if (!msu_status_track_missing) begin

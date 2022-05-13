@@ -16,8 +16,6 @@ set_global_assignment -name VHDL_FILE rtl/bram.vhd
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/sdram.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/ioport.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/lightgun.sv
-set_global_assignment -name VERILOG_FILE rtl/msu_audio_fifo.v
-set_global_assignment -name VERILOG_FILE rtl/msu_audio.v
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/hps_ext.v
 set_global_assignment -name SDC_FILE SNES.sdc
 set_global_assignment -name SYSTEMVERILOG_FILE SNES.sv

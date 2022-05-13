@@ -142,11 +142,11 @@ module msu_audio(
             // loop sector - also need to take into account the 4 words for file header (msu1 and loop index = 8 bytes)
             loop_index_in_sectors_full <= loop_index >> 8;
             loop_sector <= loop_index_in_sectors_full[21:0];
-            loop_sector_sample_offset[10:0] <= ((loop_index[10:0] * 4) - (loop_sector[10:0] * 11'd1024) + 8) / 4;
+            loop_sector_sample_offset[10:0] <= loop_index[10:0] - {loop_sector[2:0],8'h00} + 11'd2; //((loop_index[10:0] * 4) - (loop_sector[10:0] * 11'd1024) + 8) / 4;
 
             // End sector handling
             end_sector <= img_size_sectors[21:0];
-            end_sector_sample_offset[10:0] <= (img_size[10:0] * 11'd1024) / 4;
+            end_sector_sample_offset[10:0] <= {img_size[2:0], 8'h00}; //(img_size[10:0] * 11'd1024) / 4;
 
             case (state)
                 WAITING_FOR_PLAY_STATE: begin
@@ -227,7 +227,7 @@ module msu_audio(
                     // Check if we've reached end_sector yet
                     if ((ext_sector < (end_sector - 1)) && audio_play) begin
                         // Nope, Fetch another sector, keeping track of where we are
-                        ext_sector <= ext_sector + 1;
+                        ext_sector <= ext_sector + 1'd1;
                         ext_req <= 1;
                         state <= WAITING_ACK_STATE;
                     end else begin
@@ -259,7 +259,7 @@ module msu_audio(
                             0: begin
                                 // Move to the partial sector
                                 partial_sector_state <= 8'd1;
-                                ext_sector <= ext_sector + 1;
+                                ext_sector <= ext_sector + 1'd1;
                                 ext_req <= 1;
                             end
                             1: begin

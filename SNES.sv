@@ -420,7 +420,7 @@ hps_io #(.CONF_STR(CONF_STR), .WIDE(1)) hps_io
 
 	.img_mounted(img_mounted),
 	.img_readonly(img_readonly),
-	.img_size(img_size[31:0]),
+	.img_size(img_size),
 
 	.RTC(RTC),
 
@@ -643,21 +643,21 @@ main main
 	.DBG_CPU_EN(1'b1),
 `endif
 
-    // MSU register handling
+	// MSU register handling
 
-    // Audio track number requested by the SNES
-    .MSU_TRACKOUT(msu_trackout),
-    // SNES wants a track
-    .MSU_TRACKREQUEST(msu_trackrequest),
-    // Waits until trackmounting goes low
-    .MSU_TRACKMOUNTING(msu_trackmounting),
-    .MSU_TRACKMISSING(msu_trackmissing),
-    .MSU_TRIG_PLAY(msu_trig_play),
-    .MSU_VOLUME_OUT(msu_volume_out),
-    .MSU_REPEAT_OUT(msu_repeat_out),
-    .MSU_TRIG_PAUSE(msu_trig_pause),
-    .MSU_AUDIO_PLAYING_IN(msu_audio_play),
-    .MSU_AUDIO_PLAYING_OUT(msu_audio_playing_out),
+	// Audio track number requested by the SNES
+	.MSU_TRACKOUT(msu_trackout),
+	// SNES wants a track
+	.MSU_TRACKREQUEST(msu_trackrequest),
+	// Waits until trackmounting goes low
+	.MSU_TRACKMOUNTING(msu_trackmounting),
+	.MSU_TRACKMISSING(msu_trackmissing),
+	.MSU_TRIG_PLAY(msu_trig_play),
+	.MSU_VOLUME_OUT(msu_volume_out),
+	.MSU_REPEAT_OUT(msu_repeat_out),
+	.MSU_TRIG_PAUSE(msu_trig_pause),
+	.MSU_AUDIO_PLAYING_IN(msu_audio_play),
+	.MSU_AUDIO_PLAYING_OUT(msu_audio_playing_out),
 
 	.AUDIO_L(MAIN_AUDIO_L),
 	.AUDIO_R(MAIN_AUDIO_R)
@@ -1138,9 +1138,9 @@ end
 ///////////////////////////  MSU1  ///////////////////////////////////
 
 wire msu_audio_download = ioctl_download & ioctl_index[5:0] == 6'h02;
-wire [31:0] msu_audio_img_size = msu_audio_download ? img_size : 0;
-wire msu_data_download = ioctl_download & ioctl_index[5:0] == 6'h03;
-wire [31:0] msu_data_img_size = msu_data_download ? img_size : 0;
+//wire [31:0] msu_audio_img_size = msu_audio_download ? img_size : 0;
+//wire msu_data_download = ioctl_download & ioctl_index[5:0] == 6'h03;
+//wire [31:0] msu_data_img_size = msu_data_download ? img_size : 0;
 
 // EXT bus is used to communicate with the HPS for MSU functionality
 wire [35:0] EXT_BUS;
@@ -1148,155 +1148,19 @@ hps_ext hps_ext
 (
 	.clk_sys(clk_sys),
 	.EXT_BUS(EXT_BUS),
-	.cd_out(ext_out),    // From the HPS
-	.cd_in(ext_in)       // To HPS
+
+	.reset(reset),
+
+	.msu_trackmounting(msu_trackmounting),
+	.msu_trackmissing(msu_trackmissing),
+	.msu_trackout(msu_trackout),
+	.msu_trackrequest(msu_trackrequest),
+	
+	.msu_audio_ack(msu_audio_ack),
+	.msu_audio_req(msu_audio_req),
+	.msu_audio_jump_sector(msu_audio_jump_sector),
+	.msu_audio_sector(msu_audio_sector)
 );
-
-reg  [48:0] ext_in;
-wire [48:0] ext_out;
-// Used to send a command to the HPS
-reg         ext_send = 0;
-reg  [47:0] ext_command = 0;
-wire        ext_audio_ack;
-wire        ext_audio_req;
-wire        ext_audio_jump_sector;
-wire [31:0] ext_audio_sector;
-
-always @(posedge clk_sys) begin
-	reg ext_out48_last = 1;
-	reg ext_send_old = 0;
-	reg ext_rec_old = 0;
-	reg [2:0]  cnt = 0;
-	// Ext message payload
-	reg [39:0] ext_data;
-	reg rst_old = 0;
-	// Has an ext message been received
-	reg ext_rec = 0;
-	reg reset_old = 0;
-    reg ps2_old;
-    reg enter = 0;
-    reg esc = 0;
-    reg about_to_play = 0;
-    reg ext_audio_req_old = 0;
-    reg ext_audio_jump_sector_old = 0;
-    reg msu_trackrequest_old = 0;
-    reg msu_audio_download_old = 0;
-
-    if (reset) begin
-        msu_trackmissing <= 0;
-        msu_trackmounting <= 0;
-        ext_send <= 0;
-        ext_command <= 0;
-        ext_rec <= 0;
-        ext_audio_ack <= 0;
-        // Don't want old messages/command responses hanging around
-        ext_data <= 0;
-        msu_audio_download_old <= 0;
-    end
-
-    msu_audio_download_old <= msu_audio_download;
-    if (!msu_audio_download && msu_audio_download_old) begin
-        ext_audio_ack <= 0;
-    end
-    if (msu_audio_download && !msu_audio_download_old) begin
-        ext_audio_ack <= 1;
-    end
-
-    ps2_old <= ps2_key[10];
-    if (ps2_old ^ ps2_key[10]) begin
-        if(ps2_key[7:0] == 'h5A) enter <= ps2_key[9];
-        if(ps2_key[7:0] == 'h76) esc   <= ps2_key[9];
-    end
-
-    // Outgoing messaging
-    // Sectors
-    ext_audio_req_old <= ext_audio_req;
-    if (!ext_audio_req_old && ext_audio_req && !msu_trackrequest) begin
-        // Request for next sector has come from MSU1
-        ext_command <= 'h34;
-        ext_send <= 1;
-    end
-
-    // Jump to a sector
-    ext_audio_jump_sector_old <= ext_audio_jump_sector;
-    if (!ext_audio_jump_sector_old && ext_audio_jump_sector) begin
-        ext_command <= { ext_audio_sector, 16'h36 };
-        ext_send <= 1;
-    end
-
-    // Track requests
-    msu_trackrequest_old <= msu_trackrequest;
-    if (!msu_trackrequest_old && msu_trackrequest) begin
-        ext_command <= { 16'h0, msu_trackout, 16'h35 };
-        msu_trackmounting <= 1;
-        ext_send <= 1;
-    end
-
-    // Send and reset
-	ext_send_old <= ext_send;
-	if (ext_send && !ext_send_old) begin
-		ext_in[47:0] <= ext_command;
-		ext_in[48] <= ~ext_in[48];
-		ext_send <= 0;
-		ext_command <= 0;
-	end
-	else begin
-		reset_old <= reset;
-		if (!reset_old && reset) begin
-			ext_in[47:0] <= 8'hFF;
-			ext_in[48] <= ~ext_in[48];
-		end
-	end
-
-    // Incoming messaging - 49th bit has toggled
-    if (ext_out[48] != ext_out48_last) begin
-		ext_out48_last <= ext_out[48];
-		ext_data <= ext_out[39:0];
-		ext_rec <= 1;
-		cnt <= 7;
-	end else if (cnt) begin
-	    // Get another 7 bytes
-		cnt <= cnt - 1'd1;
-	end else begin
-		ext_rec <= 0;
-    end
-
-    ext_rec_old <= ext_rec;
-    if (ext_rec_old && !ext_rec) begin
-        case (ext_data)
-            //'h101: begin
-            //    // Handle ack to go low
-            //    msu_trackmissing <= 0;
-            //    msu_trackmounting <= 0;
-            //    //ext_ack <= 0;
-            //    ext_data <= 0;
-            //end
-            'h201: begin
-                // Track has finished mounting
-                msu_trackmissing <= 0;
-                msu_trackmounting <= 0;
-                ext_audio_ack <= 0;
-                ext_data <= 0;
-            end
-            //'h301: begin
-            //    // Handle beginning of sector
-            //    msu_trackmissing <= 0;
-            //    msu_trackmounting <= 0;
-            //    ext_data <= 0;
-            //end
-            'h401: begin
-                // Handle track missing
-                msu_trackmissing <= 1;
-                msu_trackmounting <= 0;
-                ext_audio_ack <= 0;
-                ext_data <= 0;
-            end
-            default: begin
-                // nothing
-            end
-        endcase
-	end
-end
 
 // Each sample is 4 bytes or two words. File IO is 1 word, collect 2 words
 reg  [8:0] ext_sample_count = 0;
@@ -1304,23 +1168,23 @@ reg        ext_audio_wr;
 reg [15:0] ext_audio_d;
 always @(posedge clk_sys) begin
     reg    cnt = 0;
-	if (reset || ext_audio_jump_sector || audio_fifo_reset) begin
-        cnt <= 0;
-        ext_sample_count <= 0;
-        ext_audio_wr <= 0;
-    end else begin
-        // audio play?
-        if (msu_audio_download && ioctl_wr && !cnt) begin
-            cnt <= 1;
-            ext_audio_wr <= 1;
-            ext_audio_d <= ioctl_dout;
-        end else if (cnt) begin
-            // 2 words or 4 bytes collected, 1 sample
-            ext_sample_count <= ext_sample_count + 1;
-            cnt <= 0;
-            ext_audio_wr <= 0;
-        end
-    end
+	if (reset || msu_audio_jump_sector || audio_fifo_reset) begin
+		cnt <= 0;
+		ext_sample_count <= 0;
+		ext_audio_wr <= 0;
+	end else begin
+		// audio play?
+		if (msu_audio_download && ioctl_wr && !cnt) begin
+			cnt <= 1;
+			ext_audio_wr <= 1;
+			ext_audio_d <= ioctl_dout;
+		end else if (cnt) begin
+			// 2 words or 4 bytes collected, 1 sample
+			ext_sample_count <= ext_sample_count + 1'd1;
+			cnt <= 0;
+			ext_audio_wr <= 0;
+		end
+	end
 end
 
 // Msu1 audio register related
@@ -1329,7 +1193,7 @@ wire        msu_trig_pause;
 reg         msu_trackmounting = 0;
 reg         msu_trackmissing = 0;
 wire        msu_trackmissing_reset;
-reg         msu_trackfinished = 0;
+//reg         msu_trackfinished = 0;
 wire        msu_dataseekfinished_out;
 wire        msu_repeat_out;
 wire  [7:0] msu_volume_out;
@@ -1337,6 +1201,11 @@ wire        msu_audio_playing_out;
 wire        msu_audio_play;
 wire [15:0] msu_trackout;
 wire        msu_trackrequest;
+
+wire        msu_audio_ack;
+wire        msu_audio_req;
+wire        msu_audio_jump_sector;
+wire [31:0] msu_audio_sector;
 
 // TODO Msu1 Data
 /*wire [31:0] msu_data_addr;
@@ -1351,15 +1220,15 @@ reg [15:0] temp_l;
 reg [15:0] samp_l;
 reg [15:0] samp_r;
 reg [9:0] audio_clk_div = 0;
-reg [10:0] msu_audio_word_count = 0;
+//reg [10:0] msu_audio_word_count = 0;
 
 // MSU audio sample player - Pulls samples out of the FIFO buffer - Thanks ElectronAsh
 always @(posedge CLK_50M) begin
 	// The first sample of a MSU PCM file should be the LEFT sample. (ignoring the four header words).
 	// The rest of the samples should be contiguously interleaved (LEFt/RIGHT) from that point on.
-	if (ext_sample_count == 10'd3 && ext_audio_sector == 0) left_chan <= 1'b1;
+	if (ext_sample_count == 10'd3 && msu_audio_sector == 0) left_chan <= 1'b1;
 
-	if (audio_clk_div > 0) audio_clk_div <= audio_clk_div - 1;
+	if (audio_clk_div > 0) audio_clk_div <= audio_clk_div - 1'd1;
 	else begin
 		left_chan <= !left_chan;
 		audio_clk_div <= 566;
@@ -1389,7 +1258,7 @@ msu_audio_fifo msu_audio_fifo_inst (
 
 // The MSU audio PCM files contain the "MSU1" ASCII in the first two WORDs,
 // followed by two more words that contain the loop index (in SAMPLES), for when repeat mode is active.
-wire msu_header_skip = ext_audio_sector == 0 && (ext_sample_count == 0 || ext_sample_count > 0) && ext_sample_count < 10'd2 && msu_audio_play;
+wire msu_header_skip = msu_audio_sector == 0 && (ext_sample_count == 0 || ext_sample_count > 0) && ext_sample_count < 10'd2 && msu_audio_play;
 
 (*keep*) wire audio_clk_en = (audio_clk_div == 1);
 (*keep*) wire audio_fifo_reset = RESET | msu_trackmounting | msu_trackmissing_reset | cart_download;
@@ -1411,24 +1280,24 @@ assign msu_audio_l = (msu_audio_play) ? msu_vol_mix_l[23:8] : 16'h0000;
 assign msu_audio_r = (msu_audio_play) ? msu_vol_mix_r[23:8] : 16'h0000;
 
 msu_audio msu_audio (
-  	.clk(clk_sys),
-  	.reset(reset),
-  	// Audio image file size only
-    //.img_size(msu_audio_img_size),
-    .img_size(img_size),
+	.clk(clk_sys),
+	.reset(reset),
+	// Audio image file size only
+	//.img_size(msu_audio_img_size),
+	.img_size(img_size),
 
-	.ext_ack(ext_audio_ack),
-  	.ext_wr(ext_audio_wr),
-  	.ext_dout(ext_audio_d),
-  	.ext_req(ext_audio_req),
-  	.ext_count(ext_sample_count),
-  	.ext_sector(ext_audio_sector),
-  	// MSU1 audio wants to jump to a particular sector in the pcm file
-  	.ext_jump_sector(ext_audio_jump_sector),
-  	.trig_play_in(msu_trig_play),
-  	.trig_pause_in(msu_trig_pause),
+	.ext_ack(msu_audio_ack),
+	.ext_wr(ext_audio_wr),
+	.ext_dout(ext_audio_d),
+	.ext_req(msu_audio_req),
+	.ext_count(ext_sample_count),
+	.ext_sector(msu_audio_sector),
+	// MSU1 audio wants to jump to a particular sector in the pcm file
+	.ext_jump_sector(msu_audio_jump_sector),
+	.trig_play_in(msu_trig_play),
+	.trig_pause_in(msu_trig_pause),
 	.audio_play(msu_audio_play),
-    .audio_fifo_usedw(audio_fifo_usedw),
+	.audio_fifo_usedw(audio_fifo_usedw),
 	.audio_fifo_full(audio_fifo_full),
 	.audio_fifo_write(msu_audio_fifo_write),
 	// MSU1 audio needs to know about file size of pcm file to make decisions on sectors

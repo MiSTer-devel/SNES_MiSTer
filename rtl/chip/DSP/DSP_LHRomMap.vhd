@@ -20,18 +20,18 @@ entity DSP_LHRomMap is
 		DO				: out std_logic_vector(7 downto 0);
 		CPURD_N		: in std_logic;
 		CPUWR_N		: in std_logic;
-		
+
 		PA				: in std_logic_vector(7 downto 0);
 		PARD_N		: in std_logic;
 		PAWR_N		: in std_logic;
-		
+
 		ROMSEL_N		: in std_logic;
 		RAMSEL_N		: in std_logic;
-		
+
 		SYSCLKF_CE	: in std_logic;
 		SYSCLKR_CE	: in std_logic;
 		REFRESH		: in std_logic;
-		
+
 		IRQ_N			: out std_logic;
 
 		ROM_ADDR		: out std_logic_vector(23 downto 0);
@@ -39,7 +39,7 @@ entity DSP_LHRomMap is
 		ROM_CE_N		: out std_logic;
 		ROM_OE_N		: out std_logic;
 		ROM_WORD		: out std_logic;
-		
+
 		BSRAM_ADDR	: out std_logic_vector(19 downto 0);
 		BSRAM_D		: out std_logic_vector(7 downto 0);
 		BSRAM_Q		: in  std_logic_vector(7 downto 0);
@@ -52,24 +52,24 @@ entity DSP_LHRomMap is
 		ROM_MASK		: in std_logic_vector(23 downto 0);
 		BSRAM_MASK	: in std_logic_vector(23 downto 0);
 
-        MSU_TRACKOUT          : out std_logic_vector(15 downto 0);
-        MSU_TRACKREQUEST      : out std_logic;
-        MSU_TRACKMOUNTING     : in  std_logic;
-        MSU_TRACKFINISHED     : in  std_logic;
-        MSU_TRIG_PLAY         : out std_logic;
-        MSU_TRIG_PAUSE        : out std_logic;
-        MSU_VOLUME_OUT		  : out std_logic_vector(7 downto 0);
-        MSU_REPEAT_OUT		  : out std_logic;
-        MSU_AUDIO_PLAYING_IN  : in  std_logic;
-        MSU_AUDIO_PLAYING_OUT : out std_logic;
-        MSU_TRACKMISSING      : in  std_logic;
-        MSU_DATA_ADDR		  : out std_logic_vector(31 downto 0);
-        MSU_DATA_IN           : in  std_logic_vector(7 downto 0);
-        MSU_DATA_BUSY		  : in  std_logic;
-        MSU_DATA_SEEK		  : out std_logic;
-        MSU_DATA_REQ		  : out std_logic;
+		MSU_TRACKOUT          : out std_logic_vector(15 downto 0);
+		MSU_TRACKREQUEST      : out std_logic;
+		MSU_TRACKMOUNTING     : in  std_logic;
+		MSU_TRACKFINISHED     : in  std_logic;
+		MSU_TRIG_PLAY         : out std_logic;
+		MSU_TRIG_PAUSE        : out std_logic;
+		MSU_VOLUME_OUT		    : out std_logic_vector(7 downto 0);
+		MSU_REPEAT_OUT		    : out std_logic;
+		MSU_AUDIO_PLAYING_IN  : in  std_logic;
+		MSU_AUDIO_PLAYING_OUT : out std_logic;
+		MSU_TRACKMISSING      : in  std_logic;
+		MSU_DATA_ADDR		    : out std_logic_vector(31 downto 0);
+		MSU_DATA_IN           : in  std_logic_vector(7 downto 0);
+		MSU_DATA_BUSY		    : in  std_logic;
+		MSU_DATA_SEEK		    : out std_logic;
+		MSU_DATA_REQ		    : out std_logic;
 
-		EXT_RTC		: in std_logic_vector(64 downto 0)
+		EXT_RTC		          : in  std_logic_vector(64 downto 0)
 	);
 end DSP_LHRomMap;
 
@@ -81,23 +81,23 @@ architecture rtl of DSP_LHRomMap is
 	signal BSRAM_SEL 		: std_logic;
 	signal NO_BSRAM_SEL	: std_logic;
 	signal DP_SEL    		: std_logic;
-	
+
 	signal DSP_SEL	  		: std_logic;
 	signal DSP_DO    		: std_logic_vector(7 downto 0);
 	signal DSP_A0	  		: std_logic;
 	signal DSP_CS_N  		: std_logic;
 	signal DSP_CE	  		: std_logic;
-	
+
 	signal OBC1_SEL		: std_logic;
 	signal OBC1_SRAM_A 	: std_logic_vector(12 downto 0);
 	signal OBC1_SRAM_DO 	: std_logic_vector(7 downto 0);
-	
+
 	signal SRTC_DO 		: std_logic_vector(7 downto 0);
 	signal SRTC_SEL		: std_logic;
 
 	signal MSU_SEL          : std_logic;
-    signal MSU_DO           : std_logic_vector(7 downto 0);
-	
+	signal MSU_DO           : std_logic_vector(7 downto 0);
+
 	signal OPENBUS   		: std_logic_vector(7 downto 0);
 
 	signal MAP_DSP_VER	: std_logic_vector(2 downto 0);
@@ -107,44 +107,44 @@ architecture rtl of DSP_LHRomMap is
 	signal DSP_CLK	  		: integer;
 	signal ROM_RD	  		: std_logic;
 
-    component MSU is
-        port (
-            CLK             : in  std_logic;
-            RST_N           : in  std_logic;
-            ENABLE          : in  std_logic;
+	component MSU is
+	port (
+		CLK             : in  std_logic;
+		RST_N           : in  std_logic;
+		ENABLE          : in  std_logic;
 
-            RD_N            : in  std_logic;
-            WR_N            : in  std_logic;
-            ADDR            : in  std_logic_vector(23 downto 0);
-            DIN             : in  std_logic_vector(7 downto 0);
-            DOUT            : out std_logic_vector(7 downto 0);
+		RD_N            : in  std_logic;
+		WR_N            : in  std_logic;
+		ADDR            : in  std_logic_vector(23 downto 0);
+		DIN             : in  std_logic_vector(7 downto 0);
+		DOUT            : out std_logic_vector(7 downto 0);
 
-            track_out       : out std_logic_vector(15 downto 0);
-            track_request   : out std_logic;
-            track_mounting  : in  std_logic;
-            track_finished  : in  std_logic;
-            trig_play       : out std_logic;
-            trig_pause		: out std_logic;
+		track_out       : out std_logic_vector(15 downto 0);
+		track_request   : out std_logic;
+		track_mounting  : in  std_logic;
+		track_finished  : in  std_logic;
+		trig_play       : out std_logic;
+		trig_pause		: out std_logic;
 
-            volume_out		 : out std_logic_vector(7 downto 0);
+		volume_out		 : out std_logic_vector(7 downto 0);
 
-            msu_status_audio_busy 		: out std_logic;
-            msu_status_audio_repeat 	: out std_logic;
-            msu_status_audio_playing_in : in  std_logic;
-            msu_status_audio_playing_out: out std_logic;
+		msu_status_audio_busy 		: out std_logic;
+		msu_status_audio_repeat 	: out std_logic;
+		msu_status_audio_playing_in : in  std_logic;
+		msu_status_audio_playing_out: out std_logic;
 
-            msu_status_track_missing_in : in std_logic;
+		msu_status_track_missing_in : in std_logic;
 
-            msu_data_addr			: out std_logic_vector(31 downto 0);
-            msu_data_in				: in std_logic_vector(7 downto 0);
-            msu_status_data_busy 	: in std_logic;
-            msu_data_seek			: out std_logic;
-            msu_data_req			: out std_logic
-        );
-    end component;
-		
+		msu_data_addr			: out std_logic_vector(31 downto 0);
+		msu_data_in				: in std_logic_vector(7 downto 0);
+		msu_status_data_busy 	: in std_logic;
+		msu_data_seek			: out std_logic;
+		msu_data_req			: out std_logic
+	);
+	end component;
+
 begin
-	
+
 	MAP_DSP_VER <= MAP_CTRL(3) & MAP_CTRL(5 downto 4);
 	MAP_DSP_SEL <= not MAP_CTRL(6) and (MAP_CTRL(7) or not (MAP_CTRL(5) or MAP_CTRL(4)));	--8..B
 	MAP_OBC1_SEL <= MAP_CTRL(7) and MAP_CTRL(6) and not MAP_CTRL(5) and not MAP_CTRL(4);	--C
@@ -158,7 +158,7 @@ begin
 		OUT_CLK => DSP_CLK,
 		CE      => DSP_CE
 	);
-	
+
 	DSP_CLK <= 760000 when MAP_CTRL(3) = '0' else 1000000;
 
 	process( CA, MAP_CTRL, ROMSEL_N, RAMSEL_N, BSRAM_MASK, ROM_MASK )
@@ -226,7 +226,7 @@ begin
 					if CA(22) = '0' and CA(15 downto 1) = x"280"&"000" and MAP_CTRL(3) = '1' then
 						SRTC_SEL <= '1';
 					end if;
-				when others =>					-- SpecialLoROM														
+				when others =>					-- SpecialLoROM
 					CART_ADDR <= "00" & (CA(23) and not CA(21)) & CA(21 downto 16) & CA(14 downto 0);--00-1F:8000-FFFF; 20-3F/A0-BF:8000-FFFF; 80-9F:8000-FFFF
 					BRAM_ADDR <= CA(20 downto 16) & CA(14 downto 0);
 					BSRAM_SEL <= '0';
@@ -252,10 +252,8 @@ begin
 			DSP_A0 <= '1';
 		end if;
 	end process;
-	
-	ROM_SEL <= not ROMSEL_N and not DSP_SEL and not DP_SEL and not SRTC_SEL and not BSRAM_SEL and not OBC1_SEL and not NO_BSRAM_SEL;
-	
 
+	ROM_SEL <= not ROMSEL_N and not DSP_SEL and not DP_SEL and not SRTC_SEL and not BSRAM_SEL and not OBC1_SEL and not NO_BSRAM_SEL;
 	DSP_CS_N <= not DSP_SEL;
 
 	DSPn_BLOCK: if USE_DSPn = '1' generate
@@ -280,60 +278,60 @@ begin
 	);
 	end generate;
 
-    MSU_instance : component MSU
-    port map(
-        CLK           => MCLK,
-        RST_N		  => RST_N,
-        ENABLE		  => ENABLE,
+	MSU_instance : component MSU
+	port map(
+		CLK    => MCLK,
+		RST_N  => RST_N,
+		ENABLE => ENABLE,
 
-        RD_N		  => CPURD_N,
-        WR_N		  => CPUWR_N,
+		RD_N   => CPURD_N,
+		WR_N   => CPUWR_N,
 
-        ADDR		  => CA,
-        DIN			  => DI,
-        DOUT		  => MSU_DO,
+		ADDR   => CA,
+		DIN    => DI,
+		DOUT   => MSU_DO,
 
-        track_out     => MSU_TRACKOUT,
-        track_request => MSU_TRACKREQUEST,
-        track_mounting=> MSU_TRACKMOUNTING,
-        track_finished=> MSU_TRACKFINISHED,
-        trig_play     => MSU_TRIG_PLAY,
-        trig_pause    => MSU_TRIG_PAUSE,
+		track_out      => MSU_TRACKOUT,
+		track_request  => MSU_TRACKREQUEST,
+		track_mounting => MSU_TRACKMOUNTING,
+		track_finished => MSU_TRACKFINISHED,
+		trig_play      => MSU_TRIG_PLAY,
+		trig_pause     => MSU_TRIG_PAUSE,
 
-        volume_out => MSU_VOLUME_OUT,
+		volume_out     => MSU_VOLUME_OUT,
 
-        msu_status_audio_repeat => MSU_REPEAT_OUT,
-        msu_status_audio_playing_in => MSU_AUDIO_PLAYING_IN,
-        msu_status_audio_playing_out => MSU_AUDIO_PLAYING_OUT,
-        msu_status_track_missing_in => MSU_TRACKMISSING,
+		msu_status_audio_repeat      => MSU_REPEAT_OUT,
+		msu_status_audio_playing_in  => MSU_AUDIO_PLAYING_IN,
+		msu_status_audio_playing_out => MSU_AUDIO_PLAYING_OUT,
+		msu_status_track_missing_in  => MSU_TRACKMISSING,
 
-        msu_data_addr => MSU_DATA_ADDR,
-        msu_data_in => MSU_DATA_IN,
-        msu_status_data_busy => MSU_DATA_BUSY,
-        msu_data_seek => MSU_DATA_SEEK,
-        msu_data_req => MSU_DATA_REQ
-    );
+		msu_data_addr        => MSU_DATA_ADDR,
+		msu_data_in          => MSU_DATA_IN,
+		msu_status_data_busy => MSU_DATA_BUSY,
+		msu_data_seek        => MSU_DATA_SEEK,
+		msu_data_req         => MSU_DATA_REQ
+	);
 
 	OBC1 : entity work.OBC1
 	port map(
 		CLK			=> MCLK,
 		RST_N			=> RST_N and MAP_OBC1_SEL,
 		ENABLE		=> ENABLE,
-		
+
 		CA				=> CA,
 		DI				=> DI,
 		CPURD_N		=> CPURD_N,
 		CPUWR_N		=> CPUWR_N,
-		
+
 		SYSCLKF_CE	=> SYSCLKF_CE,
-		
+
 		CS				=> OBC1_SEL,
-				
+
 		SRAM_A		=> OBC1_SRAM_A,
 		SRAM_DI  	=> BSRAM_Q,
 		SRAM_DO		=> OBC1_SRAM_DO
 	);
-	
+
 	SRTC : entity work.SRTC
 	port map(
 		CLK			=> MCLK,
@@ -344,12 +342,12 @@ begin
 		CS				=> SRTC_SEL,
 		CPURD_N		=> CPURD_N,
 		CPUWR_N		=> CPUWR_N,
-		
+
 		SYSCLKF_CE	=> SYSCLKF_CE,
-		
+
 		EXT_RTC		=> EXT_RTC
 	);
-	
+
 	ROM_RD <= (SYSCLKF_CE or SYSCLKR_CE) when rising_edge(MCLK);
 
 	ROM_ADDR <= CART_ADDR and ROM_MASK;
@@ -362,7 +360,7 @@ begin
 	BSRAM_OE_N <= CPURD_N;
 	BSRAM_WE_N <= CPUWR_N;
 	BSRAM_D    <= OBC1_SRAM_DO when OBC1_SEL = '1' else DI;
-	
+
 	process(MCLK, RST_N)
 	begin
 		if RST_N = '0' then
@@ -373,7 +371,7 @@ begin
 			end if;
 		end if;
 	end process;
-	
+
 	DO <= ROM_Q(7 downto 0) when ROM_SEL = '1' else
 			DSP_DO when DSP_SEL = '1' or DP_SEL = '1' else
 			SRTC_DO when SRTC_SEL = '1' else

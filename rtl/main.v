@@ -1,4 +1,3 @@
-
 module main (
    input             RESET_N,
 
@@ -92,6 +91,18 @@ module main (
 
    input             TURBO,
    output            TURBO_ALLOW,
+
+   output     [15:0] MSU_TRACKOUT,
+   output            MSU_TRACKREQUEST,
+   input             MSU_TRACKMOUNTING,
+   output            MSU_TRIG_PLAY,
+   output            MSU_TRIG_PAUSE,
+   output      [7:0] MSU_VOLUME_OUT,
+   output            MSU_REPEAT_OUT,
+   input             MSU_AUDIO_PLAYING_IN,
+   output			 MSU_AUDIO_PLAYING_OUT,
+   input             MSU_TRACKMISSING,
+   input             MSU_TRACKFINISHED,
 
    output     [15:0] AUDIO_L,
    output     [15:0] AUDIO_R
@@ -272,7 +283,27 @@ DSP_LHRomMap #(.USE_DSPn(USE_DSPn)) DSP_LHRomMap
 	.map_ctrl(ROM_TYPE),
 	.rom_mask(ROM_MASK),
 	.bsram_mask(RAM_MASK),
-	
+
+    // MSU1 audio
+    .msu_trackout(MSU_TRACKOUT),
+    .msu_trackrequest(MSU_TRACKREQUEST),
+    .msu_trackmounting(MSU_TRACKMOUNTING),
+    .msu_trackmissing(MSU_TRACKMISSING),
+    .msu_trackfinished(MSU_TRACKFINISHED),
+    .msu_trig_play(MSU_TRIG_PLAY),
+    .msu_trig_pause(MSU_TRIG_PAUSE),
+    .msu_volume_out(MSU_VOLUME_OUT),
+    .msu_repeat_out(MSU_REPEAT_OUT),
+    .msu_audio_playing_in(MSU_AUDIO_PLAYING_IN),
+    .msu_audio_playing_out(MSU_AUDIO_PLAYING_OUT),
+
+    // MSU1 data
+    .msu_data_addr(MSU_DATA_ADDR),
+    .msu_data_in(MSU_DATA_IN),
+    .msu_data_busy(MSU_DATA_BUSY),
+    .msu_data_seek(MSU_DATA_SEEK),
+    .msu_data_req(MSU_DATA_REQ),
+
 	.ext_rtc(EXT_RTC)
 );
 end else begin
@@ -661,6 +692,7 @@ BSXMap BSXMap
 	.map_ctrl(ROM_TYPE),
 	.rom_mask(ROM_MASK),
 	.bsram_mask(RAM_MASK),
+
 	
 	.ext_rtc(EXT_RTC)
 );

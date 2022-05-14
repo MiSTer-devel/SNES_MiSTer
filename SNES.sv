@@ -1163,7 +1163,8 @@ hps_ext hps_ext
 	.msu_audio_ack(msu_audio_ack),
 	.msu_audio_req(msu_audio_req),
 	.msu_audio_jump_sector(msu_audio_jump_sector),
-	.msu_audio_sector(msu_audio_sector)
+	.msu_audio_sector(msu_audio_sector),
+	.msu_audio_download(msu_audio_download)
 );
 
 // Each sample is 4 bytes or two words. File IO is 1 word, collect 2 words

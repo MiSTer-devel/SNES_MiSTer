@@ -115,6 +115,7 @@ parameter USE_SA1 = 1'b1;
 parameter USE_DSPn = 1'b1;
 parameter USE_SPC7110 = 1'b1;
 parameter USE_BSX = 1'b1;
+parameter USE_MSU = 1'b1;
 
 wire [23:0] CA;
 wire        CPURD_N;
@@ -227,6 +228,56 @@ SNES SNES
 	.audio_r(AUDIO_R)
 );
 
+wire  [7:0] MSU_DO;
+wire        MSU_SEL;
+
+generate
+if (USE_MSU == 1'b1) begin
+MSU MSU
+(
+	.CLK(MCLK),
+	.RST_N(RESET_N),
+	.ENABLE(MSU_ENABLE),
+
+	.RD_N(CPURD_N),
+	.WR_N(CPUWR_N),
+
+	.ADDR(CA),
+	.DIN(DO),
+	.DOUT(MSU_DO),
+	.MSU_SEL(MSU_SEL),
+
+	.track_out(MSU_TRACKOUT),
+	.track_request(MSU_TRACKREQUEST),
+	.track_mounting(MSU_TRACKMOUNTING),
+	.track_finished(MSU_TRACKFINISHED),
+
+	.msu_status_audio_repeat(MSU_REPEAT_OUT),
+	.msu_status_audio_playing_in(MSU_AUDIO_PLAYING_IN),
+	.msu_status_audio_playing_out(MSU_AUDIO_PLAYING_OUT),
+	.msu_status_track_missing_in(MSU_TRACKMISSING),
+
+	/*
+	.msu_data_addr(MSU_DATA_ADDR),
+	.msu_data_in(MSU_DATA_IN),
+	.msu_status_data_busy(MSU_DATA_BUSY),
+	.msu_data_seek(MSU_DATA_SEEK),
+	.msu_data_req(MSU_DATA_REQ),
+	*/
+
+	.volume_out(MSU_VOLUME_OUT)
+);
+end else begin
+	assign MSU_DO  = 0;
+	assign MSU_SEL = 0;
+	assign MSU_TRACKOUT = 0;
+	assign MSU_TRACKREQUEST = 0;
+	assign MSU_VOLUME_OUT = 0;
+	assign MSU_REPEAT_OUT = 0;
+	assign MSU_AUDIO_PLAYING_OUT = 0;
+end
+endgenerate
+
 wire  [7:0] DLH_DO;
 wire        DLH_IRQ_N;
 wire [23:0] DLH_ROM_ADDR;
@@ -252,7 +303,7 @@ DSP_LHRomMap #(.USE_DSPn(USE_DSPn)) DSP_LHRomMap
 	.do(DLH_DO),
 	.cpurd_n(CPURD_N),
 	.cpuwr_n(CPUWR_N),
-
+	
 	.pa(PA),
 	.pard_n(PARD_N),
 	.pawr_n(PAWR_N),
@@ -282,27 +333,6 @@ DSP_LHRomMap #(.USE_DSPn(USE_DSPn)) DSP_LHRomMap
 	.map_ctrl(ROM_TYPE),
 	.rom_mask(ROM_MASK),
 	.bsram_mask(RAM_MASK),
-
-	// MSU1 audio
-	.msu_trackout(MSU_TRACKOUT),
-	.msu_trackrequest(MSU_TRACKREQUEST),
-	.msu_trackmounting(MSU_TRACKMOUNTING),
-	.msu_trackmissing(MSU_TRACKMISSING),
-	.msu_trackfinished(MSU_TRACKFINISHED),
-	.msu_volume_out(MSU_VOLUME_OUT),
-	.msu_repeat_out(MSU_REPEAT_OUT),
-	.msu_audio_playing_in(MSU_AUDIO_PLAYING_IN),
-	.msu_audio_playing_out(MSU_AUDIO_PLAYING_OUT),
-	.msu_enable(MSU_ENABLE),
-
-	/*
-	// MSU1 data
-	.msu_data_addr(MSU_DATA_ADDR),
-	.msu_data_in(MSU_DATA_IN),
-	.msu_data_busy(MSU_DATA_BUSY),
-	.msu_data_seek(MSU_DATA_SEEK),
-	.msu_data_req(MSU_DATA_REQ),
-	*/
 
 	.ext_rtc(EXT_RTC)
 );
@@ -823,6 +853,8 @@ always @(*) begin
 			ROM_WORD   = DLH_ROM_WORD;
 		end
 	endcase
+	
+	if(MSU_SEL)   DI = MSU_DO;
 end
 
 endmodule

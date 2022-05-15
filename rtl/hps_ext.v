@@ -32,6 +32,7 @@ module hps_ext
 	input      [15:0] msu_trackout,
 	input             msu_trackrequest,
 	
+	output reg [31:0] msu_audio_size,
 	output reg        msu_audio_ack,
 	input             msu_audio_req,
 	input             msu_audio_jump_sector,
@@ -106,26 +107,24 @@ reg [48:0] cd_in;
 reg [48:0] cd_out;
 
 always @(posedge clk_sys) begin
-	reg         send = 0;
-	reg  [47:0] command = 0;
+	reg cd_out48_last = 1;
+	reg reset_old = 0;
+	reg msu_audio_req_old = 0;
+	reg msu_audio_jump_sector_old = 0;
+	reg msu_trackrequest_old = 0;
+	reg msu_audio_download_old = 0;
 
-	reg         cd_out48_last = 1;
-	reg         send_old = 0;
-	reg         reset_old = 0;
-	reg         msu_audio_req_old = 0;
-	reg         msu_audio_jump_sector_old = 0;
-	reg         msu_trackrequest_old = 0;
-	reg         msu_audio_download_old = 0;
-
+	reset_old <= reset;
 	if (reset) begin
-		msu_trackmissing <= 0;
+		msu_trackmissing  <= 0;
 		msu_trackmounting <= 0;
-		send <= 0;
-		command <= 0;
-		msu_audio_ack <= 0;
-		msu_audio_download_old <= 0;
+		msu_audio_ack     <= 0;
+		if (!reset_old) begin
+			cd_in[47:0] <= 8'hFF;
+			cd_in[48]   <= ~cd_in[48];
+		end
 	end
-	
+
 	msu_audio_download_old <= msu_audio_download;
 	if (!msu_audio_download && msu_audio_download_old) begin
 		msu_audio_ack <= 0;
@@ -139,72 +138,44 @@ always @(posedge clk_sys) begin
 	msu_audio_req_old <= msu_audio_req;
 	if (!msu_audio_req_old && msu_audio_req && !msu_trackrequest) begin
 		// Request for next sector has come from MSU1
-		command <= 'h34;
-		send <= 1;
+		cd_in[47:0] <= 'h34;
+		cd_in[48]   <= ~cd_in[48];
 	end
 	
 	// Jump to a sector
 	msu_audio_jump_sector_old <= msu_audio_jump_sector;
 	if (!msu_audio_jump_sector_old && msu_audio_jump_sector) begin
-		command <= { msu_audio_sector, 16'h36 };
-		send <= 1;
+		cd_in[47:0] <= { msu_audio_sector, 16'h36 };
+		cd_in[48]   <= ~cd_in[48];
 	end
 	
 	// Track requests
 	msu_trackrequest_old <= msu_trackrequest;
 	if (!msu_trackrequest_old && msu_trackrequest) begin
-		command <= { 16'h0, msu_trackout, 16'h35 };
+		cd_in[47:0] <= { msu_trackout, 16'h35 };
+		cd_in[48]   <= ~cd_in[48];
 		msu_trackmounting <= 1;
-		send <= 1;
-	end
-
-	// Send and reset
-	send_old <= send;
-	if (send && !send_old) begin
-		cd_in[47:0] <= command;
-		cd_in[48] <= ~cd_in[48];
-		send <= 0;
-		command <= 0;
-	end
-	else begin
-		reset_old <= reset;
-		if (!reset_old && reset) begin
-			cd_in[47:0] <= 8'hFF;
-			cd_in[48] <= ~cd_in[48];
-		end
 	end
 
 	cd_out48_last <= cd_out[48];
 	if (cd_out[48] != cd_out48_last) begin
-		if(cd_out == 'h001) begin
-			msu_enable <= 1;
-		end
-		else if(cd_out == 'h002) begin
-			msu_enable <= 0;
-		end
-		else if(cd_out == 'h101) begin
-			//    // Handle ack to go low
-			//    msu_trackmissing <= 0;
-			//    msu_trackmounting <= 0;
-			//    //ext_ack <= 0;
-		end
-		else if(cd_out == 'h201) begin
-			// Track has finished mounting
-			msu_trackmissing <= 0;
-			msu_trackmounting <= 0;
-			msu_audio_ack <= 0;
-		end
-		else if(cd_out == 'h301) begin
-			//    // Handle beginning of sector
-			//    msu_trackmissing <= 0;
-			//    msu_trackmounting <= 0;
-		end
-		else if(cd_out == 'h401) begin
-			// Handle track missing
-			msu_trackmissing <= 1;
-			msu_trackmounting <= 0;
-			msu_audio_ack <= 0;
-		end
+		case(cd_out[3:0])
+			1: msu_enable <= 1;
+			2: msu_enable <= 0;
+			3: begin
+					// Track has finished mounting
+					msu_audio_size    <= cd_out[47:16];
+					msu_trackmissing  <= 0;
+					msu_trackmounting <= 0;
+					msu_audio_ack     <= 0;
+				end
+			4: begin
+					// Handle track missing
+					msu_trackmissing  <= 1;
+					msu_trackmounting <= 0;
+					msu_audio_ack     <= 0;
+				end
+		endcase
 	end
 end
 

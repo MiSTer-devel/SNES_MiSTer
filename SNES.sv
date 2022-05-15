@@ -652,10 +652,8 @@ main main
 	// Waits until trackmounting goes low
 	.MSU_TRACKMOUNTING(msu_trackmounting),
 	.MSU_TRACKMISSING(msu_trackmissing),
-	.MSU_TRIG_PLAY(msu_trig_play),
 	.MSU_VOLUME_OUT(msu_volume_out),
 	.MSU_REPEAT_OUT(msu_repeat_out),
-	.MSU_TRIG_PAUSE(msu_trig_pause),
 	.MSU_AUDIO_PLAYING_IN(msu_audio_play),
 	.MSU_AUDIO_PLAYING_OUT(msu_audio_playing_out),
 	.MSU_ENABLE(msu_enable),
@@ -1159,6 +1157,7 @@ hps_ext hps_ext
 	.msu_trackmissing(msu_trackmissing),
 	.msu_trackout(msu_trackout),
 	.msu_trackrequest(msu_trackrequest),
+	.msu_audio_size(msu_audio_size),
 	
 	.msu_audio_ack(msu_audio_ack),
 	.msu_audio_req(msu_audio_req),
@@ -1168,26 +1167,26 @@ hps_ext hps_ext
 );
 
 // Each sample is 4 bytes or two words. File IO is 1 word, collect 2 words
-reg  [8:0] ext_sample_count = 0;
 reg        ext_audio_wr;
-reg [15:0] ext_audio_d;
+reg [31:0] ext_audio_d;
+reg  [7:0] ext_audio_cnt;
 always @(posedge clk_sys) begin
-    reg    cnt = 0;
-	if (reset || msu_audio_jump_sector || audio_fifo_reset) begin
-		cnt <= 0;
-		ext_sample_count <= 0;
-		ext_audio_wr <= 0;
-	end else begin
-		// audio play?
-		if (msu_audio_download && ioctl_wr && !cnt) begin
-			cnt <= 1;
-			ext_audio_wr <= 1;
-			ext_audio_d <= ioctl_dout;
-		end else if (cnt) begin
-			// 2 words or 4 bytes collected, 1 sample
-			ext_sample_count <= ext_sample_count + 1'd1;
-			cnt <= 0;
-			ext_audio_wr <= 0;
+	reg wr;
+
+	wr <= 0;
+	ext_audio_wr <= wr;
+
+	if(reset || msu_audio_jump_sector || audio_fifo_reset) begin
+		ext_audio_cnt <= 0;
+	end
+	else if(msu_audio_download && ioctl_wr)  begin
+		if(ioctl_addr[1]) begin
+			wr <= 1;
+			ext_audio_d[31:16] <= ioctl_dout;
+			ext_audio_cnt <= ioctl_addr[9:2];
+		end
+		else begin
+			ext_audio_d[15:0] <= ioctl_dout;
 		end
 	end
 end
@@ -1197,8 +1196,6 @@ wire        msu_trig_play;
 wire        msu_trig_pause;
 reg         msu_trackmounting = 0;
 reg         msu_trackmissing = 0;
-wire        msu_trackmissing_reset;
-//reg         msu_trackfinished = 0;
 wire        msu_dataseekfinished_out;
 wire        msu_repeat_out;
 wire  [7:0] msu_volume_out;
@@ -1206,45 +1203,22 @@ wire        msu_audio_playing_out;
 wire        msu_audio_play;
 wire [15:0] msu_trackout;
 wire        msu_trackrequest;
+wire [31:0] msu_audio_size;
 
 wire        msu_audio_ack;
 wire        msu_audio_req;
 wire        msu_audio_jump_sector;
 wire [31:0] msu_audio_sector;
 
-// TODO Msu1 Data
-/*wire [31:0] msu_data_addr;
-wire [7:0] msu_data_in;
-// busy status is a combination of fifo and dataseek (by the hps) states
-wire msu_data_busy = msu_data_fifo_busy || (msu_dataseekfinished == 0);
-wire msu_data_seek;
-*/
-
-reg left_chan = 0;
-reg [15:0] temp_l;
 reg [15:0] samp_l;
 reg [15:0] samp_r;
-reg [9:0] audio_clk_div = 0;
-//reg [10:0] msu_audio_word_count = 0;
+reg [10:0] audio_clk_div = 0;
 
-// MSU audio sample player - Pulls samples out of the FIFO buffer - Thanks ElectronAsh
 always @(posedge CLK_50M) begin
-	// The first sample of a MSU PCM file should be the LEFT sample. (ignoring the four header words).
-	// The rest of the samples should be contiguously interleaved (LEFt/RIGHT) from that point on.
-	if (ext_sample_count == 10'd3 && msu_audio_sector == 0) left_chan <= 1'b1;
-
-	if (audio_clk_div > 0) audio_clk_div <= audio_clk_div - 1'd1;
+	if(audio_clk_div) audio_clk_div <= audio_clk_div - 1'd1;
 	else begin
-		left_chan <= !left_chan;
-		audio_clk_div <= 566;
-
-		// left then right samples
-		if (left_chan) temp_l <= audio_fifo_dout;
-		else begin
-			// Make sure both the left and right samples get output at the same time.
-			samp_l <= temp_l;
-			samp_r <= audio_fifo_dout;
-		end
+		audio_clk_div <= 1133;
+		{samp_r,samp_l} <= audio_fifo_dout;
 	end
 end
 
@@ -1261,19 +1235,15 @@ msu_audio_fifo msu_audio_fifo_inst (
 	.q(audio_fifo_dout)
 );
 
-// The MSU audio PCM files contain the "MSU1" ASCII in the first two WORDs,
-// followed by two more words that contain the loop index (in SAMPLES), for when repeat mode is active.
-wire msu_header_skip = msu_audio_sector == 0 && (ext_sample_count == 0 || ext_sample_count > 0) && ext_sample_count < 10'd2 && msu_audio_play;
-
-(*keep*) wire audio_clk_en = (audio_clk_div == 1);
-(*keep*) wire audio_fifo_reset = RESET | msu_trackmounting | msu_trackmissing_reset | cart_download;
-(*keep*) wire audio_fifo_full;
-(*keep*) wire audio_fifo_wr = !audio_fifo_full && ext_audio_wr && msu_audio_fifo_write && !msu_header_skip;
-(*keep*) wire [10:0] audio_fifo_usedw;
-(*keep*) wire audio_fifo_empty;
-(*keep*) wire audio_fifo_rd = !audio_fifo_empty && audio_clk_en && msu_audio_play;
-(*keep*) wire [15:0] audio_fifo_dout;
-         wire msu_audio_fifo_write;
+wire audio_clk_en = (audio_clk_div == 1);
+wire audio_fifo_reset = RESET | msu_trackmounting | msu_trackmissing | cart_download;
+wire audio_fifo_full;
+wire audio_fifo_wr = !audio_fifo_full && ext_audio_wr && msu_audio_fifo_write;
+wire [10:0] audio_fifo_usedw;
+wire audio_fifo_empty;
+wire audio_fifo_rd = !audio_fifo_empty && audio_clk_en && msu_audio_play;
+wire [15:0] audio_fifo_dout;
+wire msu_audio_fifo_write;
 
 // Audio volume
 reg [15:0] msu_audio_l;
@@ -1287,20 +1257,17 @@ assign msu_audio_r = (msu_audio_play) ? msu_vol_mix_r[23:8] : 16'h0000;
 msu_audio msu_audio (
 	.clk(clk_sys),
 	.reset(reset),
-	// Audio image file size only
-	//.img_size(msu_audio_img_size),
-	.img_size(img_size),
+
+	.track_size(msu_audio_size),
 
 	.ext_ack(msu_audio_ack),
 	.ext_wr(ext_audio_wr),
 	.ext_dout(ext_audio_d),
 	.ext_req(msu_audio_req),
-	.ext_count(ext_sample_count),
+	.ext_count(ext_audio_cnt),
 	.ext_sector(msu_audio_sector),
 	// MSU1 audio wants to jump to a particular sector in the pcm file
 	.ext_jump_sector(msu_audio_jump_sector),
-	.trig_play_in(msu_trig_play),
-	.trig_pause_in(msu_trig_pause),
 	.audio_play(msu_audio_play),
 	.audio_fifo_usedw(audio_fifo_usedw),
 	.audio_fifo_full(audio_fifo_full),
@@ -1309,10 +1276,8 @@ msu_audio msu_audio (
 
 	.trackmissing(msu_trackmissing),
 	.trackmounting(msu_trackmounting),
-	.trackstopped(!msu_audio_playing_out),
-	.repeat_in(msu_repeat_out),
-	// This allows the msu_audio instance to reset the fifo
-	.trackmissing_reset(msu_trackmissing_reset)
+	.play_in(msu_audio_playing_out),
+	.repeat_in(msu_repeat_out)
 );
 
 endmodule

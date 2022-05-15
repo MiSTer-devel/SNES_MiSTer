@@ -1242,7 +1242,7 @@ wire audio_fifo_wr = !audio_fifo_full && ext_audio_wr && msu_audio_fifo_write;
 wire [10:0] audio_fifo_usedw;
 wire audio_fifo_empty;
 wire audio_fifo_rd = !audio_fifo_empty && audio_clk_en && msu_audio_play;
-wire [15:0] audio_fifo_dout;
+wire [31:0] audio_fifo_dout;
 wire msu_audio_fifo_write;
 
 // Audio volume

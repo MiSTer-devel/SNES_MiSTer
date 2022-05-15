@@ -20,8 +20,6 @@ module MSU(
     input             track_finished,
 
     // Audio player control
-    output reg        trig_play,
-    output reg        trig_pause,
     output reg  [7:0] volume_out,
 
     // Wired into the status reg later
@@ -48,8 +46,6 @@ initial begin
     msu_status_audio_playing_out = 0;
     msu_status_track_missing = 0;
     track_out = 0;
-    trig_play = 0;
-    trig_pause = 0;
 
     //track_mounting_falling = 0;
     track_mounting_old = 0;
@@ -140,8 +136,6 @@ always @(posedge CLK or negedge RST_N) begin
         msu_status_track_missing_in_old <= 0;
         msu_status_data_busy_out <= 0;
         msu_status_audio_busy <= 0;
-        trig_play <= 0;
-        trig_pause <= 0;
         track_mounting_old <= 0;
         //track_mounting_falling_old <= 0;
 
@@ -149,9 +143,7 @@ always @(posedge CLK or negedge RST_N) begin
         msu_data_seek <= 0;
         msu_data_addr <= 32'h00000000;
     end else begin
-        // Reset our play/pause/request triggers for pulsing
-        trig_play <= 0;
-        trig_pause <= 0;
+        // Reset our request trigger for pulsing
         track_request <= 0;
         // Pulses for data
         msu_data_seek <= 0;
@@ -257,13 +249,6 @@ always @(posedge CLK or negedge RST_N) begin
                         // We can only play/pause a track that has been set and mounted. Not on missing track either
                         if (!msu_status_track_missing) begin
                             msu_status_audio_playing_out <= DIN[0];
-                            if (DIN[0] == 1) begin
-                                // Pulse trig_play for only ONE clock cycle
-                                trig_play <= 1;
-                            end else if (DIN[0] == 0) begin
-                                // Pulse trig_pause for only ONE clock cycle
-                                trig_pause <= 1;
-                            end
                         end
                     end
                 end

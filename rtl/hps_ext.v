@@ -59,16 +59,15 @@ reg  [9:0] byte_cnt;
 always@(posedge clk_sys) begin
 	reg [15:0] cmd;
 	reg  [7:0] cd_req = 0;
-	reg        old_cd = 0;
 
-	old_cd <= cd_in[48];
-	if(old_cd ^ cd_in[48]) cd_req <= cd_req + 1'd1;
+	cd_get <= 0;
+	if(cd_put) cd_req <= cd_req + 1'd1;
 
 	if(~io_enable) begin
 		dout_en <= 0;
 		io_dout <= 0;
 		byte_cnt <= 0;
-		if(cmd == 'h35) cd_out[48] <= ~cd_out[48];
+		if(cmd == 'h35) cd_get <= 1;
 	end
 	else if(io_strobe) begin
 
@@ -103,16 +102,18 @@ always@(posedge clk_sys) begin
 	end
 end
 
-reg [48:0] cd_in;
-reg [48:0] cd_out;
+reg [47:0] cd_in;
+reg [47:0] cd_out;
+reg cd_put, cd_get;
 
 always @(posedge clk_sys) begin
-	reg cd_out48_last = 1;
 	reg reset_old = 0;
 	reg msu_audio_req_old = 0;
 	reg msu_audio_jump_sector_old = 0;
 	reg msu_trackrequest_old = 0;
 	reg msu_audio_download_old = 0;
+
+	cd_put <= 0;
 
 	reset_old <= reset;
 	if (reset) begin
@@ -120,8 +121,8 @@ always @(posedge clk_sys) begin
 		msu_trackmounting <= 0;
 		msu_audio_ack     <= 0;
 		if (!reset_old) begin
-			cd_in[47:0] <= 8'hFF;
-			cd_in[48]   <= ~cd_in[48];
+			cd_in  <= 8'hFF;
+			cd_put <= 1;
 		end
 	end
 
@@ -138,27 +139,26 @@ always @(posedge clk_sys) begin
 	msu_audio_req_old <= msu_audio_req;
 	if (!msu_audio_req_old && msu_audio_req && !msu_trackrequest) begin
 		// Request for next sector has come from MSU1
-		cd_in[47:0] <= 'h34;
-		cd_in[48]   <= ~cd_in[48];
+		cd_in  <= 'h34;
+		cd_put <= 1;
 	end
 	
 	// Jump to a sector
 	msu_audio_jump_sector_old <= msu_audio_jump_sector;
 	if (!msu_audio_jump_sector_old && msu_audio_jump_sector) begin
-		cd_in[47:0] <= { msu_audio_sector, 16'h36 };
-		cd_in[48]   <= ~cd_in[48];
+		cd_in  <= { msu_audio_sector, 16'h36 };
+		cd_put <= 1;
 	end
 	
 	// Track requests
 	msu_trackrequest_old <= msu_trackrequest;
 	if (!msu_trackrequest_old && msu_trackrequest) begin
-		cd_in[47:0] <= { msu_trackout, 16'h35 };
-		cd_in[48]   <= ~cd_in[48];
+		cd_in  <= { msu_trackout, 16'h35 };
+		cd_put <= 1;
 		msu_trackmounting <= 1;
 	end
 
-	cd_out48_last <= cd_out[48];
-	if (cd_out[48] != cd_out48_last) begin
+	if (cd_get) begin
 		case(cd_out[3:0])
 			1: msu_enable <= 1;
 			2: msu_enable <= 0;

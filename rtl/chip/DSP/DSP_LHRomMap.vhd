@@ -56,8 +56,6 @@ entity DSP_LHRomMap is
 		MSU_TRACKREQUEST      : out std_logic;
 		MSU_TRACKMOUNTING     : in  std_logic;
 		MSU_TRACKFINISHED     : in  std_logic;
-		MSU_TRIG_PLAY         : out std_logic;
-		MSU_TRIG_PAUSE        : out std_logic;
 		MSU_VOLUME_OUT		    : out std_logic_vector(7 downto 0);
 		MSU_REPEAT_OUT		    : out std_logic;
 		MSU_AUDIO_PLAYING_IN  : in  std_logic;
@@ -125,8 +123,6 @@ architecture rtl of DSP_LHRomMap is
 		track_request   : out std_logic;
 		track_mounting  : in  std_logic;
 		track_finished  : in  std_logic;
-		trig_play       : out std_logic;
-		trig_pause		 : out std_logic;
 
 		volume_out		 : out std_logic_vector(7 downto 0);
 
@@ -296,8 +292,6 @@ begin
 		track_request  => MSU_TRACKREQUEST,
 		track_mounting => MSU_TRACKMOUNTING,
 		track_finished => MSU_TRACKFINISHED,
-		trig_play      => MSU_TRIG_PLAY,
-		trig_pause     => MSU_TRIG_PAUSE,
 
 		volume_out     => MSU_VOLUME_OUT,
 

@@ -243,14 +243,8 @@ always @(posedge CLK or negedge RST_N) begin
                 end
                 // MSU Audio state control. (MSU_CONTROL).
                 16'h2007: begin
-                    if (!msu_status_audio_busy) begin
-                        //MSU_CONTROL <= DIN;
-                        msu_status_audio_repeat <= DIN[1];
-                        // We can only play/pause a track that has been set and mounted. Not on missing track either
-                        if (!msu_status_track_missing) begin
-                            msu_status_audio_playing_out <= DIN[0];
-                        end
-                    end
+                    msu_status_audio_repeat <= DIN[1];
+                    msu_status_audio_playing_out <= DIN[0];
                 end
                 default:;
             endcase

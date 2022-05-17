@@ -95,12 +95,17 @@ module main (
 	output     [15:0] MSU_TRACKOUT,
 	output            MSU_TRACKREQUEST,
 	input             MSU_TRACKMOUNTING,
-	output      [7:0] MSU_VOLUME_OUT,
-	output            MSU_REPEAT_OUT,
+	output      [7:0] MSU_VOLUME,
+	output            MSU_REPEAT,
 	input             MSU_AUDIO_PLAYING_IN,
 	output            MSU_AUDIO_PLAYING_OUT,
 	input             MSU_TRACKMISSING,
 	input             MSU_TRACKFINISHED,
+	output     [31:0] MSU_DATA_ADDR,
+	input       [7:0] MSU_DATA_IN,
+	input             MSU_DATA_ACK,
+	output            MSU_DATA_SEEK,
+	output            MSU_DATA_REQ,
 	input             MSU_ENABLE,
 
 	output     [15:0] AUDIO_L,
@@ -241,39 +246,38 @@ MSU MSU
 
 	.RD_N(CPURD_N),
 	.WR_N(CPUWR_N),
+	.SYSCLKF_CE(SYSCLKF_CE),
 
 	.ADDR(CA),
 	.DIN(DO),
 	.DOUT(MSU_DO),
 	.MSU_SEL(MSU_SEL),
 
+	.msu_data_addr(MSU_DATA_ADDR),
+	.msu_data_in(MSU_DATA_IN),
+	.msu_data_ack(MSU_DATA_ACK),
+	.msu_data_seek(MSU_DATA_SEEK),
+	.msu_data_req(MSU_DATA_REQ),
+
 	.track_out(MSU_TRACKOUT),
 	.track_request(MSU_TRACKREQUEST),
 	.track_mounting(MSU_TRACKMOUNTING),
 	.track_finished(MSU_TRACKFINISHED),
 
-	.msu_status_audio_repeat(MSU_REPEAT_OUT),
+	.msu_status_audio_repeat(MSU_REPEAT),
 	.msu_status_audio_playing_in(MSU_AUDIO_PLAYING_IN),
 	.msu_status_audio_playing_out(MSU_AUDIO_PLAYING_OUT),
-	.msu_status_track_missing_in(MSU_TRACKMISSING),
+	.msu_status_track_missing(MSU_TRACKMISSING),
 
-	/*
-	.msu_data_addr(MSU_DATA_ADDR),
-	.msu_data_in(MSU_DATA_IN),
-	.msu_status_data_busy(MSU_DATA_BUSY),
-	.msu_data_seek(MSU_DATA_SEEK),
-	.msu_data_req(MSU_DATA_REQ),
-	*/
-
-	.volume_out(MSU_VOLUME_OUT)
+	.msu_volume(MSU_VOLUME)
 );
 end else begin
 	assign MSU_DO  = 0;
 	assign MSU_SEL = 0;
 	assign MSU_TRACKOUT = 0;
 	assign MSU_TRACKREQUEST = 0;
-	assign MSU_VOLUME_OUT = 0;
-	assign MSU_REPEAT_OUT = 0;
+	assign MSU_VOLUME = 0;
+	assign MSU_REPEAT = 0;
 	assign MSU_AUDIO_PLAYING_OUT = 0;
 end
 endgenerate

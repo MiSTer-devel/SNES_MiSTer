@@ -9,13 +9,11 @@ module msu_audio(
     input      [31:0] ext_dout,
     input       [7:0] ext_count,
     input             ext_wr,
-    input      [10:0] audio_fifo_usedw,
+    input       [9:0] audio_fifo_usedw,
     input             audio_fifo_full,
     input             repeat_in,
     input             play_in,
     input             trackmounting,
-    input             trackmissing,
-    input             trackfinished,
     input      [31:0] track_size,
 
     output reg        ext_req,
@@ -34,7 +32,6 @@ localparam END_SECTOR_STATE       = 5;
 reg [31:0] loop_index = 0;
 reg  [7:0] state = WAITING_FOR_PLAY_STATE;
 reg partial_sector_state = 0;
-reg trackmissing_old = 0;
 reg trackmounting_old = 0;
 reg play_in_old = 0;
 reg looping;
@@ -48,7 +45,6 @@ always @(posedge clk) begin
 		state <= WAITING_FOR_PLAY_STATE;
 		ext_sector <= 0;
 		ext_jump_sector <= 0;
-		trackmissing_old <= 0;
 		audio_fifo_write <= 0;
 		ext_req <= 0;
 	end
@@ -160,9 +156,6 @@ always @(posedge clk) begin
 				end
 		endcase
 		
-		trackmissing_old  <= trackmissing;
-		if (!trackmissing_old  && trackmissing)  state <= WAITING_FOR_PLAY_STATE;
-
 		trackmounting_old <= trackmounting;
 		if (!trackmounting_old && trackmounting) state <= WAITING_FOR_PLAY_STATE;
   end // Ends else

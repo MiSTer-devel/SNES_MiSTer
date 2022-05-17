@@ -36,8 +36,9 @@ module hps_ext
 	output reg        msu_audio_ack,
 	input             msu_audio_req,
 	input             msu_audio_jump_sector,
-	input      [31:0] msu_audio_sector,
-	input             msu_audio_download	
+	input      [21:0] msu_audio_sector,
+	input             msu_audio_download,
+	output reg [31:0] msu_data_base
 );
 
 assign EXT_BUS[15:0] = io_dout;
@@ -137,15 +138,14 @@ always @(posedge clk_sys) begin
 	// Outgoing messaging
 	// Sectors
 	msu_audio_req_old <= msu_audio_req;
-	if (!msu_audio_req_old && msu_audio_req && !msu_trackrequest) begin
-		// Request for next sector has come from MSU1
+	if (!msu_trackrequest && !msu_audio_req_old && msu_audio_req) begin
 		cd_in  <= 'h34;
 		cd_put <= 1;
 	end
 	
 	// Jump to a sector
 	msu_audio_jump_sector_old <= msu_audio_jump_sector;
-	if (!msu_audio_jump_sector_old && msu_audio_jump_sector) begin
+	if (!msu_trackrequest && !msu_audio_jump_sector_old && msu_audio_jump_sector) begin
 		cd_in  <= { msu_audio_sector, 16'h36 };
 		cd_put <= 1;
 	end
@@ -155,26 +155,15 @@ always @(posedge clk_sys) begin
 	if (!msu_trackrequest_old && msu_trackrequest) begin
 		cd_in  <= { msu_trackout, 16'h35 };
 		cd_put <= 1;
+		msu_trackmissing <= 0;
 		msu_trackmounting <= 1;
 	end
 
 	if (cd_get) begin
 		case(cd_out[3:0])
-			1: msu_enable <= 1;
-			2: msu_enable <= 0;
-			3: begin
-					// Track has finished mounting
-					msu_audio_size    <= cd_out[47:16];
-					msu_trackmissing  <= 0;
-					msu_trackmounting <= 0;
-					msu_audio_ack     <= 0;
-				end
-			4: begin
-					// Handle track missing
-					msu_trackmissing  <= 1;
-					msu_trackmounting <= 0;
-					msu_audio_ack     <= 0;
-				end
+			1: msu_enable <= cd_out[15];
+			2: {msu_audio_size, msu_trackmissing, msu_trackmounting, msu_audio_ack} <= {cd_out[47:16], !cd_out[47:16], 2'b00};
+			3: msu_data_base <= cd_out[47:16];
 		endcase
 	end
 end

@@ -27,6 +27,7 @@ set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) BSX/BSX_BS
 set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) BSX/BSXMap.vhd ]
 set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) MSU1/MSU.sv ]
 set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) MSU1/msu_audio.v ]
-set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) MSU1/msu_audio_fifo.v ]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) MSU1/msu_fifo.v ]
+set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) MSU1/msu_data_store.sv ]
 set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) RTC4513.vhd ]
 set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) SRTC.vhd ]

@@ -64,9 +64,8 @@ wire [7:0] MSU_STATUS = {
 reg [31:0] MSU_SEEK;   // $2000 - $2003
 reg [15:0] MSU_TRACK;  // $2004 - $2005
 
-// Make sure we are aware of which bank ADDR is currently in
-wire IO_BANK_SEL = (ADDR[23:16]>=8'h00 && ADDR[23:16]<=8'h3F) || (ADDR[23:16]>=8'h80 && ADDR[23:16]<=8'hBF);
-assign MSU_SEL = ENABLE && IO_BANK_SEL && (ADDR[15:4] == 'h200) && !ADDR[3];
+// banks 00-3F and 80-BF, address 2000-2007
+assign MSU_SEL = ENABLE && !ADDR[22] && (ADDR[15:4] == 'h200) && !ADDR[3];
 
 reg msu_status_audio_busy = 0;
 

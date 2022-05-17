@@ -270,7 +270,6 @@ reg [15:0] cfg;
 
 reg        cfg_set      = 0;
 wire       vga_fb       = cfg[12] | vga_force_scaler;
-wire [1:0] hdmi_limited = {cfg[11],cfg[8]};
 
 `ifdef MISTER_DEBUG_NOHDMI
 wire       direct_video = 1;
@@ -278,7 +277,6 @@ wire       direct_video = 1;
 wire       direct_video = cfg[10];
 `endif
 
-wire       dvi_mode     = cfg[7];
 wire       audio_96k    = cfg[6];
 wire       csync_en     = cfg[3];
 wire       ypbpr_en     = cfg[5];
@@ -304,7 +302,7 @@ reg [11:0] VSET = 0, HSET = 0;
 reg        FREESCALE = 0;
 reg  [2:0] scaler_flt;
 reg        lowlat = 0;
-reg        cfg_dis = 0;
+reg        cfg_done = 0;
 
 reg        vs_wait = 0;
 reg [11:0] vs_line = 0;
@@ -401,7 +399,7 @@ always@(posedge clk_sys) begin
 						cfg_custom_t <= ~cfg_custom_t;
 						cnt[2:0] <= 3'b100;
 					end
-					if(cnt == 8) {lowlat,cfg_dis} <= io_din[15:14];
+					if(cnt == 8) {lowlat,cfg_done} <= {io_din[15],1'b1};
 `endif
 				end
 			end
@@ -634,6 +632,11 @@ wire clk_hdmi  = hdmi_clk_out;
 ascal 
 #(
 	.RAMBASE(32'h20000000),
+`ifdef MISTER_SMALL_VBUF
+	.RAMSIZE(32'h00100000),
+`else
+	.RAMSIZE(32'h00800000),
+`endif
 `ifndef MISTER_FB
 	.PALETTE2("false"),
 `else
@@ -907,7 +910,7 @@ pll_hdmi_adj pll_hdmi_adj
 	.reset_na(~reset_req),
 
 	.llena(lowlat),
-	.lltune({16{hdmi_config_done | cfg_dis}} & lltune),
+	.lltune({16{cfg_done}} & lltune),
 	.locked(led_locked),
 	.i_waitrequest(adj_waitrequest),
 	.i_write(adj_write),
@@ -1034,22 +1037,6 @@ end
 wire cfg_ready = 1;
 
 `endif
-
-wire hdmi_config_done;
-hdmi_config hdmi_config
-(
-	.iCLK(FPGA_CLK1_50),
-	.iRST_N(cfg_ready & ~HDMI_TX_INT & ~cfg_dis),
-	.done(hdmi_config_done),
-
-	.I2C_SCL(HDMI_I2C_SCL),
-	.I2C_SDA(HDMI_I2C_SDA),
-
-	.dvi_mode(dvi_mode),
-	.audio_96k(audio_96k),
-	.limited(hdmi_limited),
-	.ypbpr(ypbpr_en & direct_video)
-);
 
 assign HDMI_I2C_SCL = hdmi_scl_en ? 1'b0 : 1'bZ;
 assign HDMI_I2C_SDA = hdmi_sda_en ? 1'b0 : 1'bZ;

@@ -20,24 +20,24 @@
 
 module hps_ext
 (
+	input             reset,
 	input             clk_sys,
 	inout      [35:0] EXT_BUS,
 
-	input             reset,
-
 	output reg        msu_enable,
 
-	output reg        msu_trackmounting,
-	output reg        msu_trackmissing,
-	input      [15:0] msu_trackout,
-	input             msu_trackrequest,
+	input      [15:0] msu_track_num,
+	input             msu_track_request,
+	output reg        msu_track_mounting,
+	output reg        msu_track_missing,
 	
 	output reg [31:0] msu_audio_size,
 	output reg        msu_audio_ack,
 	input             msu_audio_req,
-	input             msu_audio_jump_sector,
+	input             msu_audio_seek,
 	input      [21:0] msu_audio_sector,
 	input             msu_audio_download,
+
 	output reg [31:0] msu_data_base
 );
 
@@ -110,16 +110,16 @@ reg cd_put, cd_get;
 always @(posedge clk_sys) begin
 	reg reset_old = 0;
 	reg msu_audio_req_old = 0;
-	reg msu_audio_jump_sector_old = 0;
-	reg msu_trackrequest_old = 0;
+	reg msu_audio_seek_old = 0;
+	reg msu_track_request_old = 0;
 	reg msu_audio_download_old = 0;
 
 	cd_put <= 0;
 
 	reset_old <= reset;
 	if (reset) begin
-		msu_trackmissing  <= 0;
-		msu_trackmounting <= 0;
+		msu_track_missing  <= 0;
+		msu_track_mounting <= 0;
 		msu_audio_ack     <= 0;
 		if (!reset_old) begin
 			cd_in  <= 8'hFF;
@@ -138,31 +138,31 @@ always @(posedge clk_sys) begin
 	// Outgoing messaging
 	// Sectors
 	msu_audio_req_old <= msu_audio_req;
-	if (!msu_trackrequest && !msu_audio_req_old && msu_audio_req) begin
+	if (!msu_track_request && !msu_audio_req_old && msu_audio_req) begin
 		cd_in  <= 'h34;
 		cd_put <= 1;
 	end
 	
 	// Jump to a sector
-	msu_audio_jump_sector_old <= msu_audio_jump_sector;
-	if (!msu_trackrequest && !msu_audio_jump_sector_old && msu_audio_jump_sector) begin
+	msu_audio_seek_old <= msu_audio_seek;
+	if (!msu_track_request && !msu_audio_seek_old && msu_audio_seek) begin
 		cd_in  <= { msu_audio_sector, 16'h36 };
 		cd_put <= 1;
 	end
 	
 	// Track requests
-	msu_trackrequest_old <= msu_trackrequest;
-	if (!msu_trackrequest_old && msu_trackrequest) begin
-		cd_in  <= { msu_trackout, 16'h35 };
+	msu_track_request_old <= msu_track_request;
+	if (!msu_track_request_old && msu_track_request) begin
+		cd_in  <= { msu_track_num, 16'h35 };
 		cd_put <= 1;
-		msu_trackmissing <= 0;
-		msu_trackmounting <= 1;
+		msu_track_missing <= 0;
+		msu_track_mounting <= 1;
 	end
 
 	if (cd_get) begin
 		case(cd_out[3:0])
 			1: msu_enable <= cd_out[15];
-			2: {msu_audio_size, msu_trackmissing, msu_trackmounting, msu_audio_ack} <= {cd_out[47:16], !cd_out[47:16], 2'b00};
+			2: {msu_audio_size, msu_track_missing, msu_track_mounting, msu_audio_ack} <= {cd_out[47:16], !cd_out[47:16], 2'b00};
 			3: msu_data_base <= cd_out[47:16];
 		endcase
 	end

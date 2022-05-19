@@ -92,17 +92,16 @@ module main (
 	input             TURBO,
 	output            TURBO_ALLOW,
 
-	output     [15:0] MSU_TRACKOUT,
-	output            MSU_TRACKREQUEST,
-	input             MSU_TRACKMOUNTING,
+	output     [15:0] MSU_TRACK_NUM,
+	output            MSU_TRACK_REQUEST,
+	input             MSU_TRACK_MOUNTING,
+	input             MSU_TRACK_MISSING,
 	output      [7:0] MSU_VOLUME,
-	output            MSU_REPEAT,
-	input             MSU_AUDIO_PLAYING_IN,
-	output            MSU_AUDIO_PLAYING_OUT,
-	input             MSU_TRACKMISSING,
-	input             MSU_TRACKFINISHED,
+	input             MSU_AUDIO_STOP,
+	output            MSU_AUDIO_REPEAT,
+	output            MSU_AUDIO_PLAYING,
 	output     [31:0] MSU_DATA_ADDR,
-	input       [7:0] MSU_DATA_IN,
+	input       [7:0] MSU_DATA,
 	input             MSU_DATA_ACK,
 	output            MSU_DATA_SEEK,
 	output            MSU_DATA_REQ,
@@ -253,32 +252,31 @@ MSU MSU
 	.DOUT(MSU_DO),
 	.MSU_SEL(MSU_SEL),
 
-	.msu_data_addr(MSU_DATA_ADDR),
-	.msu_data_in(MSU_DATA_IN),
-	.msu_data_ack(MSU_DATA_ACK),
-	.msu_data_seek(MSU_DATA_SEEK),
-	.msu_data_req(MSU_DATA_REQ),
+	.data_addr(MSU_DATA_ADDR),
+	.data(MSU_DATA),
+	.data_ack(MSU_DATA_ACK),
+	.data_seek(MSU_DATA_SEEK),
+	.data_req(MSU_DATA_REQ),
 
-	.track_out(MSU_TRACKOUT),
-	.track_request(MSU_TRACKREQUEST),
-	.track_mounting(MSU_TRACKMOUNTING),
-	.track_finished(MSU_TRACKFINISHED),
+	.track_num(MSU_TRACK_NUM),
+	.track_request(MSU_TRACK_REQUEST),
+	.track_mounting(MSU_TRACK_MOUNTING),
 
-	.msu_status_audio_repeat(MSU_REPEAT),
-	.msu_status_audio_playing_in(MSU_AUDIO_PLAYING_IN),
-	.msu_status_audio_playing_out(MSU_AUDIO_PLAYING_OUT),
-	.msu_status_track_missing(MSU_TRACKMISSING),
+	.status_track_missing(MSU_TRACK_MISSING),
+	.status_audio_repeat(MSU_AUDIO_REPEAT),
+	.status_audio_playing(MSU_AUDIO_PLAYING),
+	.audio_stop(MSU_AUDIO_STOP),
 
-	.msu_volume(MSU_VOLUME)
+	.volume(MSU_VOLUME)
 );
 end else begin
 	assign MSU_DO  = 0;
 	assign MSU_SEL = 0;
-	assign MSU_TRACKOUT = 0;
-	assign MSU_TRACKREQUEST = 0;
+	assign MSU_TRACK_NUM = 0;
+	assign MSU_TRACK_REQUEST = 0;
 	assign MSU_VOLUME = 0;
-	assign MSU_REPEAT = 0;
-	assign MSU_AUDIO_PLAYING_OUT = 0;
+	assign MSU_AUDIO_REPEAT = 0;
+	assign MSU_AUDIO_PLAYING = 0;
 end
 endgenerate
 

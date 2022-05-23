@@ -329,7 +329,7 @@ begin
 						PSW <= PSW;
 					when "001" => 
 						PSW(1 downto 0) <= ZO & CO; PSW(3) <= HO; PSW(7 downto 6) <= SO & VO; -- ALU
-					when "010" => PSW(2) <= '0'; PSW(4) <= '1';    -- BRK
+					when "010" => PSW(2) <= '0'; PSW(4) <= not IsResetInterrupt ;    -- BRK
 					when "011" => PSW <= D_IN; -- RETI/POP PSW
 					when "100" => 
 						case IR(7 downto 5) is
@@ -374,7 +374,7 @@ begin
 			when "00" => 
 				A_OUT <= PC; 
 			when "01"=> 
-				if IR = x"0A" or IR = x"4A" or IR = x"8A" or IR = x"AA" or IR = x"CA" or IR = x"EA" then
+				if IR = x"0A" or IR = x"2A" or IR = x"4A" or IR = x"6A" or IR = x"8A" or IR = x"AA" or IR = x"CA" or IR = x"EA" then
 					A_OUT <= AX and x"1FFF";
 				else
 					A_OUT <= AX;

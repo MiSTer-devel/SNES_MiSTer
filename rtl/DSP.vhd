@@ -216,6 +216,7 @@ architecture rtl of DSP is
 	signal REG5D			: std_logic_vector(7 downto 0);
 	signal REG6C			: std_logic_vector(7 downto 0);
 	signal REG6D			: std_logic_vector(7 downto 0);
+	signal REGRI			: std_logic_vector(7 downto 0);
 	signal REG_SET 		: std_logic;
 
 begin
@@ -285,7 +286,9 @@ begin
 		if RST_N = '0' then
 			RI <= (others=>'0');
 		elsif rising_edge(CLK) then
-			if ENABLE = '1' and CE = '1' then
+			if REG_SET = '1' then
+				RI <= REGRI;
+			elsif ENABLE = '1' and CE = '1' then
 				if SMP_EN_INT = '1' and SMP_WE = '0' then
 					if SMP_A = x"00F2" then
 						RI <= SMP_DO;
@@ -1109,6 +1112,9 @@ begin
 					              REG6D <= IO_DAT(15 downto 8);
 					when others => null;
 				end case;
+				REG_SET <= '1';
+			elsif IO_WR = '1' and IO_ADDR(16 downto 1) = "0"&x"02F"&"001" then
+				REGRI <= IO_DAT(7 downto 0);
 				REG_SET <= '1';
 			elsif RST_N = '1' and REG_SET = '1' then
 				REG_SET <= '0';

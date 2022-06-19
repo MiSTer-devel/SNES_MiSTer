@@ -175,7 +175,7 @@ module emu
 //`define DEBUG_BUILD
 
 assign ADC_BUS  = 'Z;
-assign {UART_RTS, UART_TXD, UART_DTR} = 0;
+//assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 
 assign AUDIO_S   = 1;
 assign AUDIO_MIX = status[20:19];
@@ -290,11 +290,11 @@ wire reset = RESET | buttons[1] | status[0] | cart_download | spc_download | bk_
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX   XXXXXXXXXXX
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX   XXXXXXXXXXXX
 
 `include "build_id.v"
 parameter CONF_STR = {
-	"SNES;;",
+	"SNES;UART31250,MIDI;",
 	"FS0,SFCSMCBINBS ;",
 	"FS1,SPC;",
 	"-;",
@@ -340,6 +340,7 @@ parameter CONF_STR = {
 
 	"-;",
 	"O56,Mouse,None,Port1,Port2;",
+	"oB,Miracle Piano,No,Yes;",
 	"O7,Swap Joysticks,No,Yes;",
 	"-;",
 	"R0,Reset;",
@@ -433,7 +434,7 @@ wire       GUN_TYPE = status[34];
 wire       GSU_TURBO = status[18];
 wire       BLEND = ~status[16];
 wire [1:0] mouse_mode = status[6:5];
-wire       joy_swap = status[7];
+wire       joy_swap = status[7] | piano;
 wire [2:0] LHRom_type = status[3:1];
 
 wire code_index = &ioctl_index;
@@ -927,9 +928,25 @@ video_mixer #(.LINE_LENGTH(520), .GAMMA(1)) video_mixer
 
 ////////////////////////////  I/O PORTS  ////////////////////////////////
 
+assign {UART_RTS, UART_DTR} = 1;
+wire [15:0] uart_data;
+wire piano_joypad_do;
+wire piano = status[43];
+miraclepiano miracle(
+	.clk(clk_sys),
+	.reset(reset_nes || !piano),
+	.strobe(JOY_STRB),
+	.joypad_o(piano_joypad_do),
+	.joypad_clock(JOY1_CLK),
+	.data_o(uart_data),
+	.txd(UART_TXD),
+	.rxd(UART_RXD)
+);
+wire [1:0] JOY1_DO = piano ? {1'b1,piano_joypad_do} : JOY1_DO_t;
+
 wire       JOY_STRB;
 
-wire [1:0] JOY1_DO;
+wire [1:0] JOY1_DO_t;
 wire       JOY1_CLK;
 wire       JOY1_P6;
 ioport port1
@@ -939,7 +956,7 @@ ioport port1
 	.PORT_LATCH(JOY_STRB),
 	.PORT_CLK(JOY1_CLK),
 	.PORT_P6(JOY1_P6),
-	.PORT_DO(JOY1_DO),
+	.PORT_DO(JOY1_DO_t),
 
 	.JOYSTICK1((joy_swap ^ raw_serial) ? joy1 : joy0),
 

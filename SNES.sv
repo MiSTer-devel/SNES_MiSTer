@@ -175,7 +175,6 @@ module emu
 //`define DEBUG_BUILD
 
 assign ADC_BUS  = 'Z;
-//assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 
 assign AUDIO_S   = 1;
 assign AUDIO_MIX = status[20:19];
@@ -290,7 +289,7 @@ wire reset = RESET | buttons[1] | status[0] | cart_download | spc_download | bk_
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX   XXXXXXXXXXXX
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX   XXXXXXXXXXXXXX
 
 `include "build_id.v"
 parameter CONF_STR = {
@@ -311,7 +310,7 @@ parameter CONF_STR = {
 
 	"P1,Audio & Video;",
 	"P1-;",
-	"P1o01,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
+	"P1o01,Aspect Ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"P1O9B,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
 	"P1-;",
 	"d5P1o7,Vertical Crop,Disabled,216p(5x);",
@@ -322,6 +321,7 @@ parameter CONF_STR = {
 	"P1OG,Pseudo Transparency,Blend,Off;",
 	"P1-;",
 	"P1OJK,Stereo Mix,None,25%,50%,100%;", 
+	"P1oCD,MSU-1 Audio Boost,No,2x,4x;",
 
 	"P2,Hardware;",
 	"P2-;",
@@ -934,7 +934,7 @@ wire piano_joypad_do;
 wire piano = status[43];
 miraclepiano miracle(
 	.clk(clk_sys),
-	.reset(reset_nes || !piano),
+	.reset(reset || !piano),
 	.strobe(JOY_STRB),
 	.joypad_o(piano_joypad_do),
 	.joypad_clock(JOY1_CLK),
@@ -1198,8 +1198,8 @@ wire        msu_audio_req;
 wire        msu_audio_seek;
 wire [21:0] msu_audio_sector;
 
-wire [15:0] msu_audio_l;
-wire [15:0] msu_audio_r;
+wire [15:0] msu_l;
+wire [15:0] msu_r;
 
 msu_audio msu_audio
 (
@@ -1225,9 +1225,42 @@ msu_audio msu_audio
 	.audio_req(msu_audio_req),
 	.audio_seek(msu_audio_seek),
 
-	.audio_l(msu_audio_l),
-	.audio_r(msu_audio_r)
+	.audio_l(msu_l),
+	.audio_r(msu_r)
 );
+
+localparam [3:0] comp_f1 = 4;
+localparam [3:0] comp_a1 = 2;
+localparam       comp_x1 = ((32767 * (comp_f1 - 1)) / ((comp_f1 * comp_a1) - 1)) + 1; // +1 to make sure it won't overflow
+localparam       comp_b1 = comp_x1 * comp_a1;
+
+localparam [3:0] comp_f2 = 8;
+localparam [3:0] comp_a2 = 4;
+localparam       comp_x2 = ((32767 * (comp_f2 - 1)) / ((comp_f2 * comp_a2) - 1)) + 1; // +1 to make sure it won't overflow
+localparam       comp_b2 = comp_x2 * comp_a2;
+
+function [15:0] compr; input [15:0] inp;
+	reg [15:0] v, v1, v2;
+	begin
+		v  = inp[15] ? (~inp) + 1'd1 : inp;
+		v1 = (v < comp_x1[15:0]) ? (v * comp_a1) : (((v - comp_x1[15:0])/comp_f1) + comp_b1[15:0]);
+		v2 = (v < comp_x2[15:0]) ? (v * comp_a2) : (((v - comp_x2[15:0])/comp_f2) + comp_b2[15:0]);
+		v  = status[45] ? v2 : v1;
+		compr = inp[15] ? ~(v-1'd1) : v;
+	end
+endfunction
+
+wire [15:0] msu_audio_l;
+wire [15:0] msu_audio_r;
+
+always @(posedge clk_sys) begin
+	reg [15:0] cmp_l, cmp_r;
+	cmp_l <= compr(msu_l);
+	cmp_r <= compr(msu_r);
+	
+	msu_audio_l = status[45:44] ? cmp_l : msu_l;
+	msu_audio_r = status[45:44] ? cmp_r : msu_r;
+end
 
 wire [31:0] msu_data_addr;
 wire  [7:0] msu_data;

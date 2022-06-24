@@ -289,7 +289,7 @@ wire reset = RESET | buttons[1] | status[0] | cart_download | spc_download | bk_
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX   XXXXXXXXXXXXXX
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX   XXXXXXXXXXXX
 
 `include "build_id.v"
 parameter CONF_STR = {
@@ -321,7 +321,6 @@ parameter CONF_STR = {
 	"P1OG,Pseudo Transparency,Blend,Off;",
 	"P1-;",
 	"P1OJK,Stereo Mix,None,25%,50%,100%;", 
-	"P1oCD,MSU-1 Audio Boost,No,2x,4x;",
 
 	"P2,Hardware;",
 	"P2-;",
@@ -542,8 +541,8 @@ end
 wire GSU_ACTIVE;
 wire turbo_allow;
 
-reg [15:0] MAIN_AUDIO_L;
-reg [15:0] MAIN_AUDIO_R;
+reg [15:0] main_audio_l;
+reg [15:0] main_audio_r;
 
 main main
 (
@@ -659,16 +658,12 @@ main main
 	.MSU_DATA_REQ(msu_data_req),
 	.MSU_ENABLE(msu_enable),
 
-	.AUDIO_L(MAIN_AUDIO_L),
-	.AUDIO_R(MAIN_AUDIO_R)
+	.AUDIO_L(main_audio_l),
+	.AUDIO_R(main_audio_r)
 );
 
-// Mix msu_audio into main mix
-wire signed [16:0] AUDIO_MIX_L = $signed({MAIN_AUDIO_L[15], MAIN_AUDIO_L}) + $signed({msu_audio_l[15], msu_audio_l});
-wire signed [16:0] AUDIO_MIX_R = $signed({MAIN_AUDIO_R[15], MAIN_AUDIO_R}) + $signed({msu_audio_r[15], msu_audio_r});
-
-assign AUDIO_L = msu_enable ? AUDIO_MIX_L[16:1] : MAIN_AUDIO_L;
-assign AUDIO_R = msu_enable ? AUDIO_MIX_R[16:1] : MAIN_AUDIO_R;
+assign AUDIO_L = audio_l;
+assign AUDIO_R = audio_r;
 
 reg RESET_N = 0;
 reg RFSH = 0;
@@ -1229,37 +1224,16 @@ msu_audio msu_audio
 	.audio_r(msu_r)
 );
 
-localparam [3:0] comp_f1 = 4;
-localparam [3:0] comp_a1 = 2;
-localparam       comp_x1 = ((32767 * (comp_f1 - 1)) / ((comp_f1 * comp_a1) - 1)) + 1; // +1 to make sure it won't overflow
-localparam       comp_b1 = comp_x1 * comp_a1;
-
-localparam [3:0] comp_f2 = 8;
-localparam [3:0] comp_a2 = 4;
-localparam       comp_x2 = ((32767 * (comp_f2 - 1)) / ((comp_f2 * comp_a2) - 1)) + 1; // +1 to make sure it won't overflow
-localparam       comp_b2 = comp_x2 * comp_a2;
-
-function [15:0] compr; input [15:0] inp;
-	reg [15:0] v, v1, v2;
-	begin
-		v  = inp[15] ? (~inp) + 1'd1 : inp;
-		v1 = (v < comp_x1[15:0]) ? (v * comp_a1) : (((v - comp_x1[15:0])/comp_f1) + comp_b1[15:0]);
-		v2 = (v < comp_x2[15:0]) ? (v * comp_a2) : (((v - comp_x2[15:0])/comp_f2) + comp_b2[15:0]);
-		v  = status[45] ? v2 : v1;
-		compr = inp[15] ? ~(v-1'd1) : v;
-	end
-endfunction
-
-wire [15:0] msu_audio_l;
-wire [15:0] msu_audio_r;
+reg [15:0] audio_l, audio_r;
 
 always @(posedge clk_sys) begin
-	reg [15:0] cmp_l, cmp_r;
-	cmp_l <= compr(msu_l);
-	cmp_r <= compr(msu_r);
-	
-	msu_audio_l = status[45:44] ? cmp_l : msu_l;
-	msu_audio_r = status[45:44] ? cmp_r : msu_r;
+	reg [16:0] mix_l, mix_r;
+
+	mix_l = $signed({main_audio_l[15], main_audio_l}) + $signed({msu_l[15], msu_l});
+	mix_r = $signed({main_audio_r[15], main_audio_r}) + $signed({msu_r[15], msu_r});
+
+	audio_l <= (^mix_l[16:15]) ? {mix_l[16], {15{mix_l[15]}}} : mix_l[15:0];
+	audio_r <= (^mix_r[16:15]) ? {mix_r[16], {15{mix_r[15]}}} : mix_r[15:0];
 end
 
 wire [31:0] msu_data_addr;

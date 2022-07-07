@@ -308,6 +308,7 @@ reg        vs_wait = 0;
 reg [11:0] vs_line = 0;
 
 reg        scaler_out = 0;
+reg        vrr_mode = 0;
 
 reg [31:0] aflt_rate = 7056000;
 reg [39:0] acx  = 4258969;
@@ -365,7 +366,7 @@ always@(posedge clk_sys) begin
 				acy2 <= -24'd2023767;
 				areset <= 1;
 			end
-			if(io_din[7:0] == 'h20) io_dout_sys <= 1;
+			if(io_din[7:0] == 'h20) io_dout_sys <= 'b11;
 `ifndef MISTER_DEBUG_NOHDMI
 			if(io_din[7:0] == 'h40) io_dout_sys <= fb_crc;
 `endif
@@ -381,14 +382,14 @@ always@(posedge clk_sys) begin
 				cfg_set <= 0;
 				if(cnt<8) begin
 					case(cnt[2:0])
-						0: {HDMI_PR,WIDTH} <= {io_din[15], io_din[11:0]};
-						1: HFP             <= io_din[11:0];
-						2: HS              <= {io_din[15], io_din[11:0]};
-						3: HBP             <= io_din[11:0];
-						4: HEIGHT          <= io_din[11:0];
-						5: VFP             <= io_din[11:0];
-						6: VS              <= {io_din[15],io_din[11:0]};
-						7: VBP             <= io_din[11:0];
+						0: {HDMI_PR,vrr_mode,WIDTH} <= {io_din[15:14], io_din[11:0]};
+						1: HFP    <= io_din[11:0];
+						2: HS     <= {io_din[15], io_din[11:0]};
+						3: HBP    <= io_din[11:0];
+						4: HEIGHT <= io_din[11:0];
+						5: VFP    <= io_din[11:0];
+						6: VS     <= {io_din[15],io_din[11:0]};
+						7: VBP    <= io_din[11:0];
 					endcase
 `ifndef MISTER_DEBUG_NOHDMI
 					if(cnt == 1) begin
@@ -659,7 +660,7 @@ ascal
 #(
 	.RAMBASE(32'h20000000),
 `ifdef MISTER_SMALL_VBUF
-	.RAMSIZE(32'h00100000),
+	.RAMSIZE(32'h00200000),
 `else
 	.RAMSIZE(32'h00800000),
 `endif
@@ -724,6 +725,8 @@ ascal
 	.vdisp    (HEIGHT),
 	.vmin     (vmin),
 	.vmax     (vmax),
+	.vrr      (vrr_mode),
+	.vrrmax   (HEIGHT + VBP + VS[11:0] + 12'd1),
 
 	.mode     ({~lowlat,LFB_EN ? LFB_FLT : |scaler_flt,2'b00}),
 	.poly_clk (clk_sys),

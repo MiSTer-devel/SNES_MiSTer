@@ -114,6 +114,8 @@ architecture rtl of GSU is
 	signal RAM_LOAD_EN 		: std_logic;
 	signal ROM_ACCESS_CNT 	: unsigned(2 downto 0);
 	signal RAM_ACCESS_CNT 	: unsigned(2 downto 0);
+	signal ROM_LAST_CYCLE	: std_logic;
+	signal RAM_LAST_CYCLE	: std_logic; 
 	signal ROM_NEED_WAIT 	: std_logic;
 	signal RAM_NEED_WAIT 	: std_logic;
 	signal CODE_IN_ROM 		: std_logic;
@@ -150,6 +152,8 @@ architecture rtl of GSU is
 	signal PCN 					: std_logic;
 	signal PC0_FULL 			: std_logic;
 	signal PC1_FULL 			: std_logic;
+	signal PC0_EMPTY 			: std_logic;
+	signal PC1_EMPTY			: std_logic; 
 	signal PC0 					: integer range 0 to 1;
 	signal PC1 					: integer range 0 to 1;
 	signal PC_X 				: unsigned(7 downto 0);
@@ -376,8 +380,8 @@ begin
 	
 	RAM_WE_N <= '1' when ENABLE = '0' else 
 					WR_N when GSU_RAM_ACCESS = '0' else 
-					'0' when RAMST = RAMST_SAVE and RAM_ACCESS_CNT = 0 and GSU_RAM_ACCESS = '1' and EN = '1' else 
-					not PCF_RW when RAMST = RAMST_PCF and RAM_ACCESS_CNT = 0 and GSU_RAM_ACCESS = '1' else 
+					'0' when RAMST = RAMST_SAVE and RAM_LAST_CYCLE = '1' and GSU_RAM_ACCESS = '1' and EN = '1' else 
+					not PCF_RW when RAMST = RAMST_PCF and RAM_LAST_CYCLE = '1' and GSU_RAM_ACCESS = '1' else 
 					'1';
 
 	RAM_CE_N <= '0' when ENABLE = '0' else 
@@ -395,17 +399,21 @@ begin
 	VAL_CACHE <= CACHE_VALID(to_integer(CACHE_POS(8 downto 4)));
 	
 	CACHE_FETCH_EN <= VAL_CACHE and IN_CACHE;
-	ROM_FETCH_EN <= '1' when ROMST = ROMST_FETCH and ROM_ACCESS_CNT = 0 and RON = '1' else '0';
-	RAM_FETCH_EN  <= '1' when RAMST = RAMST_FETCH and RAM_ACCESS_CNT = 0 and RAN = '1' else '0';
-	ROM_CACHE_EN <= '1' when ROMST = ROMST_CACHE and ROM_ACCESS_CNT = 0 and RON = '1' else '0';
-	RAM_CACHE_EN  <= '1' when RAMST = RAMST_CACHE and RAM_ACCESS_CNT = 0 and RAN = '1' else '0';
-	ROM_LOAD_EN <= '1' when ROMST = ROMST_LOAD and ROM_ACCESS_CNT = 0 and RON = '1' else '0';
-	RAM_LOAD_EN  <= '1' when RAMST = RAMST_LOAD and RAM_ACCESS_CNT = 0 and RAM_BYTES = RAM_WORD and RAN = '1' else '0';
+	ROM_FETCH_EN <= '1' when ROMST = ROMST_FETCH and ROM_LAST_CYCLE = '1' and RON = '1' else '0';
+	RAM_FETCH_EN  <= '1' when RAMST = RAMST_FETCH and RAM_LAST_CYCLE = '1' and RAN = '1' else '0';
+	ROM_CACHE_EN <= '1' when ROMST = ROMST_CACHE and ROM_LAST_CYCLE = '1' and RON = '1' else '0';
+	RAM_CACHE_EN  <= '1' when RAMST = RAMST_CACHE and RAM_LAST_CYCLE = '1' and RAN = '1' else '0';
+	ROM_LOAD_EN <= '1' when ROMST = ROMST_LOAD and ROM_LAST_CYCLE = '1' and RON = '1' else '0';
+	RAM_LOAD_EN  <= '1' when RAMST = RAMST_LOAD and RAM_LAST_CYCLE = '1' and RAM_BYTES = RAM_WORD and RAN = '1' else '0';
 	
-	ROM_NEED_WAIT <= '1' when (R14_CHANGE = '1' or MC.ROMWAIT = '1') and (ROMST = ROMST_LOAD or ROMST = ROMST_CACHE or (ROMST = ROMST_FETCH and ROM_ACCESS_CNT /= 0) or RON = '0') else '0';
-	RAM_NEED_WAIT <= '1' when (OP.OP = OP_STOP and (RAMST = RAMST_SAVE or RAMST = RAMST_PCF)) or 
-	                          (MC.RAMWAIT = '1' and (RAMST = RAMST_SAVE or RAMST = RAMST_PCF or RAN = '0')) or
-									  RAMST = RAMST_LOAD or RAMST = RAMST_CACHE or (RAMST = RAMST_FETCH and RAM_ACCESS_CNT /= 0) or RAMST = RAMST_RPIX else '0';
+	ROM_NEED_WAIT <= '1' when (R14_CHANGE = '1' or MC.ROMWAIT = '1') and (ROMST = ROMST_LOAD or ROMST = ROMST_CACHE or (ROMST = ROMST_FETCH and ROM_LAST_CYCLE = '0') or RON = '0') else '0';
+	RAM_NEED_WAIT <= '1' when (MC.RAMWAIT = '1' and (RAMST = RAMST_SAVE or RAMST = RAMST_PCF or RAN = '0')) or
+	                          (OP.OP = OP_STOP and (RAMST = RAMST_SAVE or RAMST = RAMST_PCF)) or 
+									  (OP.OP = OP_PLOT and (PC0_OFFS_HIT = '0' or PC0_FULL = '1') and (RAMST = RAMST_SAVE or RAMST = RAMST_PCF or RAN = '0')) or
+									  RAMST = RAMST_LOAD or 
+									  RAMST = RAMST_CACHE or 
+									  (RAMST = RAMST_FETCH and RAM_LAST_CYCLE = '0') or 
+									  RAMST = RAMST_RPIX else '0'; 
 	
 	process(CLK, RST_N)
 	begin
@@ -423,9 +431,9 @@ begin
 	EN <= ENABLE and FLAG_GO and (CLK_CE or SPEED);
 	
 	OP_CYCLES <= "000" when TURBO = '1' else
-					 not (MS0 and not SPEED) & "10" when OP.OP = OP_FMULT or OP.OP = OP_LMULT else
-					 "00" & not (MS0 and not SPEED) when OP.OP = OP_MULT or OP.OP = OP_UMULT else
-					 "000";
+					 not MS0 & "11" when OP.OP = OP_FMULT or OP.OP = OP_LMULT else
+					 "00" & not MS0 when OP.OP = OP_MULT or OP.OP = OP_UMULT else
+					 "000"; 
 	
 	process(CLK, RST_N)
 	begin
@@ -561,7 +569,7 @@ begin
 	
 	--Memory buses
 	R14_CHANGE <= '1' when DST_REG = 14 and (MC.DREG(1) = '1' or MC.DREG(0) = '1') and MC.LAST_CYCLE = '1' else '0';
-	
+	ROM_LAST_CYCLE <= '1' when ROM_ACCESS_CNT = 0 else '0'; 
 	process(CLK, RST_N)
 	variable ROM_CYCLES : unsigned(2 downto 0);
 	begin
@@ -577,7 +585,7 @@ begin
 				elsif SPEED = '0' then
 					ROM_CYCLES := "010";
 				else 
-					ROM_CYCLES := "100";
+					ROM_CYCLES := "110";
 				end if;
 				
 				case ROMST is
@@ -589,14 +597,14 @@ begin
 						end if;
 					
 					when ROMST_LOAD =>
-						if ROM_ACCESS_CNT = 0 and RON = '1' then
+						if ROM_LAST_CYCLE = '1' and RON = '1' then
 							ROMDR <= ROM_DI;
 							FLAG_R <= '0';
 							ROMST <= ROMST_IDLE;
 						end if;
 					
 					when ROMST_CACHE =>
-						if ROM_ACCESS_CNT = 0 and RON = '1' then
+						if ROM_LAST_CYCLE = '1' and RON = '1' then
 							if CACHE_DST_ADDR(3 downto 0) = 15 then
 								ROMST <= ROMST_IDLE;
 							end if;
@@ -652,6 +660,7 @@ begin
 		end if;
 	end process;
 	
+	RAM_LAST_CYCLE <= '1' when RAM_ACCESS_CNT = 0 else '0'; 
 	process(CLK, RST_N)
 		variable RAM_CYCLES : unsigned(2 downto 0);
 	begin
@@ -673,7 +682,7 @@ begin
 				else 
 					RAM_CYCLES := "100";
 				end if;
-				
+
 				if CPU_EN = '1' then
 					if MC.RAMADDR = "001" then
 						RAMADDR(7 downto 0) <= OPDATA;
@@ -695,14 +704,14 @@ begin
 						end if;
 												
 					when RAMST_CACHE =>
-						if RAM_ACCESS_CNT = 0 and RAN = '1' then
+						if RAM_LAST_CYCLE = '1' and RAN = '1' then
 							if CACHE_DST_ADDR(3 downto 0) = 15 then
 								RAMST <= RAMST_IDLE;
 							end if;
 						end if;
 						
 					when RAMST_LOAD =>
-						if RAM_ACCESS_CNT = 0 and RAN = '1' then
+						if RAM_LAST_CYCLE = '1' and RAN = '1' then
 							RAM_BYTES <= '1';
 							if RAM_BYTES = '0' then
 								RAM_LOAD_DATA(7 downto 0) <= RAM_DI;
@@ -715,7 +724,7 @@ begin
 						end if;
 						
 					when RAMST_SAVE =>
-						if RAM_ACCESS_CNT = 0 and RAN = '1' then
+						if RAM_LAST_CYCLE = '1' and RAN = '1' then
 							RAM_BYTES <= '1';
 							if RAM_BYTES = RAM_WORD then
 								RAMST <= RAMST_IDLE;
@@ -723,7 +732,7 @@ begin
 						end if;
 						
 					when RAMST_PCF =>
-						if RAM_ACCESS_CNT = 0 and RAN = '1' then
+						if RAM_LAST_CYCLE = '1' and RAN = '1' then
 							if PC1_FULL = '0' then
 								PCF_RW <= not PCF_RW;
 							end if;
@@ -739,7 +748,7 @@ begin
 						end if;
 						
 					when RAMST_RPIX =>
-						if RAM_ACCESS_CNT = 0 and RAN = '1' then
+						if RAM_LAST_CYCLE = '1' and RAN = '1' then
 							if BPP_CNT = GetLastBPP(SCMR_MD) then
 								RAMST <= RAMST_IDLE;
 							end if;
@@ -771,24 +780,27 @@ begin
 						RAMST <= RAMST_FETCH;
 					elsif IN_CACHE = '1' and VAL_CACHE = '0' and CODE_IN_RAM = '1' and RAMST = RAMST_IDLE then
 						RAMST <= RAMST_CACHE;
-					elsif CPU_EN = '1' and OP.OP = OP_PLOT and PLOT_EXEC = '1' and (PC0_OFFS_HIT = '0' or PC0_FULL = '1') then
+					elsif CPU_EN = '1' and OP.OP = OP_PLOT and (PC0_OFFS_HIT = '0' or PC0_FULL = '1') and PC0_EMPTY = '0' then
 						PCF_RW <= PC0_FULL;
 						RAMST <= RAMST_PCF;
 					elsif CPU_EN = '1' and OP.OP = OP_RPIX and STATE = 0 then
-						if PIX_CACHE(PC0).VALID /= x"00" then
+						if PC0_EMPTY = '0' then
 							PCF_RW <= PC0_FULL;
 							RAMST <= RAMST_PCF;
 						else
 							RAMST <= RAMST_RPIX;
 						end if;
 					end if;
-
 				end if;
 
 				if RAMST /= RAMST_IDLE and RAN = '1' then
 					RAM_ACCESS_CNT <= RAM_ACCESS_CNT - 1;
 					if RAM_ACCESS_CNT = 0 then
-						RAM_ACCESS_CNT <= RAM_CYCLES;
+						if RAMST = RAMST_CACHE or RAMST = RAMST_LOAD or RAMST = RAMST_SAVE then
+							RAM_ACCESS_CNT <= RAM_CYCLES - 1;
+						else
+							RAM_ACCESS_CNT <= RAM_CYCLES;
+						end if;
 					end if;
 				else
 					RAM_ACCESS_CNT <= RAM_CYCLES;
@@ -1097,9 +1109,11 @@ begin
 	
 	PC0 <= 0 when PCN = '0' else 1;
 	PC1 <= 0 when PCN = '1' else 1;
-	PC0_FULL <= '1' when PIX_CACHE(PC0).VALID = x"FF" else '0';
-	PC1_FULL <= '1' when PIX_CACHE(PC1).VALID = x"FF" else '0';
-	PC0_OFFS_HIT <= '1' when PIX_CACHE(PC0).OFFSET = PC_Y & PC_X(7 downto 3) else '0';
+	PC0_FULL <= '1' when PIX_CACHE(0).VALID = x"FF" else '0';
+	PC1_FULL <= '1' when PIX_CACHE(1).VALID = x"FF" else '0';
+	PC0_EMPTY <= '1' when PIX_CACHE(0).VALID = x"00" else '0';
+	PC1_EMPTY <= '1' when PIX_CACHE(1).VALID = x"00" else '0';
+	PC0_OFFS_HIT <= '1' when PIX_CACHE(0).OFFSET = PC_Y & PC_X(7 downto 3) else '0';
 	
 	process(POR_TRANS, SCMR_MD, POR_FH, COLR )
 	begin
@@ -1128,7 +1142,7 @@ begin
 			POR_FH <= '0';
 			POR_OBJ <= '0';
 			COLR <= (others => '0');
-			PIX_CACHE <= (others => ((others =>(others => '0')),(others => '0'),(others => '0')));
+			PIX_CACHE <= (others => ((others =>(others => '0')),(others => '0'),(others => '0'),(others => '0')));
 			PCN <= '0';
 			PCF_RD_DATA <= (others => '0');
 			RPIX_DATA <= (others => '0');
@@ -1167,34 +1181,40 @@ begin
 							COL_DITH := COLR;
 						end if;
 						
-						if PLOT_EXEC = '1' then
-							if PC0_OFFS_HIT = '0' or PC0_FULL = '1' then
-								PCN <= not PCN;
-								PIX_CACHE(PC1).DATA(to_integer(not PC_X(2 downto 0))) <= COL_DITH;
-								PIX_CACHE(PC1).OFFSET <= PC_Y & PC_X(7 downto 3);
-								PIX_CACHE(PC1).VALID(to_integer(not PC_X(2 downto 0))) <= '1';
-							else
-								PIX_CACHE(PC0).DATA(to_integer(not PC_X(2 downto 0))) <= COL_DITH;
-								PIX_CACHE(PC0).OFFSET <= PC_Y & PC_X(7 downto 3);
-								PIX_CACHE(PC0).VALID(to_integer(not PC_X(2 downto 0))) <= '1';
-							end if;
+						if PC0_OFFS_HIT = '0' or PC0_FULL = '1' then
+							PIX_CACHE(1).DATA <= PIX_CACHE(0).DATA;
+							PIX_CACHE(1).OFFSET <= PIX_CACHE(0).OFFSET;
+							PIX_CACHE(1).PLOTTED <= PIX_CACHE(0).PLOTTED;
+							PIX_CACHE(1).VALID <= PIX_CACHE(0).VALID;
+							PIX_CACHE(0).PLOTTED <= (others => '0');
+							PIX_CACHE(0).VALID <= (others => '0');
 						end if;
+						PIX_CACHE(0).DATA(to_integer(not PC_X(2 downto 0))) <= COL_DITH;
+						PIX_CACHE(0).OFFSET <= PC_Y & PC_X(7 downto 3);
+						PIX_CACHE(0).PLOTTED(to_integer(not PC_X(2 downto 0))) <= PLOT_EXEC;
+						PIX_CACHE(0).VALID(to_integer(not PC_X(2 downto 0))) <= PLOT_EXEC;
 					elsif OP.OP = OP_RPIX and STATE = 0 then
-						PCN <= not PCN;
+						PIX_CACHE(1).DATA <= PIX_CACHE(0).DATA;
+						PIX_CACHE(1).OFFSET <= PIX_CACHE(0).OFFSET;
+						PIX_CACHE(1).PLOTTED <= PIX_CACHE(0).PLOTTED;
+						PIX_CACHE(1).VALID <= PIX_CACHE(0).VALID;
+						PIX_CACHE(0).PLOTTED <= (others => '0');
+						PIX_CACHE(0).VALID <= (others => '0');
 					end if;
 				end if;
 				
-				if RAMST = RAMST_PCF and RAM_ACCESS_CNT = 0 and RAN = '1' then
+				if RAMST = RAMST_PCF and RAM_LAST_CYCLE = '1' and RAN = '1' then
 					if PCF_RW = '0' then
 						PCF_RD_DATA <= RAM_DI;
 					else
 						BPP_CNT <= BPP_CNT + 1;
 						if BPP_CNT = GetLastBPP(SCMR_MD) then
 							BPP_CNT <= (others => '0');
-							PIX_CACHE(PC1).VALID <= (others => '0');
+							PIX_CACHE(1).PLOTTED <= (others => '0');
+							PIX_CACHE(1).VALID <= (others => '0');
 						end if;
 					end if;
-				elsif RAMST = RAMST_RPIX and RAM_ACCESS_CNT = 0 and RAN = '1' then
+				elsif RAMST = RAMST_RPIX and RAM_LAST_CYCLE = '1' and RAN = '1' then
 					RPIX_DATA(to_integer(BPP_CNT)) <= RAM_DI(to_integer(not PC_X(2 downto 0)));
 					BPP_CNT <= BPP_CNT + 1;
 					if BPP_CNT = GetLastBPP(SCMR_MD) then
@@ -1205,10 +1225,10 @@ begin
 		end if;
 	end process; 
 	
-	PCF_WR_DATA <= (PCF_RD_DATA and not PIX_CACHE(PC1).VALID) or (GetPCData(PIX_CACHE(PC1),BPP_CNT) and PIX_CACHE(PC1).VALID);
+	PCF_WR_DATA <= (PCF_RD_DATA and not PIX_CACHE(1).PLOTTED) or (GetPCData(PIX_CACHE(1),BPP_CNT) and PIX_CACHE(1).PLOTTED);
 	
-	PCF_RAM_A <= GetCharOffset(PIX_CACHE(PC1).OFFSET, (SCMR_HT or POR_OBJ&POR_OBJ), SCMR_MD, BPP_CNT, SCBR);
+	PCF_RAM_A <= GetCharOffset(PIX_CACHE(1).OFFSET, (SCMR_HT or POR_OBJ&POR_OBJ), SCMR_MD, BPP_CNT, SCBR);
 	
-	RPIX_RAM_A <= GetCharOffset(PC_Y & PC_X(7 downto 3), (SCMR_HT or POR_OBJ&POR_OBJ), SCMR_MD, BPP_CNT, SCBR);
+	RPIX_RAM_A <= GetCharOffset(PC_Y & PC_X(7 downto 3), (SCMR_HT or POR_OBJ&POR_OBJ), SCMR_MD, BPP_CNT, SCBR); 
 	
 end rtl;

@@ -171,8 +171,8 @@ package GSU_PKG is
 	 ('1','1','1',"001",'0','1',"01","000","000"),
 	 ('X','X','X',"XXX",'X','X',"XX","XXX","XXX"),
 	 ('X','X','X',"XXX",'X','X',"XX","XXX","XXX")),
-	 -- 23 PLOT
-	(('1','1','0',"000",'0','1',"00","000","000"),
+	-- 23 PLOT
+	(('1','1','0',"000",'0','0',"00","000","000"),
 	 ('X','X','X',"XXX",'X','X',"XX","XXX","XXX"),
 	 ('X','X','X',"XXX",'X','X',"XX","XXX","XXX"),
 	 ('X','X','X',"XXX",'X','X',"XX","XXX","XXX"))
@@ -459,6 +459,7 @@ package GSU_PKG is
 	type PixCache_r is record
 		DATA		: PixCacheData_t;
 		OFFSET	: unsigned(12 downto 0);
+		PLOTTED	: std_logic_vector(7 downto 0);
 		VALID		: std_logic_vector(7 downto 0);
 	end record;
 	type PixCaches_t is array (0 to 1) of PixCache_r;

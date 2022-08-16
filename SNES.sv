@@ -289,7 +289,7 @@ wire reset = RESET | buttons[1] | status[0] | cart_download | spc_download | bk_
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX   XXXXXXXXXXXX
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX   XXXXXXXXXXXXXX
 
 `include "build_id.v"
 parameter CONF_STR = {
@@ -336,6 +336,7 @@ parameter CONF_STR = {
 	"D3P2O4,CPU Speed,Normal,Turbo;",
 	"P2-;",
 	"P2OLM,Initial WRAM,9966(SNES2),00FF(SNES1),55(SD2SNES),FF;",
+	"P2oCD,Initial ARAM,9966(SNES2),00FF(SNES1),55(SD2SNES),FF;",
 
 	"-;",
 	"O56,Mouse,None,Port1,Port2;",
@@ -733,6 +734,16 @@ always @* begin
     endcase
 end
 
+reg [7:0] aram_fill_data;
+always @* begin
+    case(status[45:44])
+        0: aram_fill_data = (mem_fill_addr[8] ^ mem_fill_addr[2]) ? 8'h66 : 8'h99;
+        1: aram_fill_data = (mem_fill_addr[9] ^ mem_fill_addr[0]) ? 8'hFF : 8'h00;
+        2: aram_fill_data = 8'h55;
+        3: aram_fill_data = 8'hFF;
+    endcase
+end
+
 wire[23:0] ROM_ADDR;
 wire       ROM_OE_N;
 wire       ROM_WE_N;
@@ -821,7 +832,7 @@ dpram_dif #(16,8,15,16) aram
 
 	// clear the RAM on loading
 	.address_b(spc_download ? addr_download[15:1] : mem_fill_addr[15:1]),
-	.data_b(spc_download ? ioctl_dout : 16'h0000),
+	.data_b(spc_download ? ioctl_dout : {2{aram_fill_data}}),
 	.wren_b(spc_download ? ioctl_wr : clearing_ram)
 );
 

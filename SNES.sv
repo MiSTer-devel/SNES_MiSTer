@@ -322,26 +322,28 @@ parameter CONF_STR = {
 	"P1-;",
 	"P1OJK,Stereo Mix,None,25%,50%,100%;", 
 
-	"P2,Hardware;",
+	"P2,Input Options;",
 	"P2-;",
+	"P2O7,Swap Joysticks,No,Yes;",
+	"P2O8,SNAC,No,Yes;",
+	"P2-;",
+	"P2oB,Miracle Piano,No,Yes;",
 	"P2OH,Multitap,Disabled,Port2;",
-	"P2O8,Serial,OFF,SNAC;",
+	"P2O56,Mouse,None,Port1,Port2;",
 	"P2-;",
 	"P2OPQ,Super Scope,Disabled,Joy1,Joy2,Mouse;",
 	"D4P2OR,Super Scope Btn,Joy,Mouse;",
 	"D4P2OST,Cross,Small,Big,None;",
 	"D4P2o2,Gun Type,Super Scope,Justifier;",
-	"P2-;",
-	"D1P2OI,SuperFX Speed,Normal,Turbo;",
-	"D3P2O4,CPU Speed,Normal,Turbo;",
-	"P2-;",
-	"P2OLM,Initial WRAM,9966(SNES2),00FF(SNES1),55(SD2SNES),FF;",
-	"P2oCD,Initial ARAM,9966(SNES2),00FF(SNES1),55(SD2SNES),FF;",
+	
+	"P3,Hardware;",
+	"P3-;",
+	"D1P3OI,SuperFX Speed,Normal,Turbo;",
+	"D3P3O4,CPU Speed,Normal,Turbo;",
+	"P3-;",
+	"P3OLM,Initial WRAM,9966(SNES2),00FF(SNES1),55(SD2SNES),FF;",
+	"P3oCD,Initial ARAM,9966(SNES2),00FF(SNES1),55(SD2SNES),FF;",
 
-	"-;",
-	"O56,Mouse,None,Port1,Port2;",
-	"oB,Miracle Piano,No,Yes;",
-	"O7,Swap Joysticks,No,Yes;",
 	"-;",
 	"R0,Reset;",
 	"J1,A(SS Fire),B(SS Cursor),X(SS TurboSw),Y(SS Pause),LT(SS Cursor),RT(SS Fire),Select,Start;",
@@ -1028,37 +1030,55 @@ lightgun lightgun
 	.PORT_DO(LG_DO)
 );
 
+// 1 [oooo|ooo) 7 - 1:+5V  2:Clk  3:Strobe   4:D0  5:D1  6: I/O  7:Gnd
+
 // Indexes:
-// 0 = D+    = Latch
-// 1 = D-    = CLK
-// 2 = TX-   = P5
-// 3 = GND_d
-// 4 = RX+   = P6
-// 5 = RX-   = P4
+// IDXDIR   Function    USBPIN
+// 0  OUT   Strobe      D+
+// 1  OUT   Clk (P1)    D-
+// 2  IN    D1          TX-
+// 3  OUT   CLK (P2)    GND_d
+// 4  BI    I/O         RX+
+// 5  IN    P1D0        RX-
+// 6  IN    P2D0        TX+
 
 wire raw_serial = status[8];
+reg snac_p2 = 0;
 
 assign USER_OUT[2] = 1'b1;
-assign USER_OUT[3] = 1'b1;
 assign USER_OUT[5] = 1'b1;
 assign USER_OUT[6] = 1'b1;
+
+wire  [1:0] datajoy0_DI = snac_p2 ? {1'b1, USER_IN[6]} : JOY1_DO;
+wire  [1:0] datajoy1_DI = snac_p2 ? {USER_IN[2], USER_IN[6]} : JOY2_DO;
 
 // JOYX_DO[0] is P4, JOYX_DO[1] is P5
 wire [1:0] JOY1_DI;
 wire [1:0] JOY2_DI;
 wire JOY2_P6_DI;
 
+always @(posedge clk_sys) begin
+	if (raw_serial) begin
+		if (~USER_IN[6])
+			snac_p2 <= 1;
+	end else begin
+		snac_p2 <= 0;
+	end
+end
+
 always_comb begin
 	if (raw_serial) begin
 		USER_OUT[0] = JOY_STRB;
 		USER_OUT[1] = joy_swap ? ~JOY2_CLK : ~JOY1_CLK;
-		USER_OUT[4] = joy_swap ? JOY2_P6 : JOY1_P6;
-		JOY1_DI = joy_swap ? JOY1_DO : {USER_IN[2], USER_IN[5]};
-		JOY2_DI = joy_swap ? {USER_IN[2], USER_IN[5]} : JOY2_DO;
-		JOY2_P6_DI = joy_swap ? USER_IN[4] : (LG_P6_out | !GUN_MODE);
+		USER_OUT[3] = joy_swap ? ~JOY1_CLK : ~JOY2_CLK;
+		USER_OUT[4] = joy_swap ? JOY2_P6 : snac_p2 ? JOY2_P6 : JOY1_P6;
+		JOY1_DI = joy_swap ? datajoy0_DI : snac_p2 ? {1'b1, USER_IN[5]} : {USER_IN[2], USER_IN[5]};
+		JOY2_DI = joy_swap ? {USER_IN[2], USER_IN[5]} : datajoy1_DI;		
+		JOY2_P6_DI = joy_swap ? USER_IN[4] : snac_p2 ? USER_IN[4] : (LG_P6_out | !GUN_MODE);
 	end else begin
 		USER_OUT[0] = 1'b1;
 		USER_OUT[1] = 1'b1;
+		USER_OUT[3] = 1'b1;
 		USER_OUT[4] = 1'b1;
 		JOY1_DI = JOY1_DO;
 		JOY2_DI = JOY2_DO;

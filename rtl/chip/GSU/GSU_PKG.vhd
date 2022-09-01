@@ -11,7 +11,7 @@ package GSU_PKG is
 	constant FLAG_IH : integer range 0 to 15 := 11;
 	constant FLAG_IRQ : integer range 0 to 15 := 15;
 	
-	constant NUM_MCODES : integer := 24;
+	constant NUM_MCODES : integer := 25;
 	
 	type Opcode_t is (
 		OP_NOP, OP_STOP, OP_CACHE,
@@ -57,7 +57,7 @@ package GSU_PKG is
 	type MicrocodeTbl_t is array(0 to NUM_MCODES-1, 0 to 3) of Microcode_r;
 	constant MC_TBL: MicrocodeTbl_t := (
 	-- 0 STOP
-	(('1','1','0',"000",'0','0',"00","000","000"),
+	(('1','1','0',"000",'1','1',"00","000","000"),
 	 ('X','X','X',"XXX",'X','X',"XX","XXX","XXX"),
 	 ('X','X','X',"XXX",'X','X',"XX","XXX","XXX"),
 	 ('X','X','X',"XXX",'X','X',"XX","XXX","XXX")),
@@ -117,13 +117,13 @@ package GSU_PKG is
 	 ('X','X','X',"XXX",'X','X',"XX","XXX","XXX"),
 	 ('X','X','X',"XXX",'X','X',"XX","XXX","XXX")),
 	-- 12 STB
-	(('1','1','0',"000",'0','1',"00","001","011"),
-	 ('X','X','X',"XXX",'X','X',"XX","XXX","XXX"),
+	(('0','0','0',"000",'0','1',"00","001","011"),
+	 ('1','1','0',"000",'0','1',"00","001","000"),
 	 ('X','X','X',"XXX",'X','X',"XX","XXX","XXX"),
 	 ('X','X','X',"XXX",'X','X',"XX","XXX","XXX")),
 	-- 13 STW
-	(('1','1','0',"000",'0','1',"00","010","011"),
-	 ('X','X','X',"XXX",'X','X',"XX","XXX","XXX"),
+	(('0','0','0',"000",'0','1',"00","010","011"),
+	 ('1','1','0',"000",'0','1',"00","010","000"),
 	 ('X','X','X',"XXX",'X','X',"XX","XXX","XXX"),
 	 ('X','X','X',"XXX",'X','X',"XX","XXX","XXX")),
 	-- 14 INC/DEC
@@ -134,8 +134,8 @@ package GSU_PKG is
 	-- 15 SM
 	(('0','1','0',"000",'0','1',"00","000","000"),
 	 ('0','1','0',"000",'0','1',"00","000","001"),
-	 ('1','1','0',"000",'0','1',"00","110","010"),
-	 ('X','X','X',"XXX",'X','X',"XX","XXX","XXX")),
+	 ('0','0','0',"000",'0','1',"00","110","010"),
+	 ('1','1','0',"000",'0','1',"00","110","000")),
 	-- 16 ROMB
 	(('1','1','0',"000",'1','0',"00","000","000"),
 	 ('X','X','X',"XXX",'X','X',"XX","XXX","XXX"),
@@ -158,12 +158,12 @@ package GSU_PKG is
 	 ('X','X','X',"XXX",'X','X',"XX","XXX","XXX")),
 	-- 20 SMS
 	(('0','1','0',"000",'0','1',"00","000","000"),
-	 ('1','1','0',"000",'0','1',"00","110","100"),
-	 ('X','X','X',"XXX",'X','X',"XX","XXX","XXX"),
+	 ('0','0','0',"000",'0','1',"00","110","100"),
+	 ('1','1','0',"000",'0','1',"00","110","000"),
 	 ('X','X','X',"XXX",'X','X',"XX","XXX","XXX")),
 	-- 21 SBK
-	(('1','1','0',"000",'0','1',"00","010","101"),
-	 ('X','X','X',"XXX",'X','X',"XX","XXX","XXX"),
+	(('0','0','0',"000",'0','1',"00","010","101"),
+	 ('1','1','0',"000",'0','1',"00","010","000"),
 	 ('X','X','X',"XXX",'X','X',"XX","XXX","XXX"),
 	 ('X','X','X',"XXX",'X','X',"XX","XXX","XXX")),
 	-- 22 RPIX
@@ -175,6 +175,11 @@ package GSU_PKG is
 	(('1','1','0',"000",'0','0',"00","000","000"),
 	 ('X','X','X',"XXX",'X','X',"XX","XXX","XXX"),
 	 ('X','X','X',"XXX",'X','X',"XX","XXX","XXX"),
+	 ('X','X','X',"XXX",'X','X',"XX","XXX","XXX")),
+	-- 24 LMULT
+	(('0','0','0',"000",'0','0',"00","000","000"),
+	 ('0','0','0',"000",'0','0',"00","000","000"),
+	 ('1','1','1',"011",'0','0',"00","000","000"),
 	 ('X','X','X',"XXX",'X','X',"XX","XXX","XXX"))
 	);
 	
@@ -345,10 +350,10 @@ package GSU_PKG is
 	((OP_JMP,    1), (OP_LJMP,    1), (OP_JMP,     1), (OP_JMP,     1)), --JMP R9 / LJMP R9 
 	((OP_JMP,    1), (OP_LJMP,    1), (OP_JMP,     1), (OP_JMP,     1)), --JMP R10 / LJMP R10 
 	((OP_JMP,    1), (OP_LJMP,    1), (OP_JMP,     1), (OP_JMP,     1)), --JMP R11 / LJMP R11 
-	((OP_JMP,    1), (OP_LJMP,    1), (OP_JMP,     1), (OP_JMP,     1)), --JMP LJMP R12 / LJMP R12 
-	((OP_JMP,    1), (OP_LJMP,    1), (OP_JMP,     1), (OP_JMP,     1)), --JMP LJMP R13 / LJMP R13 
+	((OP_JMP,    1), (OP_LJMP,    1), (OP_JMP,     1), (OP_JMP,     1)), --JMP R12 / LJMP R12 
+	((OP_JMP,    1), (OP_LJMP,    1), (OP_JMP,     1), (OP_JMP,     1)), --JMP R13 / LJMP R13 
 	((OP_LOB,    5), (OP_LOB,     5), (OP_LOB,     5), (OP_LOB,     5)), --LOB
-	((OP_FMULT,  5), (OP_LMULT,   5), (OP_FMULT,   5), (OP_FMULT,   5)), --FMULT / LMULT
+	((OP_FMULT, 24), (OP_LMULT,  24), (OP_FMULT,  24), (OP_FMULT,  24)), --FMULT / LMULT
 	--A0
 	((OP_IBT,    7), (OP_LMS,    19), (OP_SMS,    20), (OP_IBT,     7)), --IBT R0,#pp / LMS R0,(yy) / SMS (yy),R0
 	((OP_IBT,    7), (OP_LMS,    19), (OP_SMS,    20), (OP_IBT,     7)), --IBT R1,#pp / LMS R1,(yy) / SMS (yy),R1
@@ -459,7 +464,6 @@ package GSU_PKG is
 	type PixCache_r is record
 		DATA		: PixCacheData_t;
 		OFFSET	: unsigned(12 downto 0);
-		PLOTTED	: std_logic_vector(7 downto 0);
 		VALID		: std_logic_vector(7 downto 0);
 	end record;
 	type PixCaches_t is array (0 to 1) of PixCache_r;
@@ -467,17 +471,29 @@ package GSU_PKG is
 	type ROMState_t is (
 		ROMST_IDLE, 
 		ROMST_FETCH, 
+		ROMST_FETCH_DONE,
 		ROMST_CACHE, 
+		ROMST_CACHE_DONE,
+		ROMST_CACHE_END,
 		ROMST_LOAD
 	);
 	type RAMState_t is (
 		RAMST_IDLE, 
 		RAMST_FETCH, 
+		RAMST_FETCH_DONE,
 		RAMST_CACHE, 
+		RAMST_CACHE_DONE,
+		RAMST_CACHE_END,
 		RAMST_LOAD, 
 		RAMST_SAVE, 
 		RAMST_PCF, 
+		RAMST_PCF_END,
 		RAMST_RPIX
+	);
+	
+	type MULTState_t is (
+		MULTST_IDLE, 
+		MULTST_EXEC
 	);
 	
 	function GetLastBPP(md: std_logic_vector(1 downto 0)) return unsigned;

@@ -985,7 +985,7 @@ variable FLIP_Y : unsigned(2 downto 0);
 variable TILE_OFFS : unsigned(14 downto 0);
 variable TILEPOS_INC : unsigned(4 downto 0);
 variable M7_VRAM_X, M7_VRAM_Y : signed(23 downto 0);
-variable ORG_X, ORG_Y  : signed(10 downto 0);
+variable ORG_X, ORG_Y : signed(13 downto 0);
 variable M7_X, M7_Y : signed(8 downto 0);
 variable M7_TILE : unsigned(7 downto 0);
 variable BG_TILEMAP_ADDR, BG_TILEDATA_ADDR : unsigned(15 downto 0);
@@ -1156,8 +1156,8 @@ begin
 	BG_TILEDATA_ADDR := (resize(unsigned(BG_NBA(BF.BG)),BG_TILEDATA_ADDR'length) sll 12) + TILE_OFFS + TILEPOS_INC;
 	
 	-- MODE 7
-	ORG_X := resize(signed(M7HOFS) - signed(M7X), ORG_X'length);
-	ORG_Y := resize(signed(M7VOFS) - signed(M7Y), ORG_Y'length);
+	ORG_X := signed(resize(signed(M7HOFS), ORG_X'length)) - signed(resize(signed(M7X), ORG_X'length));
+	ORG_Y := signed(resize(signed(M7VOFS), ORG_Y'length)) - signed(resize(signed(M7Y), ORG_Y'length));
 	
 	if M7SEL(0) = '0' then
 		M7_X := signed(resize(M7_SCREEN_X, 9));
@@ -1220,12 +1220,12 @@ begin
 			
 			if H_CNT = M7_XY_LATCH then
 				M7_TEMP_X <= (resize(signed(M7X), M7_TEMP_X'length) sll 8) + 
-								 (resize(signed(M7A) * signed(ORG_X), M7_TEMP_X'length) and x"FFFFC0") + 
-								 (resize(signed(M7B) * signed(ORG_Y), M7_TEMP_X'length) and x"FFFFC0") + 
+								 (resize(signed(M7A) * Mode7Clip(ORG_X), M7_TEMP_X'length) and x"FFFFC0") + 
+								 (resize(signed(M7B) * Mode7Clip(ORG_Y), M7_TEMP_X'length) and x"FFFFC0") + 
 								 (resize(signed(M7B) * M7_Y, M7_TEMP_X'length) and x"FFFFC0");
 				M7_TEMP_Y <= (resize(signed(M7Y), M7_TEMP_Y'length) sll 8) + 
-								 (resize(signed(M7C) * signed(ORG_X), M7_TEMP_Y'length) and x"FFFFC0") + 
-								 (resize(signed(M7D) * signed(ORG_Y), M7_TEMP_Y'length) and x"FFFFC0") + 
+								 (resize(signed(M7C) * Mode7Clip(ORG_X), M7_TEMP_Y'length) and x"FFFFC0") + 
+								 (resize(signed(M7D) * Mode7Clip(ORG_Y), M7_TEMP_Y'length) and x"FFFFC0") + 
 								 (resize(signed(M7D) * M7_Y, M7_TEMP_Y'length) and x"FFFFC0");
 			end if;
 

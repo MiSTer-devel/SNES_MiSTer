@@ -124,6 +124,12 @@ module sys_top
 	inout   [6:0] USER_IO
 );
 
+`ifdef MISTER_DUAL_SDRAM
+	`ifndef MISTER_DISABLE_YC
+		`define MISTER_DISABLE_YC
+	`endif
+`endif
+
 //////////////////////  Secondary SD  ///////////////////////////////////
 wire SD_CS, SD_CLK, SD_MOSI;
 
@@ -519,17 +525,6 @@ cyclonev_hps_interface_peripheral_uart uart
 	.txd(uart_txd)
 );
 
-wire aspi_sck,aspi_mosi,aspi_ss,aspi_miso;
-cyclonev_hps_interface_peripheral_spi_master spi
-(
-	.sclk_out(aspi_sck),
-	.txd(aspi_mosi), // mosi
-	.rxd(aspi_miso), // miso
-
-	.ss_0_n(aspi_ss),
-	.ss_in_n(1)
-);
-
 wire [63:0] f2h_irq = {video_sync,HDMI_TX_VS};
 cyclonev_hps_interface_interrupts interrupts
 (
@@ -635,11 +630,13 @@ ddr_svc ddr_svc
 	.ram_write(ram2_write),
 	.ram_bcnt(ram2_bcnt),
 
+`ifndef MISTER_DISABLE_ALSA
 	.ch0_addr(alsa_address),
 	.ch0_burst(1),
 	.ch0_data(alsa_readdata),
 	.ch0_req(alsa_req),
 	.ch0_ready(alsa_ready),
+`endif
 
 	.ch1_addr(pal_addr),
 	.ch1_burst(128),
@@ -1477,8 +1474,10 @@ audio_out audio_out
 	.core_l(audio_l),
 	.core_r(audio_r),
 
+`ifndef MISTER_DISABLE_ALSA
 	.alsa_l(alsa_l),
 	.alsa_r(alsa_r),
+`endif
 
 	.i2s_bclk(HDMI_SCLK),
 	.i2s_lrclk(HDMI_LRCLK),
@@ -1490,6 +1489,18 @@ audio_out audio_out
 	.spdif(spdif)
 );
 
+
+`ifndef MISTER_DISABLE_ALSA
+wire aspi_sck,aspi_mosi,aspi_ss,aspi_miso;
+cyclonev_hps_interface_peripheral_spi_master spi
+(
+	.sclk_out(aspi_sck),
+	.txd(aspi_mosi), // mosi
+	.rxd(aspi_miso), // miso
+
+	.ss_0_n(aspi_ss),
+	.ss_in_n(1)
+);
 
 wire [28:0] alsa_address;
 wire [63:0] alsa_readdata;
@@ -1517,6 +1528,7 @@ alsa alsa
 	.pcm_l(alsa_l),
 	.pcm_r(alsa_r)
 );
+`endif
 
 ////////////////  User I/O (USB 3.0 connector) /////////////////////////
 

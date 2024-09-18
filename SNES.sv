@@ -173,8 +173,6 @@ module emu
 	input         OSD_STATUS
 );
 
-//`define DEBUG_BUILD
-
 assign ADC_BUS  = 'Z;
 
 assign AUDIO_S   = 1;
@@ -547,6 +545,7 @@ end
 
 wire GSU_ACTIVE;
 wire turbo_allow;
+wire SNES_SYSCLKR_CE,SNES_SYSCLKF_CE;
 
 reg [15:0] main_audio_l;
 reg [15:0] main_audio_r;
@@ -561,6 +560,9 @@ main main
 	.GSU_ACTIVE(GSU_ACTIVE),
 	.GSU_TURBO(GSU_TURBO),
 	.GSU_FASTROM(GSU_FASTROM),
+	
+	.SYSCLKR_CE(SNES_SYSCLKR_CE),
+	.SYSCLKF_CE(SNES_SYSCLKF_CE),
 
 	.ROM_TYPE(rom_type),
 	.ROM_MASK(rom_mask),
@@ -585,6 +587,7 @@ main main
 	.WRAM_D(WRAM_D),
 	.WRAM_Q(WRAM_Q),
 	.WRAM_CE_N(WRAM_CE_N),
+	.WRAM_OE_N(WRAM_OE_N),
 	.WRAM_WE_N(WRAM_WE_N),
 
 	.VRAM1_ADDR(VRAM1_ADDR),
@@ -642,7 +645,7 @@ main main
 	.TURBO(status[4] & turbo_allow),
 	.TURBO_ALLOW(turbo_allow),
 	
-`ifdef DEBUG_BUILD
+`ifdef DEBUG
 	.DBG_BG_EN(DBG_BG_EN),
 	.DBG_CPU_EN(DBG_CPU_EN),
 `else
@@ -717,19 +720,25 @@ end
 
 ////////////////////////////  MEMORY  ///////////////////////////////////
 
-reg [16:0] mem_fill_addr;
+reg [17:0] mem_fill_addr;
 reg clearing_ram = 0;
+reg mem_fill_wait;
 always @(posedge clk_sys) begin
 	if(~old_downloading & cart_download)
 		clearing_ram <= 1'b1;
 
 	if (&mem_fill_addr) clearing_ram <= 0;
 
-	if (clearing_ram)
-		mem_fill_addr <= mem_fill_addr + 1'b1;
-	else
+	if (clearing_ram) begin
+		mem_fill_wait <= ~mem_fill_wait;
+		if (mem_fill_wait) 
+			mem_fill_addr <= mem_fill_addr + 1'b1;
+	end else begin
 		mem_fill_addr <= 0;
+		mem_fill_wait <= 0;
+	end
 end
+wire mem_fill_we = clearing_ram & ~mem_fill_wait;
 
 reg [7:0] wram_fill_data;
 always @* begin
@@ -758,40 +767,52 @@ wire       ROM_WORD;
 wire[15:0] ROM_D;
 wire[15:0] ROM_Q;
 
+wire[16:0] WRAM_ADDR;
+wire       WRAM_CE_N;
+wire       WRAM_OE_N;
+wire       WRAM_WE_N;
+wire [7:0] WRAM_Q, WRAM_D;
+
 wire[24:0] addr_download = ioctl_addr-10'd512;
 
+reg READ_PULSE;
+always @(posedge clk_sys)
+	READ_PULSE <= SNES_SYSCLKR_CE;
+
+wire [15:0] sdr_dout1;
 sdram sdram
 (
-	.*,
+	.SDRAM_CLK(SDRAM_CLK),
+	.SDRAM_A(SDRAM_A),
+	.SDRAM_BA(SDRAM_BA),
+	.SDRAM_DQ(SDRAM_DQ),
+	.SDRAM_DQML(SDRAM_DQML),
+	.SDRAM_DQMH(SDRAM_DQMH),
+	.SDRAM_nCS(SDRAM_nCS),
+	.SDRAM_nWE(SDRAM_nWE),
+	.SDRAM_nRAS(SDRAM_nRAS),
+	.SDRAM_nCAS(SDRAM_nCAS),
+	.SDRAM_CKE(SDRAM_CKE),
+		
 	.init(0), //~clock_locked),
 	.clk(clk_mem),
 	
-	.addr(cart_download ? addr_download : ROM_ADDR),
-	.din(cart_download ? ioctl_dout : ROM_D),
-	.dout(ROM_Q),
-	.rd(~cart_download & (RESET_N ? ~ROM_OE_N : RFSH)),
-	.wr(cart_download ? ioctl_wr : ~ROM_WE_N),
-	.word(cart_download | ROM_WORD),
-	.busy()
+	.addr0(cart_download ? addr_download[23:0] : ROM_ADDR),
+	.din0(cart_download ? ioctl_dout : ROM_D),
+	.dout0(ROM_Q),
+	.rd0(~cart_download & (RESET_N ? ~ROM_OE_N : RFSH)),
+	.wr0(cart_download ? ioctl_wr : ~ROM_WE_N),
+	.word0(cart_download | ROM_WORD),
+	
+	.addr1(clearing_ram ? {7'b0000000,mem_fill_addr} : {7'b0000000,WRAM_ADDR}),
+	.din1(clearing_ram ? {8'h00,wram_fill_data} : {8'h00,WRAM_D}),
+	.dout1(sdr_dout1),
+	.rd1(clearing_ram ? 1'b0 : ~WRAM_CE_N & ~WRAM_OE_N & READ_PULSE),
+	.wr1(clearing_ram ? mem_fill_we : ~WRAM_CE_N & ~WRAM_WE_N & SNES_SYSCLKF_CE),
+	.word1(0)
 );
 
-wire[16:0] WRAM_ADDR;
-wire       WRAM_CE_N;
-wire       WRAM_WE_N;
-wire [7:0] WRAM_Q, WRAM_D;
-dpram #(17)	wram
-(
-	.clock(clk_sys),
-	.address_a(WRAM_ADDR),
-	.data_a(WRAM_D),
-	.wren_a(~WRAM_CE_N & ~WRAM_WE_N),
-	.q_a(WRAM_Q),
-
-	// clear the RAM on loading
-	.address_b(mem_fill_addr[16:0]),
-	.data_b(wram_fill_data),
-	.wren_b(clearing_ram)
-);
+assign WRAM_Q = sdr_dout1[7:0];
 
 wire [15:0] VRAM1_ADDR;
 wire        VRAM1_WE_N;
@@ -806,7 +827,7 @@ dpram #(15)	vram1
 
 	// clear the RAM on loading
 	.address_b(mem_fill_addr[14:0]),
-	.wren_b(clearing_ram)
+	.wren_b(mem_fill_we)
 );
 
 wire [15:0] VRAM2_ADDR;
@@ -822,7 +843,7 @@ dpram #(15) vram2
 
 	// clear the RAM on loading
 	.address_b(mem_fill_addr[14:0]),
-	.wren_b(clearing_ram)
+	.wren_b(mem_fill_we)
 );
 
 wire [15:0] ARAM_ADDR;
@@ -840,10 +861,10 @@ dpram_dif #(16,8,15,16) aram
 	// clear the RAM on loading
 	.address_b(spc_download ? addr_download[15:1] : mem_fill_addr[15:1]),
 	.data_b(spc_download ? ioctl_dout : {2{aram_fill_data}}),
-	.wren_b(spc_download ? ioctl_wr : clearing_ram)
+	.wren_b(spc_download ? ioctl_wr : mem_fill_we)
 );
 
-localparam  BSRAM_BITS = 17; // 1Mbits
+localparam  BSRAM_BITS = 18; // 256Kbyte
 wire [19:0] BSRAM_ADDR;
 wire        BSRAM_CE_N;
 wire        BSRAM_WE_N;
@@ -855,7 +876,7 @@ dpram_dif #(BSRAM_BITS,8,BSRAM_BITS-1,16) bsram
 	//Thrash the BSRAM upon ROM loading
 	.address_a(clearing_ram ? mem_fill_addr[BSRAM_BITS-1:0] : BSRAM_ADDR[BSRAM_BITS-1:0]),
 	.data_a(clearing_ram ? 8'hFF : BSRAM_D),
-	.wren_a(clearing_ram ? 1'b1 : ~BSRAM_CE_N & ~BSRAM_WE_N),
+	.wren_a(clearing_ram ? mem_fill_we : ~BSRAM_CE_N & ~BSRAM_WE_N),
 	.q_a(BSRAM_Q),
 
 	.address_b({sd_lba[BSRAM_BITS-10:0],sd_buff_addr}),
@@ -1157,7 +1178,7 @@ always @(posedge clk_sys) begin
 end
 
 //debug
-`ifdef DEBUG_BUILD
+`ifdef DEBUG
 reg [4:0] DBG_BG_EN = '1;
 reg       DBG_CPU_EN = 1;
 

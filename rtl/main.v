@@ -7,6 +7,7 @@ module main (
 	input       [7:0] ROM_TYPE,
 	input      [23:0] ROM_MASK,
 	input      [23:0] RAM_MASK,
+	input      [ 3:0] RAM_SIZE,
 	
 	output            SYSCLKR_CE,
 	output            SYSCLKF_CE,
@@ -43,12 +44,12 @@ module main (
 	output            VRAM2_WE_N,
 	output            VRAM_OE_N,
 
-	output     [15:0] ARAM_ADDR,
-	output      [7:0] ARAM_D,
+	output reg [15:0] ARAM_ADDR,
+	output reg  [7:0] ARAM_D,
 	input       [7:0] ARAM_Q,
-	output            ARAM_CE_N,
-	output            ARAM_OE_N,
-	output            ARAM_WE_N,
+	output reg        ARAM_CE_N,
+	output reg        ARAM_OE_N,
+	output reg        ARAM_WE_N,
 
 	output            GSU_ACTIVE,
 	input             GSU_TURBO,
@@ -112,6 +113,23 @@ module main (
 	output            MSU_DATA_REQ,
 	input             MSU_ENABLE,
 
+	input             SS_SAVE,
+	input             SS_TOSD,
+	input             SS_LOAD,
+	input       [1:0] SS_SLOT,
+	output            SS_BUSY,
+	output            SS_AVAIL,
+
+	input      [63:0] SS_DDR_DI,
+	input             SS_DDR_ACK,
+	output     [63:0] SS_DDR_DO,
+	output     [21:3] SS_DDR_ADDR,
+	output            SS_DDR_WE,
+	output      [7:0] SS_DDR_BE,
+	output            SS_DDR_REQ,
+
+	input             CART_DOWNLOAD,
+
 	output     [15:0] AUDIO_L,
 	output     [15:0] AUDIO_R
 );
@@ -141,6 +159,12 @@ wire        PAWR_N;
 //wire        SYSCLKF_CE;
 //wire        SYSCLKR_CE;
 wire        REFRESH;
+
+wire  [15:0] SNES_ARAM_ADDR;
+wire   [7:0] SNES_ARAM_D;
+wire         SNES_ARAM_CE_N;
+wire         SNES_ARAM_OE_N;
+wire         SNES_ARAM_WE_N;
 
 wire  [6:0] MAP_ACTIVE;
 
@@ -189,12 +213,12 @@ SNES SNES
 	.vram_wra_n(VRAM1_WE_N),
 	.vram_wrb_n(VRAM2_WE_N),
 
-	.aram_addr(ARAM_ADDR),
-	.aram_d(ARAM_D),
+	.aram_addr(SNES_ARAM_ADDR),
+	.aram_d(SNES_ARAM_D),
 	.aram_q(ARAM_Q),
-	.aram_ce_n(ARAM_CE_N),
-	.aram_oe_n(ARAM_OE_N),
-	.aram_we_n(ARAM_WE_N),
+	.aram_ce_n(SNES_ARAM_CE_N),
+	.aram_oe_n(SNES_ARAM_OE_N),
+	.aram_we_n(SNES_ARAM_WE_N),
 
 	.joy1_di(JOY1_DI),
 	.joy2_di(JOY2_DI),
@@ -228,6 +252,14 @@ SNES SNES
 	.io_addr(IO_ADDR),
 	.io_dat(IO_DAT),
 	.io_wr(IO_WR),
+
+	.ss_addr(SS_EXT_ADDR[8:0]),
+	.ss_regs_sel(SS_DSP_REGS_SEL),
+	.ss_smp_sel(SS_SMP_SEL),
+	.ss_busy(SS_BUSY),
+	.ss_wr(~PAWR_N),
+	.ss_di(SS_DO),
+	.ss_do(SS_SPC_DI),
 	
 	.DBG_BG_EN(DBG_BG_EN),
 	.DBG_CPU_EN(DBG_CPU_EN),
@@ -237,6 +269,8 @@ SNES SNES
 	.audio_l(AUDIO_L),
 	.audio_r(AUDIO_R)
 );
+
+
 
 wire  [7:0] MSU_DO;
 wire        MSU_SEL;
@@ -802,7 +836,72 @@ end else
 assign MAP_ACTIVE[6] = 0;
 endgenerate
 
-assign TURBO_ALLOW = ~(MAP_ACTIVE[3] | MAP_ACTIVE[1]);
+wire  [7:0] SS_DO;
+wire [23:0] SS_ROM_ADDR;
+
+wire [19:0] SS_EXT_ADDR;
+wire  [7:0] SS_SPC_DI;
+wire        SS_DO_OVR;
+wire        SS_ARAM_SEL, SS_DSP_REGS_SEL, SS_SMP_SEL;
+wire        SS_BSRAM_SEL;
+
+savestates ss
+(
+	.reset_n(RESET_N),
+	.clk(MCLK),
+
+	.save(SS_SAVE),
+	.save_sd(SS_TOSD),
+	.load(SS_LOAD),
+	.slot(SS_SLOT),
+
+	.cart_download(CART_DOWNLOAD),
+	.ram_size(RAM_SIZE),
+
+	.sysclkf_ce(SYSCLKF_CE),
+	.sysclkr_ce(SYSCLKR_CE),
+
+	.romsel_n(ROMSEL_N),
+	.rom_q(ROM_Q),
+
+	.ca(CA),
+	.cpurd_n(CPURD_N),
+	.cpuwr_n(CPUWR_N),
+
+	.pa(PA),
+	.pard_n(PARD_N),
+	.pawr_n(PAWR_N),
+
+	.di(DO),
+	.ss_do(SS_DO),
+
+	.rom_addr(SS_ROM_ADDR),
+
+	.ddr_di(SS_DDR_DI),
+	.ddr_ack(SS_DDR_ACK),
+	.ddr_do(SS_DDR_DO),
+	.ddr_addr(SS_DDR_ADDR),
+	.ddr_we(SS_DDR_WE),
+	.ddr_be(SS_DDR_BE),
+	.ddr_req(SS_DDR_REQ),
+
+	.ext_addr(SS_EXT_ADDR),
+
+	.spc_di(SS_SPC_DI),
+	.aram_sel(SS_ARAM_SEL),
+	.dsp_regs_sel(SS_DSP_REGS_SEL),
+	.smp_regs_sel(SS_SMP_SEL),
+
+	.bsram_sel(SS_BSRAM_SEL),
+	.bsram_di(BSRAM_Q),
+
+	.ss_ovr(SS_DO_OVR),
+	.ss_busy(SS_BUSY)
+);
+
+assign SS_AVAIL = ~|{ROM_TYPE[7:4]}; // Only basic carts for now
+
+assign TURBO_ALLOW = ~(MAP_ACTIVE[3] | MAP_ACTIVE[1] | SS_BUSY);
 
 always @(*) begin
 	case (MAP_ACTIVE)
@@ -944,6 +1043,33 @@ always @(*) begin
 	endcase
 	
 	if(MSU_SEL)   DI = MSU_DO;
+
+	if (SS_ARAM_SEL) begin
+		ARAM_ADDR = SS_EXT_ADDR[15:0];
+		ARAM_D    = SS_DO;
+		ARAM_CE_N = 0;
+		ARAM_OE_N = PARD_N;
+		ARAM_WE_N = PAWR_N;
+	end else begin
+		ARAM_ADDR = SNES_ARAM_ADDR;
+		ARAM_D    = SNES_ARAM_D;
+		ARAM_CE_N = SNES_ARAM_CE_N;
+		ARAM_OE_N = SNES_ARAM_OE_N;
+		ARAM_WE_N = SNES_ARAM_WE_N;
+	end
+
+	if (SS_BSRAM_SEL) begin
+		BSRAM_ADDR = SS_EXT_ADDR[19:0];
+		BSRAM_D    = SS_DO;
+		BSRAM_CE_N = 0;
+		BSRAM_OE_N = PARD_N;
+		BSRAM_WE_N = PAWR_N;
+	end
+
+	if (SS_DO_OVR) begin
+		DI         = SS_DO;
+		ROM_ADDR   = SS_ROM_ADDR;
+	end
 end
 
 endmodule

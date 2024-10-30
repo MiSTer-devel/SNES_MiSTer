@@ -289,7 +289,7 @@ wire reset = RESET | buttons[1] | status[0] | cart_download | spc_download | bk_
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX  XXXXXXXXXXXXXXX
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXX
 
 `include "build_id.v"
 parameter CONF_STR = {
@@ -341,6 +341,7 @@ parameter CONF_STR = {
 	"D1P3OI,SuperFX Speed,Normal,Turbo;",
 	"D1P3oE,SuperFX FastROM,Yes,No;",
 	"D3P3O4,CPU Speed,Normal,Turbo;",
+	"P3OV,Sufami Cart swaping,No,Yes;",
 	"P3-;",
 	"P3OLM,Initial WRAM,9966(SNES2),00FF(SNES1),55(SD2SNES),FF;",
 	"P3oCD,Initial ARAM,9966(SNES2),00FF(SNES1),55(SD2SNES),FF;",
@@ -436,6 +437,7 @@ wire [1:0] GUN_MODE = status[26:25];
 wire       GUN_TYPE = status[34];
 wire       GSU_TURBO = status[18];
 wire       GSU_FASTROM = ~status[46];
+wire       SUFAMI_SWAP = status[31];
 wire       BLEND = ~status[16];
 wire [1:0] mouse_mode = status[6:5];
 wire       joy_swap = status[7] | piano;
@@ -560,6 +562,7 @@ main main
 	.GSU_ACTIVE(GSU_ACTIVE),
 	.GSU_TURBO(GSU_TURBO),
 	.GSU_FASTROM(GSU_FASTROM),
+	.SUFAMI_SWAP(SUFAMI_SWAP),
 	
 	.SYSCLKR_CE(SNES_SYSCLKR_CE),
 	.SYSCLKF_CE(SNES_SYSCLKF_CE),
@@ -1138,7 +1141,7 @@ wire bk_load    = status[12];
 wire bk_save    = status[13] | (bk_pending & OSD_STATUS && status[23]);
 reg  bk_loading = 0;
 reg  bk_state   = 0;
-
+wire [31:0] sd_lba_end = (rom_type & 8'hF8) == 8'h28 ? {ram_mask[23:9],1'b1} : ram_mask[23:9];
 always @(posedge clk_sys) begin
 	reg old_load = 0, old_save = 0, old_ack;
 
@@ -1165,7 +1168,7 @@ always @(posedge clk_sys) begin
 		end
 	end else begin
 		if(old_ack & ~sd_ack) begin
-			if(sd_lba >= ram_mask[23:9]) begin
+			if(sd_lba >= sd_lba_end) begin
 				bk_loading <= 0;
 				bk_state <= 0;
 			end else begin

@@ -117,7 +117,6 @@ module main (
 	input             SS_TOSD,
 	input             SS_LOAD,
 	input       [1:0] SS_SLOT,
-	output            SS_BUSY,
 	output            SS_AVAIL,
 
 	input      [63:0] SS_DDR_DI,
@@ -127,8 +126,6 @@ module main (
 	output            SS_DDR_WE,
 	output      [7:0] SS_DDR_BE,
 	output            SS_DDR_REQ,
-
-	input             CART_DOWNLOAD,
 
 	output     [15:0] AUDIO_L,
 	output     [15:0] AUDIO_R
@@ -593,6 +590,14 @@ wire        SA1_BSRAM_CE_N;
 wire        SA1_BSRAM_OE_N;
 wire        SA1_BSRAM_WE_N;
 
+wire [23:0] SA1_P65_A;
+wire  [7:0] SA1_P65_DO;
+wire        SA1_P65_RD_N;
+wire        SA1_P65_WR_N;
+
+wire        SS_SA1_ROMSEL;
+wire        SS_SNS_ROMSEL;
+
 generate
 if (USE_SA1 == 1'b1) begin
 
@@ -638,7 +643,17 @@ SA1Map SA1Map
 	.map_active(MAP_ACTIVE[3]),
 	.map_ctrl(ROM_TYPE),
 	.rom_mask(ROM_MASK),
-	.bsram_mask(RAM_MASK)
+	.bsram_mask(RAM_MASK),
+
+	.sa1_p65_a(SA1_P65_A),
+	.sa1_p65_do(SA1_P65_DO),
+	.sa1_p65_rd_n(SA1_P65_RD_N),
+	.sa1_p65_wr_n(SA1_P65_WR_N),
+
+	.ss_busy(SS_BUSY),
+
+	.ss_sa1_romsel(SS_SA1_ROMSEL),
+	.ss_sns_romsel(SS_SNS_ROMSEL)
 );
 end else
 assign MAP_ACTIVE[3] = 0;
@@ -836,12 +851,14 @@ end else
 assign MAP_ACTIVE[6] = 0;
 endgenerate
 
+wire        SS_BUSY;
 wire  [7:0] SS_DO;
 wire [23:0] SS_ROM_ADDR;
 
 wire [19:0] SS_EXT_ADDR;
 wire  [7:0] SS_SPC_DI;
 wire        SS_DO_OVR;
+wire        SS_ROM_OVR;
 wire        SS_ARAM_SEL, SS_DSP_REGS_SEL, SS_SMP_SEL;
 wire        SS_BSRAM_SEL;
 
@@ -855,8 +872,8 @@ savestates ss
 	.load(SS_LOAD),
 	.slot(SS_SLOT),
 
-	.cart_download(CART_DOWNLOAD),
 	.ram_size(RAM_SIZE),
+	.rom_type(ROM_TYPE),
 
 	.sysclkf_ce(SYSCLKF_CE),
 	.sysclkr_ce(SYSCLKR_CE),
@@ -895,11 +912,20 @@ savestates ss
 	.bsram_sel(SS_BSRAM_SEL),
 	.bsram_di(BSRAM_Q),
 
-	.ss_ovr(SS_DO_OVR),
+	.sa1_active(MAP_ACTIVE[3]),
+	.sa1_a(SA1_P65_A),
+	.sa1_di(SA1_P65_DO),
+	.sa1_rd_n(SA1_P65_RD_N),
+	.sa1_wr_n(SA1_P65_WR_N),
+	.sa1_sa1_romsel(SS_SA1_ROMSEL),
+	.sa1_sns_romsel(SS_SNS_ROMSEL),
+
+	.ss_do_ovr(SS_DO_OVR),
+	.ss_rom_ovr(SS_ROM_OVR),
 	.ss_busy(SS_BUSY)
 );
 
-assign SS_AVAIL = ~|{ROM_TYPE[7:4]}; // Only basic carts for now
+assign SS_AVAIL = ~|{ROM_TYPE[7:4]} | (MAP_ACTIVE[3]); // Basic carts + SA1
 
 assign TURBO_ALLOW = ~(MAP_ACTIVE[3] | MAP_ACTIVE[1] | SS_BUSY);
 
@@ -1068,6 +1094,9 @@ always @(*) begin
 
 	if (SS_DO_OVR) begin
 		DI         = SS_DO;
+	end
+
+	if (SS_ROM_OVR) begin
 		ROM_ADDR   = SS_ROM_ADDR;
 	end
 end

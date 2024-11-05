@@ -8,8 +8,8 @@ module savestates
 	input             load,
 	input       [1:0] slot,
 
-	input             cart_download,
 	input       [3:0] ram_size,
+	input       [7:0] rom_type,
 
 	input             sysclkf_ce,
 	input             sysclkr_ce,
@@ -50,7 +50,16 @@ module savestates
 	output            bsram_sel,
 	input       [7:0] bsram_di,
 
-	output            ss_ovr,
+	input             sa1_active,
+	input      [23:0] sa1_a,
+	input       [7:0] sa1_di,
+	input             sa1_rd_n,
+	input             sa1_wr_n,
+	input             sa1_sa1_romsel,
+	input             sa1_sns_romsel,
+
+	output            ss_do_ovr,
+	output            ss_rom_ovr,
 	output reg        ss_busy
 );
 
@@ -97,6 +106,10 @@ wire nmi_vect = ({ca[23:1],1'b0} == 24'h00FFEA) || ({ca[23:1],1'b0} == 24'h00FFF
 wire nmi_vect_l = nmi_vect & ~ca[0];
 wire nmi_vect_h = nmi_vect &  ca[0];
 
+wire irq_vect = ({ca[23:1],1'b0} == 24'h00FFEE) || ({ca[23:1],1'b0} == 24'h00FFFE);
+wire irq_vect_l = irq_vect & ~ca[0];
+wire irq_vect_h = irq_vect &  ca[0];
+
 wire ss_reg_sel = (ca[23:16] == 8'hC0);
 
 reg [19:0] ss_data_addr;
@@ -108,6 +121,7 @@ wire ss_data_sel = ss_reg_sel & (ca[15:0] == 16'h6000);
 wire ss_addr_sel = ss_reg_sel & (ca[15:0] == 16'h6001);
 wire ss_ext_addr_sel = ss_reg_sel & (ca[15:0] == 16'h6002);
 wire ss_ramsize_sel = ss_reg_sel & (ca[15:0] == 16'h6003);
+wire ss_romtype_sel = ss_reg_sel & (ca[15:0] == 16'h6004);
 wire ss_end_sel = ss_reg_sel & (ca[15:0] == 16'h600E);
 wire ss_status_sel = ss_reg_sel & (ca[15:0] == 16'h600F);
 
@@ -132,6 +146,23 @@ localparam DDR_IDLE = 4'd0, LOAD_DATA = 4'd1, WRITE_DATA = 4'd2,
 			DDR_END = 4'd6;
 
 reg [31:0] ss_count = 0;
+
+// Detect if NMI is being used. Some games do not use NMI during game play.
+reg [15:0] nmi_cycle_cnt, nmi_read_sr;
+wire ss_use_nmi = |nmi_read_sr;
+always @(posedge clk) begin
+	if (~reset_n) begin
+		nmi_cycle_cnt <= 0;
+		nmi_read_sr   <= 0;
+	end else if (sysclkf_ce) begin
+		nmi_cycle_cnt <= nmi_cycle_cnt + 1'b1;
+		if (&nmi_cycle_cnt | (~cpurd_n & nmi_vect_l)) begin
+			nmi_read_sr <= { nmi_read_sr[14:0], nmi_vect_l };
+			nmi_cycle_cnt <= 0;
+		end
+	end
+end
+
 
 always @(posedge clk) begin
 	if (~reset_n) begin
@@ -160,10 +191,12 @@ always @(posedge clk) begin
 		end
 
 		if (cpurd_ce) begin
-			if (nmi_vect_l & ~ss_busy & (save_en | (load_en & load_ready))) begin
-				ss_busy <= 1; // Override NMI vector
-				if (save_en) begin
-					ss_count <= ss_count + 1'b1;
+			if (nmi_vect_l | (~ss_use_nmi & irq_vect_l)) begin // Prefer to use NMI
+				if (~ss_busy & (save_en | (load_en & load_ready))) begin
+					ss_busy <= 1; // Override NMI/IRQ vector
+					if (save_en) begin
+						ss_count <= ss_count + 1'b1;
+					end
 				end
 			end
 
@@ -332,19 +365,76 @@ savestates_regs ss_regs
 	.ssr_do(ssr_do),
 	.ssr_oe(ssr_oe)
 );
+
+wire [ 7:0] map_ss_do;
+wire        map_ss_oe;
+wire [15:0] map_rom_addr;
+wire        map_rom_ovr;
+wire        map_active;
+
+savestates_map ss_map
+(
+	.reset_n(reset_n),
+	.clk(clk),
+
+	.ss_busy(ss_busy),
+	.save_en(save_en),
+
+	.ss_reg_sel(ss_reg_sel),
+
+	.sysclkf_ce(sysclkf_ce),
+	.sysclkr_ce(sysclkr_ce),
+
+	.ca(ca),
+	.cpurd_n(cpurd_n),
+	.cpuwr_n(cpuwr_n),
+	.cpuwr_ce(cpuwr_ce),
+
+	.pa(pa),
+	.pard_n(pard_n),
+	.pawr_n(pawr_n),
+
+	.di(di),
+
+	.sa1_active(sa1_active),
+
+	.sa1_a(sa1_a),
+	.sa1_rd_n(sa1_rd_n),
+	.sa1_wr_n(sa1_wr_n),
+	.sa1_di(sa1_di),
+	.sa1_sa1_romsel(sa1_sa1_romsel),
+	.sa1_sns_romsel(sa1_sns_romsel),
+
+	.map_active(map_active),
+
+	.rom_addr(map_rom_addr),
+	.rom_ovr(map_rom_ovr),
+
+	.ss_do(map_ss_do),
+	.ss_oe(map_ss_oe)
+);
+
+
+wire ss_oe = (ss_data_sel | ss_status_sel | nmi_vect | irq_vect | ss_ramsize_sel | ss_romtype_sel | ssr_oe | map_ss_oe);
 always @(posedge clk) begin
-	ss_do <= rom_q[7:0];
+	ss_do <= 8'h00;
 	if (ss_data_sel) ss_do <= ddr_di[ss_data_addr[2:0]*8 +:8];
-	if (ss_status_sel) ss_do <= { 7'd0, ddr_busy };
-	if (nmi_vect_l) ss_do <= nmi_vect_addr[7:0];
-	if (nmi_vect_h) ss_do <= nmi_vect_addr[15:8];
+	if (ss_status_sel) ss_do <= { 6'd0, ddr_busy, save_en };
+	if (nmi_vect_l | irq_vect_l) ss_do <= nmi_vect_addr[7:0];
+	if (nmi_vect_h | irq_vect_h) ss_do <= nmi_vect_addr[15:8];
 	if (ss_ramsize_sel) ss_do <= { 4'd0, ram_size };
+	if (ss_romtype_sel) ss_do <= rom_type;
 	if (ssr_oe) ss_do <= ssr_do;
+	if (map_ss_oe) ss_do <= map_ss_do;
 end
 
 always @(*) begin
 	// savestate.bin ROM
-	rom_addr = { 2'b11, 6'b11_1111, ca[16], ca[14:0] };
+	rom_addr[23:16] = { 2'b11, 6'b11_1111 };
+	rom_addr[15: 0] = { ca[16], ca[14:0] };
+	if (map_rom_ovr) begin
+		rom_addr[15:0] = map_rom_addr;
+	end
 end
 
 // Data to DDRAM
@@ -354,7 +444,9 @@ always @(*) begin
 	if (bsram_read) ddr_data = bsram_di;
 end
 
-assign ss_ovr = ss_busy & ~romsel_n;
+assign ss_do_ovr = ss_busy & ss_oe;
+assign ss_rom_ovr = map_active ? map_rom_ovr : ss_busy;
+
 assign aram_sel = ss_busy & (pa == 8'h84);
 assign dsp_regs_sel = ss_busy & (pa == 8'h85);
 assign smp_regs_sel = ss_busy & (pa == 8'h86);

@@ -6,9 +6,8 @@ origin 0
 base $8000
 
 
-
-
 constant SSBASE        = $C00000
+constant SS_PPU        = $C10000
 
 constant SSDATA        = $C06000
 constant SSADDR        = $C06001
@@ -23,13 +22,13 @@ constant STATUS_BUSY   = $02
 
 constant ROM_SA1       = $60
 
-constant SS_PPU_BASE   = $C02100
-constant SS_CGADD      = $C02121
-constant SS_CGDATA     = $C02122
-
 constant SS_WMADDL     = $C02181
 constant SS_WMADDM     = $C02182
 constant SS_WMADDH     = $C02183
+
+constant SS_TEMP1      = $C021F0
+constant SS_TEMP2      = $C021F1
+constant SS_TEMP3      = $C021F2
 
 constant SS_WRDIVLAST  = SSBASE + $420F
 
@@ -49,8 +48,14 @@ constant VMADDL        = $2116
 constant VMADDH        = $2117
 constant CGADD         = $2121
 constant CGDATA        = $2122
+constant COLDATA       = $2132
 constant VMDATALREAD   = $2139
 constant VMDATAHREAD   = $213A
+
+constant PPU_HBASE     = $2140
+constant COLDATA2      = $2140
+constant COLDATA3      = $2141
+constant CGADD0        = $2161
 
 constant SA1_REGBASE   = $2200
 constant SA1_CCNT      = $2200
@@ -175,6 +180,9 @@ Save_start:
 
 	a8i16()
 	
+	lda.l SS_PPU+INIDISP	;// Read INIDISP from PPU
+	sta.l SSBASE+INIDISP	;// Store in shadow register
+	
 	lda #$88
 	sta.w INIDISP
 	
@@ -259,6 +267,15 @@ Save_vram:
 	lda.b #SS_VRAM
 	sta SSDATA
 	
+	lda.l SS_PPU+VMAIN		;// Store VRAM regs in temp registers
+	sta.l SS_TEMP1			;// These will be overwritten below
+	
+	lda.l SS_PPU+VMADDL
+	sta.l SS_TEMP2
+	
+	lda.l SS_PPU+VMADDH
+	sta.l SS_TEMP3
+	
 	lda #$80
 	sta.w VMAIN
 	
@@ -274,9 +291,24 @@ Save_vram:
 	lda #$01
 	sta $420B
 	
+	lda.l SS_TEMP1			;// Restore VRAM regs
+	sta.w VMAIN
+	
+	lda.l SS_TEMP2
+	sta.w VMADDL
+	
+	lda.l SS_TEMP3
+	sta.w VMADDH
+	
 Save_oam:
 	lda.b #SS_OAM
 	sta SSDATA
+	
+	lda.l SS_PPU+OAMADDL	;// Store OAM regs in temp registers
+	sta.l SS_TEMP1
+	
+	lda.l SS_PPU+OAMADDH
+	sta.l SS_TEMP2
 	
 	lda #$00
 	sta.w OAMADDL
@@ -287,10 +319,22 @@ Save_oam:
 	lda #$01
 	sta $420B
 	
+	lda.l SS_TEMP1			;// Restore OAM regs
+	sta.w OAMADDL
+	
+	lda.l SS_TEMP2
+	sta.w OAMADDH
+	
 Save_cgram:
 	lda.b #SS_CGRAM
 	sta SSDATA
 	
+	lda.l SS_PPU+CGADD		;// Store CGRAM regs in temp registers
+	sta.l SS_TEMP1
+	
+	lda.l SS_PPU+CGADD0
+	sta.l SS_TEMP2
+
 	lda #$00    
 	sta.w CGADD
    
@@ -299,15 +343,23 @@ Save_cgram:
 	lda #$01
 	sta $420B   
 
-	lda SS_CGADD			;// Store CGRAM address
+	lda SS_TEMP1			;// Store CGRAM address
+	sta SSDATA
+	sta.w CGADD
+	
+	lda SS_TEMP2			;// Store CGRAM address LSB
+	sta SSDATA
+	xba
+	
+	lda.l SS_PPU+CGDATA		;// Store CGRAM latch value
 	sta SSDATA
 	
-	lda SS_CGADD			;// Store CGRAM address LSB
-	sta SSDATA
-	
-	lda SS_CGDATA			;// Store CGRAM latch value
-	sta SSDATA
-	
+	xba
+	bit #$01				;// Write latch value to CGDATA if LSB is 1
+	beq +					;// This will restore the LSB of CGADD
+	xba
+	sta.w CGDATA
++
 
 Save_aram:
 	lda.b #SS_ARAM
@@ -352,14 +404,33 @@ Save_ppu_regs1:
 	ldy #$0000
 -    
 	lda PPURegs1,y
+	cmp.b #COLDATA2			;// Special cases
+	beq +
+	cmp.b #COLDATA3
+	beq +
+	bra ++
++
+	tax
+	lda.b #COLDATA			;// Store as COLDATA register number
+	sta SSDATA
+	txa
+	bra Save_ppu_regs1_value
++
 	sta SSDATA				;// Store register number in save state
 	
 	cmp #$FF
 	beq Save_ppu_regs1_end
-	
+
+Save_ppu_regs1_value:
+	cmp.b #INIDISP			;// Get INIDISP from Shadow register
+	bne +
+	lda.l SSBASE+INIDISP	;// Store INIDISP in shadow register
+	bra ++
+
++	
 	tax						;// Load byte destination in x
-	lda SS_PPU_BASE,x		;// Load value from shadow register
-	
+	lda.l SS_PPU+PPU_BASE,x	;// Load value from PPU register
++	
 	sta SSDATA				;// Store register value in save state
 
 	iny
@@ -382,10 +453,10 @@ Save_ppu_regs2:
 	beq Save_ppu_regs2_end
 	
 	tax						;// Load byte destination in x
-	lda SS_PPU_BASE,x		;// Load value from shadow register
+	lda.l SS_PPU+PPU_BASE,x	;// Load value from PPU register
 	sta SSDATA				;// Store register value in save state
 	
-	lda SS_PPU_BASE,x		;// High byte
+	lda.l SS_PPU+PPU_HBASE,x	;// High byte
 	sta SSDATA
 
 	iny
@@ -631,7 +702,7 @@ Load_wram:
 	lda SSDATA
 	sta.w WMADDH
 
-	Load_vram:
+Load_vram:
 	lda SSDATA				;// load block #
 	
 	lda #$80
@@ -678,7 +749,7 @@ Load_cgram:
 	
 	xba
 	bit #$01				;// Write latch value to CGDATA if LSB is 1
-	beq +
+	beq +					;// This will restore the LSB of CGADD
 	xba
 	sta CGDATA
 +
@@ -735,7 +806,7 @@ Load_ppu_regs1:
 	sta.l SSBASE+INIDISP	;// Store INIDISP in shadow register
 	bra -
 +
-	sta PPU_BASE,x
+	sta.w PPU_BASE,x
  
 	bra -
 Load_ppu_regs1_end:
@@ -754,10 +825,10 @@ Load_ppu_regs2:
 	beq Load_ppu_regs2_end
 	
 	lda SSDATA				;// Load register value from save state
-	sta PPU_BASE,x
+	sta.w PPU_BASE,x
 	
 	lda SSDATA				;// High byte
-	sta PPU_BASE,x
+	sta.w PPU_BASE,x
  
 	bra -
 Load_ppu_regs2_end:
@@ -971,7 +1042,8 @@ Mapper_finish:
 PPURegs1:
 	db $00, $01, $02, $03, $05, $06, $07, $08, $09, $0A, $0B, $0C
 	db $15, $16, $17, $1A, $23, $24, $25, $26, $27, $28, $29, $2A
-	db $2B, $2C, $2D, $2E, $2F, $30, $31, $32, $33, $FF
+	db $2B, $2C, $2D, $2E, $2F, $30, $31, $32, $33, $40, $41
+	db $FF
 PPURegs1End:
 
 PPURegs2:

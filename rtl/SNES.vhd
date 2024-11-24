@@ -101,7 +101,8 @@ entity SNES is
 		SS_SMP_SEL  : in std_logic;
 		SS_WR       : in std_logic;
 		SS_DI       : in std_logic_vector(7 downto 0);
-		SS_DO       : out std_logic_vector(7 downto 0);
+		SS_SPC_DO   : out std_logic_vector(7 downto 0);
+		SS_PPU_DO   : out std_logic_vector(7 downto 0);
 
 		TURBO			: in std_logic;
 		
@@ -348,7 +349,10 @@ begin
 		HSYNC			=> HSYNC,
 		VSYNC			=> VSYNC,
 		
-		BG_EN			=> DBG_BG_EN
+		BG_EN			=> DBG_BG_EN,
+
+		SS_A		=> INT_CA(7 downto 0),
+		SS_DO		=> SS_PPU_DO
 	);
 
 
@@ -434,7 +438,7 @@ begin
 		AUDIO_R		=> AUDIO_R
 	);
 
-	SS_DO <= SS_SMP_DO when SS_SMP_SEL = '1' else SS_DSP_DO;
+	SS_SPC_DO <= SS_SMP_DO when SS_SMP_SEL = '1' else SS_DSP_DO;
 
 	CA <= INT_CA;
 	CPURD_N <= INT_CPURD_N;

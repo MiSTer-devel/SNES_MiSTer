@@ -47,6 +47,8 @@ module savestates
 	output            dsp_regs_sel,
 	output            smp_regs_sel,
 
+	input       [7:0] ppu_di,
+
 	output            bsram_sel,
 	input       [7:0] bsram_di,
 
@@ -124,6 +126,8 @@ wire ss_ramsize_sel = ss_reg_sel & (ca[15:0] == 16'h6003);
 wire ss_romtype_sel = ss_reg_sel & (ca[15:0] == 16'h6004);
 wire ss_end_sel = ss_reg_sel & (ca[15:0] == 16'h600E);
 wire ss_status_sel = ss_reg_sel & (ca[15:0] == 16'h600F);
+
+wire ppu_sel = (ca[23:16] == 8'hC1) & (ca[15:8] == 8'h21);
 
 wire rti_sel = (ca[23:0] == 24'h008008);
 
@@ -415,7 +419,7 @@ savestates_map ss_map
 );
 
 
-wire ss_oe = (ss_data_sel | ss_status_sel | nmi_vect | irq_vect | ss_ramsize_sel | ss_romtype_sel | ssr_oe | map_ss_oe);
+wire ss_oe = (ss_data_sel | ss_status_sel | nmi_vect | irq_vect | ss_ramsize_sel | ss_romtype_sel | ssr_oe | map_ss_oe | ppu_sel);
 always @(posedge clk) begin
 	ss_do <= 8'h00;
 	if (ss_data_sel) ss_do <= ddr_di[ss_data_addr[2:0]*8 +:8];
@@ -426,6 +430,7 @@ always @(posedge clk) begin
 	if (ss_romtype_sel) ss_do <= rom_type;
 	if (ssr_oe) ss_do <= ssr_do;
 	if (map_ss_oe) ss_do <= map_ss_do;
+	if (ppu_sel) ss_do <= ppu_di;
 end
 
 always @(*) begin

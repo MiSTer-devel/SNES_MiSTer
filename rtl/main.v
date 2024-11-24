@@ -256,8 +256,9 @@ SNES SNES
 	.ss_busy(SS_BUSY),
 	.ss_wr(~PAWR_N),
 	.ss_di(SS_DO),
-	.ss_do(SS_SPC_DI),
-	
+	.ss_spc_do(SS_SPC_DI),
+	.ss_ppu_do(SS_PPU_DI),
+
 	.DBG_BG_EN(DBG_BG_EN),
 	.DBG_CPU_EN(DBG_CPU_EN),
 	
@@ -857,6 +858,7 @@ wire [23:0] SS_ROM_ADDR;
 
 wire [19:0] SS_EXT_ADDR;
 wire  [7:0] SS_SPC_DI;
+wire  [7:0] SS_PPU_DI;
 wire        SS_DO_OVR;
 wire        SS_ROM_OVR;
 wire        SS_ARAM_SEL, SS_DSP_REGS_SEL, SS_SMP_SEL;
@@ -908,6 +910,8 @@ savestates ss
 	.aram_sel(SS_ARAM_SEL),
 	.dsp_regs_sel(SS_DSP_REGS_SEL),
 	.smp_regs_sel(SS_SMP_SEL),
+
+	.ppu_di(SS_PPU_DI),
 
 	.bsram_sel(SS_BSRAM_SEL),
 	.bsram_di(BSRAM_Q),

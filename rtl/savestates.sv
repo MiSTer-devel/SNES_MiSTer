@@ -52,6 +52,10 @@ module savestates
 	output            bsram_sel,
 	input       [7:0] bsram_di,
 
+	output            dspn_regs_sel,
+	output            dspn_ram_sel,
+	input       [7:0] dspn_di,
+
 	input             sa1_active,
 	input      [23:0] sa1_a,
 	input       [7:0] sa1_di,
@@ -127,6 +131,8 @@ wire ss_romtype_sel = ss_reg_sel & (ca[15:0] == 16'h6004);
 wire ss_end_sel = ss_reg_sel & (ca[15:0] == 16'h600E);
 wire ss_status_sel = ss_reg_sel & (ca[15:0] == 16'h600F);
 
+assign dspn_regs_sel = ss_reg_sel & (ca[15:8] == 8'h61);
+
 wire ppu_sel = (ca[23:16] == 8'hC1) & (ca[15:8] == 8'h21);
 
 wire rti_sel = (ca[23:0] == 24'h008008);
@@ -138,6 +144,8 @@ wire spc_sel = (aram_sel | dsp_regs_sel | smp_regs_sel);
 wire spc_read = spc_sel & ~pard_n;
 
 wire bsram_read = bsram_sel & ~pard_n;
+
+wire dspn_ram_read = dspn_ram_sel & ~pard_n;
 
 reg [3:0] ddr_state;
 reg [7:0] ddr_data;
@@ -263,7 +271,7 @@ always @(posedge clk) begin
 		end
 
 		if (pawr_ce | pard_ce) begin
-			if (spc_sel | bsram_sel) begin
+			if (spc_sel | bsram_sel | dspn_ram_sel) begin
 				ss_ext_addr_inc <= 1;
 			end
 		end
@@ -419,7 +427,7 @@ savestates_map ss_map
 );
 
 
-wire ss_oe = (ss_data_sel | ss_status_sel | nmi_vect | irq_vect | ss_ramsize_sel | ss_romtype_sel | ssr_oe | map_ss_oe | ppu_sel);
+wire ss_oe = (ss_data_sel | ss_status_sel | nmi_vect | irq_vect | ss_ramsize_sel | ss_romtype_sel | ssr_oe | map_ss_oe | ppu_sel | dspn_regs_sel);
 always @(posedge clk) begin
 	ss_do <= 8'h00;
 	if (ss_data_sel) ss_do <= ddr_di[ss_data_addr[2:0]*8 +:8];
@@ -431,6 +439,7 @@ always @(posedge clk) begin
 	if (ssr_oe) ss_do <= ssr_do;
 	if (map_ss_oe) ss_do <= map_ss_do;
 	if (ppu_sel) ss_do <= ppu_di;
+	if (dspn_regs_sel) ss_do <= dspn_di;
 end
 
 always @(*) begin
@@ -447,6 +456,7 @@ always @(*) begin
 	ddr_data = di;
 	if (spc_read) ddr_data = spc_di;
 	if (bsram_read) ddr_data = bsram_di;
+	if (dspn_ram_read) ddr_data = dspn_di;
 end
 
 assign ss_do_ovr = ss_busy & ss_oe;
@@ -456,6 +466,7 @@ assign aram_sel = ss_busy & (pa == 8'h84);
 assign dsp_regs_sel = ss_busy & (pa == 8'h85);
 assign smp_regs_sel = ss_busy & (pa == 8'h86);
 assign bsram_sel = ss_busy & (pa == 8'h87);
+assign dspn_ram_sel = ss_busy & (pa == 8'h88);
 assign ext_addr = ss_ext_addr;
 
 assign ddr_addr = { ss_slot[1:0], ss_ddr_addr[19:3] };

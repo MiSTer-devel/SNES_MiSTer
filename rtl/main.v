@@ -374,7 +374,14 @@ DSP_LHRomMap #(.USE_DSPn(USE_DSPn)) DSP_LHRomMap
 	.rom_mask(ROM_MASK),
 	.bsram_mask(RAM_MASK),
 
-	.ext_rtc(EXT_RTC)
+	.ext_rtc(EXT_RTC),
+
+	.ss_busy(SS_BUSY),
+	.ss_ram_a(SS_EXT_ADDR[11:0]),
+	.ss_dspn_regs_sel(SS_DSPN_REGS_SEL),
+	.ss_dspn_ram_sel(SS_DSPN_RAM_SEL),
+	.ss_di(SS_DO),
+	.ss_do(SS_DSPN_DI)
 );
 end else begin
 	assign DLH_DO = 0;
@@ -859,10 +866,12 @@ wire [23:0] SS_ROM_ADDR;
 wire [19:0] SS_EXT_ADDR;
 wire  [7:0] SS_SPC_DI;
 wire  [7:0] SS_PPU_DI;
+wire  [7:0] SS_DSPN_DI;
 wire        SS_DO_OVR;
 wire        SS_ROM_OVR;
 wire        SS_ARAM_SEL, SS_DSP_REGS_SEL, SS_SMP_SEL;
 wire        SS_BSRAM_SEL;
+wire        SS_DSPN_REGS_SEL, SS_DSPN_RAM_SEL;
 
 savestates ss
 (
@@ -916,6 +925,10 @@ savestates ss
 	.bsram_sel(SS_BSRAM_SEL),
 	.bsram_di(BSRAM_Q),
 
+	.dspn_regs_sel(SS_DSPN_REGS_SEL),
+	.dspn_ram_sel(SS_DSPN_RAM_SEL),
+	.dspn_di(SS_DSPN_DI),
+
 	.sa1_active(MAP_ACTIVE[3]),
 	.sa1_a(SA1_P65_A),
 	.sa1_di(SA1_P65_DO),
@@ -929,7 +942,7 @@ savestates ss
 	.ss_busy(SS_BUSY)
 );
 
-assign SS_AVAIL = ~|{ROM_TYPE[7:4]} | (MAP_ACTIVE[3]); // Basic carts + SA1
+assign SS_AVAIL = ~|{ROM_TYPE[7:4]} | MAP_ACTIVE[3] | (ROM_TYPE[7:6] == 2'b10); // Basic carts + SA1 + DSPn
 
 assign TURBO_ALLOW = ~(MAP_ACTIVE[3] | MAP_ACTIVE[1] | SS_BUSY);
 

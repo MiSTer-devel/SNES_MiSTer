@@ -21,6 +21,8 @@ constant STATUS_SAVE   = $01
 constant STATUS_BUSY   = $02
 
 constant ROM_SA1       = $60
+constant ROM_DSP_MASK  = $C0
+constant ROM_DSP       = $80
 
 constant SS_WMADDL     = $C02181
 constant SS_WMADDM     = $C02182
@@ -36,6 +38,7 @@ constant SS_ARAM_DATA  = $2184
 constant SS_DSP_REGSD  = $2185
 constant SS_SMP_REGSD  = $2186
 constant SS_BSRAM_DATA = $2187
+constant SS_DSPN_DATA  = $2188
 
 constant NOSHADOW      = $010000
 
@@ -92,6 +95,8 @@ constant MEMSEL        = $420D
 constant RDNMI         = $4210
 constant HVBJOY        = $4212
 
+constant SS_DSPN_BASE  = SSBASE + $6100
+
 constant DMA_DIR_AB = $00
 constant DMA_DIR_BA = $80
 constant DMA_FIXED_A = $08
@@ -113,6 +118,8 @@ constant SS_DMAREGS   = $0B
 constant SS_SA1REGS1  = $0C
 constant SS_SA1REGS2  = $0D
 constant SS_SA1IRAM   = $0E
+constant SS_DSPNREGS  = $0F
+constant SS_DSPNRAM   = $10
 
 macro a8() {
 	sep #$20
@@ -553,10 +560,17 @@ Save_bsram:
 Save_bsram_end:
 
 	lda SS_ROMTYPE
+	tax
 	and #$F0
 	cmp.b #ROM_SA1
 	bne +
 	jmp sa1_save_regs_snes
++
+	txa
+	and.b #ROM_DSP_MASK
+	cmp.b #ROM_DSP
+	bne +
+	jmp dspn_save_regs
 +
 
 Save_mapper_end:
@@ -897,7 +911,10 @@ Load_other:
 	bne +
 	jmp sa1_load_regs_snes
 +
-
+	cmp.b #SS_DSPNREGS
+	bne +
+	jmp dspn_load_regs
++
 	jmp Load_dma_regs
 	
 
@@ -1052,3 +1069,4 @@ PPURegs2:
 PPURegs3End:
 
 include "savestates_sa1.asm"
+include "savestates_dspn.asm"

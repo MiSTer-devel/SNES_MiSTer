@@ -1190,11 +1190,14 @@ end
 reg bk_ena = 0;
 reg old_downloading = 0;
 reg cart_ready = 0;
+reg ssbin_ready = 0;
 always @(posedge clk_sys) begin
 	old_downloading <= cart_download;
 	if(~old_downloading & cart_download) bk_ena <= 0;
 
 	if(old_downloading & ~cart_download) cart_ready <= 1;
+
+	if (ssbin_download) ssbin_ready <= 1;
 
 	//Save file always mounted in the end of downloading state.
 	if(cart_download && img_mounted && !img_readonly) bk_ena <= |ram_mask;
@@ -1426,7 +1429,7 @@ wire [1:0] ss_slot;
 wire [7:0] ss_info;
 wire ss_save, ss_load, ss_info_req;
 wire ss_status;
-wire ss_allow = ss_avail & cart_ready;
+wire ss_allow = ss_avail & cart_ready & ssbin_ready;
 
 savestate_ui #(.INFO_TIMEOUT_BITS(27)) savestate_ui
 (

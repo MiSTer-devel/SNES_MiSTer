@@ -343,7 +343,7 @@ parameter CONF_STR = {
 	"D1P3OI,SuperFX Speed,Normal,Turbo;",
 	"D1P3oE,SuperFX FastROM,Yes,No;",
 	"D3P3O4,CPU Speed,Normal,Turbo;",
-	"P3OV,Sufami Cart swaping,No,Yes;",
+	"P3OV,Sufami Cart swapping,No,Yes;",
 	"P3-;",
 	"P3OLM,Initial WRAM,9966(SNES2),00FF(SNES1),55(SD2SNES),FF;",
 	"P3oCD,Initial ARAM,9966(SNES2),00FF(SNES1),55(SD2SNES),FF;",

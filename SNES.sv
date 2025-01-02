@@ -406,8 +406,8 @@ hps_io #(.CONF_STR(CONF_STR), .WIDE(1)) hps_io
 
 	.status(status),
 	.status_menumask(status_menumask),
-	.status_in({status[63:5],1'b0,status[3:0]}),
-	.status_set(cart_download),
+	.status_in(cart_download ? {status[63:5],1'b0,status[3:0]} : {status[63:32],1'b0,status[30:0]}),
+	.status_set(cart_download | status[0]),
 
 	.ioctl_addr(ioctl_addr),
 	.ioctl_dout(ioctl_dout),
@@ -1143,7 +1143,7 @@ wire bk_load    = status[12];
 wire bk_save    = status[13] | (bk_pending & OSD_STATUS && status[23]);
 reg  bk_loading = 0;
 reg  bk_state   = 0;
-wire [31:0] sd_lba_end = (rom_type & 8'hF8) == 8'h28 ? {ram_mask[23:9],1'b1} : ram_mask[23:9];
+wire [31:0] sd_lba_end = rom_type[7:4] == 4'h2 && rom_type[3] ? {ram_mask[23:9],1'b1} : ram_mask[23:9];//For Sufami with B cart, it's double size
 always @(posedge clk_sys) begin
 	reg old_load = 0, old_save = 0, old_ack;
 

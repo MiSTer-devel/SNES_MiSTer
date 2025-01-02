@@ -8,7 +8,7 @@ copy \*.rbf to root of SD card. Put some ROMs (\*.SFC, \*.SMC, \*.BIN) into SNES
 ## Features
 * Cycle accurate SNES replica.
 * Supports LoROM, HiROM, ExHiROM.
-* Supports additional chips: DSP-1/2/3/4, ST010, CX4, SDD1, SuperFX(GSU-1/2), SA1, OBC1, SPC7110, S-RTC.
+* Supports additional chips: DSP-1/2/3/4, ST010, CX4, SDD1, SuperFX(GSU-1/2), SA1, OBC1, SPC7110, S-RTC, Sufami Turbo.
 * MSU-1 Support
 * Cheat engine.
 * Save/Load Backup RAM.

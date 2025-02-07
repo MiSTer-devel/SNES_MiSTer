@@ -56,6 +56,9 @@ module savestates
 	output            dspn_ram_sel,
 	input       [7:0] dspn_di,
 
+	output            gsu_regs_sel,
+	input       [7:0] gsu_di,
+
 	input             sa1_active,
 	input      [23:0] sa1_a,
 	input       [7:0] sa1_di,
@@ -132,6 +135,7 @@ wire ss_end_sel = ss_reg_sel & (ca[15:0] == 16'h600E);
 wire ss_status_sel = ss_reg_sel & (ca[15:0] == 16'h600F);
 
 assign dspn_regs_sel = ss_reg_sel & (ca[15:8] == 8'h61);
+assign gsu_regs_sel = ss_reg_sel & (ca[15:8] == 8'h62);
 
 wire ppu_sel = (ca[23:16] == 8'hC1) & (ca[15:8] == 8'h21);
 
@@ -427,7 +431,10 @@ savestates_map ss_map
 );
 
 
-wire ss_oe = (ss_data_sel | ss_status_sel | nmi_vect | irq_vect | ss_ramsize_sel | ss_romtype_sel | ssr_oe | map_ss_oe | ppu_sel | dspn_regs_sel);
+wire ss_oe = ss_data_sel | ss_status_sel | nmi_vect | irq_vect |
+			ss_ramsize_sel | ss_romtype_sel | ssr_oe | map_ss_oe |
+			ppu_sel | dspn_regs_sel | gsu_regs_sel;
+
 always @(posedge clk) begin
 	ss_do <= 8'h00;
 	if (ss_data_sel) ss_do <= ddr_di[ss_data_addr[2:0]*8 +:8];
@@ -440,6 +447,7 @@ always @(posedge clk) begin
 	if (map_ss_oe) ss_do <= map_ss_do;
 	if (ppu_sel) ss_do <= ppu_di;
 	if (dspn_regs_sel) ss_do <= dspn_di;
+	if (gsu_regs_sel) ss_do <= gsu_di;
 end
 
 always @(*) begin

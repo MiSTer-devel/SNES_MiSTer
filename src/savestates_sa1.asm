@@ -118,6 +118,11 @@ sa1_save_iram:
 	cpx #$0800
 	bne -
 	
+	lda #$00
+	xba
+	lda #$00
+	tcd
+
 	jmp Save_mapper_end
 
 sa1_load_init:
@@ -223,6 +228,11 @@ sa1_load_iram:
 	inx
 	cpx #$0800
 	bne -
+
+	lda #$00
+	xba
+	lda #$00
+	tcd
 
 	jmp Load_other
 	

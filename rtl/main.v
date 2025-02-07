@@ -578,7 +578,11 @@ GSUMap GSUMap
 	.bsram_mask(RAM_MASK),
 
 	.turbo(GSU_TURBO),
-	.fastrom(GSU_FASTROM)
+	.fastrom(GSU_FASTROM),
+
+	.ss_busy(SS_BUSY),
+	.ss_wr(SS_BUSY & SS_GSU_SEL & ~CPUWR_N),
+	.ss_do(SS_GSU_DI)
 );
 end else
 assign MAP_ACTIVE[2] = 0;
@@ -867,11 +871,13 @@ wire [19:0] SS_EXT_ADDR;
 wire  [7:0] SS_SPC_DI;
 wire  [7:0] SS_PPU_DI;
 wire  [7:0] SS_DSPN_DI;
+wire  [7:0] SS_GSU_DI;
 wire        SS_DO_OVR;
 wire        SS_ROM_OVR;
 wire        SS_ARAM_SEL, SS_DSP_REGS_SEL, SS_SMP_SEL;
 wire        SS_BSRAM_SEL;
 wire        SS_DSPN_REGS_SEL, SS_DSPN_RAM_SEL;
+wire        SS_GSU_SEL;
 
 savestates ss
 (
@@ -929,6 +935,9 @@ savestates ss
 	.dspn_ram_sel(SS_DSPN_RAM_SEL),
 	.dspn_di(SS_DSPN_DI),
 
+	.gsu_regs_sel(SS_GSU_SEL),
+	.gsu_di(SS_GSU_DI),
+
 	.sa1_active(MAP_ACTIVE[3]),
 	.sa1_a(SA1_P65_A),
 	.sa1_di(SA1_P65_DO),
@@ -942,7 +951,7 @@ savestates ss
 	.ss_busy(SS_BUSY)
 );
 
-assign SS_AVAIL = ~|{ROM_TYPE[7:4]} | MAP_ACTIVE[3] | (ROM_TYPE[7:6] == 2'b10); // Basic carts + SA1 + DSPn
+assign SS_AVAIL = ~|{ROM_TYPE[7:4]} | MAP_ACTIVE[3] | (ROM_TYPE[7:6] == 2'b10) | MAP_ACTIVE[2]; // Basic carts + SA1 + DSPn + GSU
 
 assign TURBO_ALLOW = ~(MAP_ACTIVE[3] | MAP_ACTIVE[1] | SS_BUSY);
 

@@ -22,6 +22,7 @@ constant STATUS_BUSY   = $02
 
 constant ROM_SA1       = $60
 constant ROM_DSP_MASK  = $C0
+constant ROM_GSU       = $70
 constant ROM_DSP       = $80
 
 constant SS_WMADDL     = $C02181
@@ -96,6 +97,9 @@ constant RDNMI         = $4210
 constant HVBJOY        = $4212
 
 constant SS_DSPN_BASE  = SSBASE + $6100
+constant SS_GSU_BASE   = SSBASE + $6200
+
+constant GSU_REGBASE   = $3000
 
 constant DMA_DIR_AB = $00
 constant DMA_DIR_BA = $80
@@ -120,6 +124,9 @@ constant SS_SA1REGS2  = $0D
 constant SS_SA1IRAM   = $0E
 constant SS_DSPNREGS  = $0F
 constant SS_DSPNRAM   = $10
+constant SS_GSUREGS1  = $11
+constant SS_GSUCACHE  = $12
+constant SS_GSUREGS2  = $13
 
 macro a8() {
 	sep #$20
@@ -182,11 +189,14 @@ Save_start:
 	phb
 	phd
 
-	phk
+	lda #$0000
+	tcd
+
+	a8()
+
+	pha
 	plb
 
-	a8i16()
-	
 	lda.l SS_PPU+INIDISP	;// Read INIDISP from PPU
 	sta.l SSBASE+INIDISP	;// Store in shadow register
 	
@@ -572,6 +582,12 @@ Save_bsram_end:
 	bne +
 	jmp dspn_save_regs
 +
+	txa
+	and #$F0
+	cmp.b #ROM_GSU
+	bne +
+	jmp gsu_save_regs1
++
 
 Save_mapper_end:
 
@@ -645,9 +661,14 @@ Save_dma_regs:
 Load_start:
 	sei
 
-	a8i16()
+	a16i16()
 	
-	phk						;// Set Data bank to $00
+	lda #$0000
+	tcd
+
+	a8()
+
+	pha						;// Set Data bank to $00
 	plb
 	
 	lda #$88
@@ -902,7 +923,7 @@ Load_mmio_regs:
 
 
 Load_other:
-	lda SSDATA
+	lda SSDATA				;// load block ID
 	cmp.b #SS_BSRAM
 	bne +
 	jmp Load_bsram
@@ -914,6 +935,10 @@ Load_other:
 	cmp.b #SS_DSPNREGS
 	bne +
 	jmp dspn_load_regs
++
+	cmp.b #SS_GSUREGS1
+	bne +
+	jmp gsu_load_regs1
 +
 	jmp Load_dma_regs
 	
@@ -1070,3 +1095,4 @@ PPURegs3End:
 
 include "savestates_sa1.asm"
 include "savestates_dspn.asm"
+include "savestates_gsu.asm"

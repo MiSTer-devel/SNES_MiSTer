@@ -407,7 +407,7 @@ hps_io #(.CONF_STR(CONF_STR), .WIDE(1)) hps_io
 	.status(status),
 	.status_menumask(status_menumask),
 	.status_in(cart_download ? {status[63:5],1'b0,status[3:0]} : {status[63:32],1'b0,status[30:0]}),
-	.status_set(cart_download | status[0]),
+	.status_set(cart_download | status0_fall),
 
 	.ioctl_addr(ioctl_addr),
 	.ioctl_dout(ioctl_dout),
@@ -526,6 +526,7 @@ always @(posedge clk_sys) begin
 end
 
 reg osd_btn = 0;
+reg status0_fall = 0;
 always @(posedge clk_sys) begin
 	integer timeout = 0;
 	reg     has_bootrom = 0;
@@ -536,12 +537,15 @@ always @(posedge clk_sys) begin
 
 	if (cart_download & ioctl_wr & status[0]) has_bootrom <= 1;
 
+	status0_fall <= 0;
 	if(last_rst & ~status[0]) begin
 		osd_btn <= 0;
 		if(timeout < 24000000) begin
 			timeout <= timeout + 1;
 			osd_btn <= ~has_bootrom;
 		end
+		
+		status0_fall <= 1;
 	end
 end
 

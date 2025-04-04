@@ -531,22 +531,23 @@ always @(posedge clk_sys) begin
 	integer timeout = 0;
 	reg     has_bootrom = 0;
 	reg     last_rst = 0;
+	reg     old_status0;
 
 	if (RESET) last_rst <= 0;
 	if (status[0]) last_rst <= 1;
 
 	if (cart_download & ioctl_wr & status[0]) has_bootrom <= 1;
 
-	status0_fall <= 0;
 	if(last_rst & ~status[0]) begin
 		osd_btn <= 0;
 		if(timeout < 24000000) begin
 			timeout <= timeout + 1;
 			osd_btn <= ~has_bootrom;
 		end
-		
-		status0_fall <= 1;
 	end
+
+	old_status0 <= status[0];
+	status0_fall <= old_status0 & ~status[0];
 end
 
 ////////////////////////////  SYSTEM  ///////////////////////////////////

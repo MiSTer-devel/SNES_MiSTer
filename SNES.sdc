@@ -22,6 +22,7 @@ set_max_delay 20 -from [get_registers { emu|hps_io|* \
 													 emu|sdram|rfs* \
 													 emu|sdram|write[*] \
 													 emu|sdram|read[*] \
+													 emu|sdram|is_sni[*] \
 													 emu|sdram|st_num[*]* \
 													 emu|sdram|state[1]* \
 													 emu|sdram|SDRAM_nCAS \
@@ -35,6 +36,8 @@ set_max_delay 23 -from [get_registers { emu|sdram|*}] \
 					  -to   [get_registers { emu|main|* \
 													 emu|bsram|* \
 													 emu|vram*|* }] 
+
+set_false_path -from [get_registers { emu|sdram_download_* }] -to [get_registers { emu|main|* }]
 
 #set_false_path -to [get_registers { emu|sdram|word[*] }]
 

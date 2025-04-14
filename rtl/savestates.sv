@@ -102,11 +102,11 @@ reg load_en;
 reg rd_rti;
 reg save_end;
 
-wire nmi_vect = ({ca[23:1],1'b0} == 24'h00FFEA) || ({ca[23:1],1'b0} == 24'h00FFFA);
+wire nmi_vect = ({ca[23:1],1'b0} == 24'h00FFEA);
 wire nmi_vect_l = nmi_vect & ~ca[0];
 wire nmi_vect_h = nmi_vect &  ca[0];
 
-wire irq_vect = ({ca[23:1],1'b0} == 24'h00FFEE) || ({ca[23:1],1'b0} == 24'h00FFFE);
+wire irq_vect = ({ca[23:1],1'b0} == 24'h00FFEE);
 wire irq_vect_l = irq_vect & ~ca[0];
 wire irq_vect_h = irq_vect &  ca[0];
 

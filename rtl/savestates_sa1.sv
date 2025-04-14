@@ -41,7 +41,7 @@ wire sa1_reg_sel = ~sa1_a[22] & sa1_2200_23ff; // $00-$3F/$80-$BF:$2200-$23FF
 
 wire ss_sa1reg_sel = active & ss_reg_sel & sns_2200_23ff; // $C0:$2200-$23FF
 
-wire nmi_vect = ({sa1_a[23:1],1'b0} == 24'h00FFEA) || ({sa1_a[23:1],1'b0} == 24'h00FFFA);
+wire nmi_vect = ({sa1_a[23:1],1'b0} == 24'h00FFEA);
 wire nmi_vect_l = nmi_vect & ~sa1_a[0];
 
 wire reset_vect = ({sa1_a[23:1],1'b0} == 24'h00FFFC);
@@ -52,14 +52,12 @@ wire rti_sel = (sa1_a[23:0] == 24'h008008);
 reg rd_rti;
 reg sa1_ss_busy;
 
-reg sa1_rd_n_old, sa1_wr_n_old;
+reg sa1_rd_n_old;
 always @(posedge clk) begin
 	if (reset) begin
 		sa1_rd_n_old <= 1'b1;
-		sa1_wr_n_old <= 1'b1;
 	end else begin
 		sa1_rd_n_old <= sa1_rd_n;
-		sa1_wr_n_old <= sa1_wr_n;
 	end
 end
 

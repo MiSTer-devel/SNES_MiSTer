@@ -293,7 +293,7 @@ wire reset = RESET | buttons[1] | status[0] | cart_download | spc_download | bk_
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXX
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX X XXXXXXXXXXXXXXXXX XXXX
 
 `include "build_id.v"
 parameter CONF_STR = {
@@ -301,7 +301,7 @@ parameter CONF_STR = {
 	"FS1,SFCSMCBINBS ;",
 	"FS4,SPC;",
 	"-;",
-	"O[50],Save state to SD,Off,On;",
+	"O[50],Save state to SD,On,Off;",
 	"O[52:51],Savestate Slot,1,2,3,4;",
 	"d6R[47],Save state (Alt-F1);",
 	"d6R[48],Load state (F1);",
@@ -335,6 +335,7 @@ parameter CONF_STR = {
 	"P2-;",
 	"P2O7,Swap Joysticks,No,Yes;",
 	"P2O8,SNAC,No,Yes;",
+	"P2O[53],State Ld/Sv,Start+Up/Down,Up/Down;",
 	"P2-;",
 	"P2oB,Miracle Piano,No,Yes;",
 	"P2OH,Multitap,Disabled,Port2;",
@@ -371,7 +372,7 @@ parameter CONF_STR = {
 	"Save to state 3,",
 	"Restore state 3,",
 	"Save to state 4,",
-	"Restore state 4,",
+	"Restore state 4;",
 	"V,v",`BUILD_DATE
 };
 
@@ -715,7 +716,7 @@ main main
 	.MSU_ENABLE(msu_enable),
 
 	.SS_SAVE(ss_save),
-	.SS_TOSD(status[50]),
+	.SS_TOSD(~status[50]),
 	.SS_LOAD(ss_load),
 	.SS_SLOT(ss_slot),
 	.SS_AVAIL(ss_avail),
@@ -1430,8 +1431,9 @@ wire [7:0] ss_info;
 wire ss_save, ss_load, ss_info_req;
 wire ss_status;
 wire ss_allow = ss_avail & cart_ready & ssbin_ready;
+wire ss_joy_start = joy0[11] | status[53];
 
-savestate_ui #(.INFO_TIMEOUT_BITS(27)) savestate_ui
+savestate_ui #(.INFO_TIMEOUT_BITS(25)) savestate_ui
 (
 	.clk            (clk_sys       ),
 	.ps2_key        (ps2_key[10:0] ),
@@ -1441,7 +1443,7 @@ savestate_ui #(.INFO_TIMEOUT_BITS(27)) savestate_ui
 	.joyLeft        (joy0[1]       ),
 	.joyDown        (joy0[2]       ),
 	.joyUp          (joy0[3]       ),
-	.joyStart       (joy0[11]      ),
+	.joyStart       (ss_joy_start  ),
 	.joyRewind      (0             ),
 	.rewindEnable   (0             ),
 	.status_slot    (status[52:51] ),

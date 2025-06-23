@@ -21,8 +21,7 @@ entity GSU is
 		SYSCLKF_CE	: in std_logic;
 		SYSCLKR_CE	: in std_logic;
 		
-		TURBO			: in std_logic;
-		FASTROM		: in std_logic;
+		TURBO		        : in std_logic;
 
 		IRQ_N			: out std_logic;
 		
@@ -393,7 +392,7 @@ begin
 	
 	
 	--CPU Core
-	CODE_IN_ROM <= '1' when PBR <= x"5F" or (PBR >= x"80" and FASTROM = '1') else '0';
+	CODE_IN_ROM <= '1' when PBR <= x"5F" else '0';
 	CODE_IN_RAM <= '1' when PBR(7 downto 1) = "0111000" else '0';
 	IN_CACHE <= '1' when CACHE_POS(15 downto 9) = "0000000" else '0';
 	VAL_CACHE <= CACHE_VALID(to_integer(CACHE_POS(8 downto 4)));

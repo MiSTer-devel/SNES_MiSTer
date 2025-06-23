@@ -52,7 +52,6 @@ module main (
 
 	output            GSU_ACTIVE,
 	input             GSU_TURBO,
-	input             GSU_FASTROM,
 	input             SUFAMI_SWAP,
 
 	input             BLEND,
@@ -538,8 +537,7 @@ GSUMap GSUMap
 	.rom_mask(ROM_MASK),
 	.bsram_mask(RAM_MASK),
 
-	.turbo(GSU_TURBO),
-	.fastrom(GSU_FASTROM)
+	.turbo(GSU_TURBO)
 );
 end else
 assign MAP_ACTIVE[2] = 0;

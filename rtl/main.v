@@ -141,6 +141,7 @@ parameter USE_SPC7110 = 1'b1;
 parameter USE_BSX = 1'b1;
 parameter USE_SUFAMI = 1'b1;
 parameter USE_MSU = 1'b1;
+parameter USE_SS = 1'b1;
 
 wire [23:0] CA;
 wire        CPURD_N;
@@ -879,6 +880,9 @@ wire        SS_BSRAM_SEL;
 wire        SS_DSPN_REGS_SEL, SS_DSPN_RAM_SEL;
 wire        SS_GSU_SEL;
 
+
+generate
+if (USE_SS == 1'b1) begin
 savestates ss
 (
 	.reset_n(RESET_N),
@@ -950,6 +954,27 @@ savestates ss
 	.ss_rom_ovr(SS_ROM_OVR),
 	.ss_busy(SS_BUSY)
 );
+end else begin
+	assign SS_DO = 0;
+	assign SS_ROM_ADDR = 0;
+	assign SS_EXT_ADDR = 0;
+	assign SS_DDR_DO = 0;
+	assign SS_DDR_ADDR = 0;
+	assign SS_DDR_WE = 0;
+	assign SS_DDR_BE = 0;
+	assign SS_DDR_REQ = 0;
+	assign SS_ARAM_SEL = 0;
+	assign SS_DSP_REGS_SEL = 0;
+	assign SS_SMP_SEL = 0;
+	assign SS_BSRAM_SEL = 0;
+	assign SS_DSPN_REGS_SEL = 0;
+	assign SS_DSPN_RAM_SEL = 0;
+	assign SS_GSU_SEL = 0;
+	assign SS_DO_OVR = 0;
+	assign SS_ROM_OVR = 0;
+	assign SS_BUSY = 0;
+end
+endgenerate
 
 assign SS_AVAIL = ~|{ROM_TYPE[7:4]} | MAP_ACTIVE[3] | (ROM_TYPE[7:6] == 2'b10) | MAP_ACTIVE[2]; // Basic carts + SA1 + DSPn + GSU
 

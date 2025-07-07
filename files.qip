@@ -13,10 +13,16 @@ set_global_assignment -name VHDL_FILE rtl/SNES.vhd
 set_global_assignment -name VERILOG_FILE rtl/main.v
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/cheatcodes.sv
 set_global_assignment -name VHDL_FILE rtl/bram.vhd
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/ddram.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/sdram.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/ioport.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/lightgun.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/miracle.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/hps_ext.v
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/savestates.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/savestates_regs.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/savestates_map.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/savestates_sa1.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/savestate_ui.sv
 set_global_assignment -name SDC_FILE SNES.sdc
 set_global_assignment -name SYSTEMVERILOG_FILE SNES.sv

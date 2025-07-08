@@ -584,6 +584,7 @@ end
 wire GSU_ACTIVE;
 wire turbo_allow;
 wire SNES_SYSCLKR_CE,SNES_SYSCLKF_CE;
+wire SNES_REFRESH;
 
 wire ss_avail;
 wire ss_ddr_ack, ss_ddr_req, ss_ddr_we;
@@ -608,6 +609,7 @@ main main
 	
 	.SYSCLKR_CE(SNES_SYSCLKR_CE),
 	.SYSCLKF_CE(SNES_SYSCLKF_CE),
+	.REFRESH(SNES_REFRESH),
 
 	.ROM_TYPE(rom_type),
 	.ROM_MASK(rom_mask),
@@ -873,6 +875,7 @@ sdram sdram
 	.dout1(sdr_dout1),
 	.rd1(clearing_ram ? 1'b0 : ~WRAM_CE_N & ~WRAM_OE_N & READ_PULSE),
 	.wr1(clearing_ram ? mem_fill_we : ~WRAM_CE_N & ~WRAM_WE_N & SNES_SYSCLKF_CE),
+	.rfs1(clearing_ram ? 1'b0 : SNES_REFRESH),
 	.word1(0)
 );
 

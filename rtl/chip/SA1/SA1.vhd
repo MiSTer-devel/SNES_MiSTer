@@ -1251,6 +1251,22 @@ begin
 						SIV(7 downto 0) <= SNES_DI;
 					when x"0F" =>
 						SIV(15 downto 8) <= SNES_DI;
+
+					-- rom hacks that incorrectly access the ALU through the CPU
+					when x"50" =>						--MCNT
+						AM <= SNES_DI(1 downto 0);
+						if SNES_DI(1) = '1' then
+							MR <= (others => '0');
+						end if;
+					when x"51" =>						--MA
+						MA(7 downto 0) <= SNES_DI;
+					when x"52" =>
+						MA(15 downto 8) <= SNES_DI;
+					when x"53" =>						--MB
+						MB(7 downto 0) <= SNES_DI;
+					when x"54" =>
+						MB(15 downto 8) <= SNES_DI;
+						MATH_REQ <= '1';
 					when others => null;
 				end case;
 
@@ -1455,6 +1471,20 @@ begin
 		case SNES_A(7 downto 0) is
 			when x"00" =>						--CCNT
 				SNES_DO <= SNES_IRQ_FLAG & IRQSEL & CDMA_IRQ_FLAG & NMISEL & CMSG;
+
+			-- rom hacks that incorrectly access the ALU through the CPU
+			when x"06" =>
+				SNES_DO <= MR(7 downto 0);
+			when x"07" =>
+				SNES_DO <= MR(15 downto 8);
+			when x"08" =>
+				SNES_DO <= MR(23 downto 16);
+			when x"09" =>
+				SNES_DO <= MR(31 downto 24);
+			when x"0A" =>
+				SNES_DO <= MR(39 downto 32);
+			when x"0B" =>
+				SNES_DO <= MOF & "0000000";	--OF
 			when others => 
 				SNES_DO <= OPENBUS;
 		end case;

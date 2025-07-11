@@ -184,7 +184,6 @@ signal SNES_IRQ				: std_logic;
 signal MULR						: std_logic_vector(31 downto 0);
 signal DIVQ						: std_logic_vector(15 downto 0);
 signal DIVR						: std_logic_vector(15 downto 0);
-signal MATH_CLK_CNT			: unsigned(2 downto 0);
 signal MATH_REQ				: std_logic;
 
 -- IO Registers
@@ -1185,7 +1184,6 @@ begin
 		SNES_IRQ_FLAG <= '0';
 		
 		MATH_REQ <= '0';
-		MATH_CLK_CNT <= (others => '0');
 
 	elsif rising_edge(CLK) then
 		if ENABLE = '1' then
@@ -1278,8 +1276,7 @@ begin
 			end if;
 			
 			if MATH_REQ = '1' then
-				MATH_CLK_CNT <= MATH_CLK_CNT + 1;
-				if AM(1) = '0' and MATH_CLK_CNT = 5-1 then
+				if AM(1) = '0' then
 					if AM(0) = '0' then
 						MR(39 downto 0) <= x"00" & MULR;
 						MB <= (others => '0');
@@ -1292,14 +1289,12 @@ begin
 						MA <= (others => '0');
 						MB <= (others => '0');
 					end if;
-					MATH_CLK_CNT <= (others => '0');
 					MATH_REQ <= '0';
-				elsif AM(1) = '1' and MATH_CLK_CNT = 6-1 then
+				elsif AM(1) = '1' then
 					SUM := resize(signed(MR), SUM'length) + resize(signed(MULR), SUM'length);
 					MR <= std_logic_vector(SUM(39 downto 0));
 					MOF <= SUM(40);
 					MB <= (others => '0');
-					MATH_CLK_CNT <= (others => '0');
 					MATH_REQ <= '0';
 				end if;
 			end if;
@@ -1488,7 +1483,6 @@ port map (
 
 DIV: entity work.SA1DIV
 port map (
-	clock    => CLK,
 	numer		=> MA,
 	denom		=> MB,
 	quotient	=> DIVQ,

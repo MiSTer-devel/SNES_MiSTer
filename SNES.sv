@@ -400,6 +400,7 @@ wire  [7:0] ioctl_index;
 wire [12:0] joy0,joy1,joy2,joy3,joy4;
 wire [24:0] ps2_mouse;
 wire [10:0] ps2_key;
+wire [15:0] joystick1_rumble;
 
 wire  [7:0] joy0_x,joy0_y,joy1_x,joy1_y;
 
@@ -423,6 +424,7 @@ hps_io #(.CONF_STR(CONF_STR), .WIDE(1)) hps_io
 	.joystick_2(joy2),
 	.joystick_3(joy3),
 	.joystick_4(joy4),
+	.joystick_0_rumble(joystick1_rumble),
 	.ps2_mouse(ps2_mouse),
 	.ps2_key(ps2_key),
 
@@ -1060,6 +1062,7 @@ ioport port1
 	.PORT_DO(JOY1_DO_t),
 
 	.JOYSTICK1((joy_swap ^ raw_serial) ? joy1 : joy0),
+	.JOYSTICK1_RUMBLE(joystick1_rumble),
 
 	.MOUSE(ps2_mouse),
 	.MOUSE_EN(mouse_mode[0])

@@ -1527,27 +1527,20 @@ begin
 	elsif rising_edge(CLK) then
 		if EN = '1' then
 			DOT_CLK <= not DOT_CLK;
-			if SA1_MMIO_WRITE = '1' then
-				case P65_A(7 downto 0) is
-					when x"11" =>
-						H_CNT <= (others => '0');
-						V_CNT <= (others => '0');
-					-- save state functions
-					when x"16" =>
-						if SS_BUSY = '1' then
-							H_CNT(7 downto 0) <= unsigned(P65_DO);
-						end if;
-					when x"17" =>
-						if SS_BUSY = '1' then
-							V_CNT(7 downto 0) <= unsigned(P65_DO);
-						end if;
-					when x"18" =>
-						if SS_BUSY = '1' then
+			if SS_BUSY = '1' then
+				if SA1_MMIO_WRITE = '1' then
+					case P65_A(7 downto 0) is
+						when x"16" => H_CNT(7 downto 0) <= unsigned(P65_DO);
+						when x"17" => V_CNT(7 downto 0) <= unsigned(P65_DO);
+						when x"18" =>
 							H_CNT(8) <= P65_DO(0);
 							V_CNT(8) <= P65_DO(1);
-						end if;
-					when others => null;
-				end case;
+						when others => null;
+					end case;
+				end if;
+			elsif SA1_MMIO_WRITE = '1' and P65_A(7 downto 0) = x"11" then
+				H_CNT <= (others => '0');
+				V_CNT <= (others => '0');
 			elsif DOT_CLK = '1' then
 				if TMMODE = '0' then
 					if H_CNT = 340 then

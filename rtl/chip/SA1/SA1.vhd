@@ -887,28 +887,33 @@ begin
 						BRF(15) <= P65_DO;
 						CCDMA_RW <= '1';
 						DMA_RUN <= CC2DMA_SEL;
-					when others => null;
-				end case;
-
-				if SS_BUSY = '1' then
-					case P65_A(7 downto 0) is
-						when x"09" =>
+					-- save state functions
+					when x"09" =>
+						if SS_BUSY = '1' then
 							CDMA_IRQ_FLAG <= P65_DO(5);
-						when x"0A" =>
+						end if;
+					when x"0A" =>
+						if SS_BUSY = '1' then
 							DMA_IRQ_FLAG <= P65_DO(0);
-						when x"70" =>
+						end if;
+					when x"70" =>
+						if SS_BUSY = '1' then
 							CC_BPP		<= unsigned(P65_DO(2 downto 0));
 							CC_TILE_Y	<= unsigned(P65_DO(5 downto 3));
 							CCDMA_RW	<= P65_DO(6);
 							CC1DMA_EXEC	<= P65_DO(7);
-						when x"71" =>
+						end if;
+					when x"71" =>
+						if SS_BUSY = '1' then
 							CC_TILE_N(7 downto 0) <= unsigned(P65_DO);
-						when x"72" =>
+						end if;
+					when x"72" =>
+						if SS_BUSY = '1' then
 							CC_TILE_N(14 downto 8) <= unsigned(P65_DO(6 downto 0));
 							DMAEN <= P65_DO(7);
-						when others => null;
-					end case;
-				end if;
+						end if;
+					when others => null;
+				end case;
 			end if;
 				
 			if DMA_RUN = '1' and DMA_EN = '1' then
@@ -1074,24 +1079,29 @@ begin
 								VBP_RUN <= '1';
 								VBP_PRELOAD <= '1';
 							end if;
+						-- save state functions
+						when x"73" =>
+							if SS_BUSY = '1' then
+								VBP_BUF(7 downto 0) <= P65_DO;
+							end if;
+						when x"74" =>
+							if SS_BUSY = '1' then
+								VBP_BUF(15 downto 8) <= P65_DO;
+							end if;
+						when x"75" =>
+							if SS_BUSY = '1' then
+								VBP_BUF(23 downto 16) <= P65_DO;
+							end if;
+						when x"76" =>
+							if SS_BUSY = '1' then
+								VBP_BUF(31 downto 24) <= P65_DO;
+							end if;
+						when x"77" =>
+							if SS_BUSY = '1' then
+								VBIT <= unsigned(P65_DO(3 downto 0));
+							end if;
 						when others => null;
 					end case;
-
-					if SS_BUSY = '1' then
-						case P65_A(7 downto 0) is
-							when x"73" =>
-								VBP_BUF(7 downto 0) <= P65_DO;
-							when x"74" =>
-								VBP_BUF(15 downto 8) <= P65_DO;
-							when x"75" =>
-								VBP_BUF(23 downto 16) <= P65_DO;
-							when x"76" =>
-								VBP_BUF(31 downto 24) <= P65_DO;
-							when x"77" =>
-								VBIT <= unsigned(P65_DO(3 downto 0));
-							when others => null;
-						end case;
-					end if;
 				elsif SA1_MMIO_READ = '1' then
 					case P65_A(7 downto 0) is
 						when x"0D" =>							--VDP Msb
@@ -1253,18 +1263,17 @@ begin
 						SIV(7 downto 0) <= SNES_DI;
 					when x"0F" =>
 						SIV(15 downto 8) <= SNES_DI;
+					-- save state functions
+					when x"0A" =>
+						if SS_BUSY = '1' then
+							SA1_NMI_EN <= SNES_DI(4);
+						end if;
+					when x"FF" =>
+						if SS_BUSY = '1' then
+							SS_CMD <= SNES_DI(0);
+						end if;
 					when others => null;
 				end case;
-
-				if SS_BUSY = '1' then
-					case SNES_A(7 downto 0) is
-						when x"0A" =>
-							SA1_NMI_EN <= SNES_DI(4);
-						when x"FF" =>
-							SS_CMD <= SNES_DI(0);
-						when others => null;
-					end case;
-				end if;
 			end if;
 		end if;
 		
@@ -1370,35 +1379,47 @@ begin
 					when x"54" =>
 						MB(15 downto 8) <= P65_DO;
 						MATH_REQ <= '1';
-					when others => null;
-				end case;
-
-				if SS_BUSY = '1' then
-					case P65_A(7 downto 0) is
-						when x"19" =>
+						-- save state functions
+					when x"19" =>
+						if SS_BUSY = '1' then
 							VCR(7 downto 0) <= P65_DO;
-						when x"1A" =>
+						end if;
+					when x"1A" =>
+						if SS_BUSY = '1' then
 							HCR(8) <= P65_DO(0);
 							VCR(8) <= P65_DO(1);
 							TM_IRQ_FLAG <= P65_DO(2);
-						when x"6A" =>
+						end if;
+					when x"6A" =>
+						if SS_BUSY = '1' then
 							MR(7 downto 0) <= P65_DO;
-						when x"6B" =>
+						end if;
+					when x"6B" =>
+						if SS_BUSY = '1' then
 							MR(15 downto 8) <= P65_DO;
-						when x"6C" =>
+						end if;
+					when x"6C" =>
+						if SS_BUSY = '1' then
 							MR(23 downto 16) <= P65_DO;
-						when x"6D" =>
+						end if;
+					when x"6D" =>
+						if SS_BUSY = '1' then
 							MR(31 downto 24) <= P65_DO;
-						when x"6E" =>
+						end if;
+					when x"6E" =>
+						if SS_BUSY = '1' then
 							MR(39 downto 32) <= P65_DO;
-						when x"6F" =>
+						end if;
+					when x"6F" =>
+						if SS_BUSY = '1' then
 							MOF <= P65_DO(0);
-						when x"FF" =>
+						end if;
+					when x"FF" =>
+						if SS_BUSY = '1' then
 							SS_CMD <= P65_DO(0);
-						when others => null;
-					end case;
-				end if;
-
+						end if;
+					when others => null;
+				end case;
 			elsif SA1_MMIO_READ = '1' then
 				case P65_A(7 downto 0) is
 					when x"02" =>						--HCR Lsb
@@ -1506,20 +1527,27 @@ begin
 	elsif rising_edge(CLK) then
 		if EN = '1' then
 			DOT_CLK <= not DOT_CLK;
-			if SS_BUSY = '1' then
-				if SA1_MMIO_WRITE = '1' then
-					case P65_A(7 downto 0) is
-						when x"16" => H_CNT(7 downto 0) <= unsigned(P65_DO);
-						when x"17" => V_CNT(7 downto 0) <= unsigned(P65_DO);
-						when x"18" =>
+			if SA1_MMIO_WRITE = '1' then
+				case P65_A(7 downto 0) is
+					when x"11" =>
+						H_CNT <= (others => '0');
+						V_CNT <= (others => '0');
+					-- save state functions
+					when x"16" =>
+						if SS_BUSY = '1' then
+							H_CNT(7 downto 0) <= unsigned(P65_DO);
+						end if;
+					when x"17" =>
+						if SS_BUSY = '1' then
+							V_CNT(7 downto 0) <= unsigned(P65_DO);
+						end if;
+					when x"18" =>
+						if SS_BUSY = '1' then
 							H_CNT(8) <= P65_DO(0);
 							V_CNT(8) <= P65_DO(1);
-						when others => null;
-					end case;
-				end if;
-			elsif SA1_MMIO_WRITE = '1' and P65_A(7 downto 0) = x"11" then
-				H_CNT <= (others => '0');
-				V_CNT <= (others => '0');
+						end if;
+					when others => null;
+				end case;
 			elsif DOT_CLK = '1' then
 				if TMMODE = '0' then
 					if H_CNT = 340 then

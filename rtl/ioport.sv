@@ -85,8 +85,8 @@ always @(posedge CLK) begin
   // whenever the top‑byte matches 0x72, latch the low nibble intensities
   if (shift16[15:8] == RUMBLE_SENTRY && doing_port1) begin
     // expand 4‑bit to 8‑bit by duplicating nibble
-    current_rumble[15:8] <= { shift16[7:4], shift16[7:4] };   // large motor
-    current_rumble[ 7:0] <= { shift16[3:0], shift16[3:0] };   // small motor
+    current_rumble[15:8] <= { shift16[3:0], shift16[3:0] };   // large motor
+    current_rumble[ 7:0] <= { shift16[7:4], shift16[7:4] };   // small motor
   end
 end
 

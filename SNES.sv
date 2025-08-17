@@ -424,7 +424,7 @@ hps_io #(.CONF_STR(CONF_STR), .WIDE(1)) hps_io
 	.joystick_2(joy2),
 	.joystick_3(joy3),
 	.joystick_4(joy4),
-	.joystick_0_rumble(joystick1_rumble),
+	.joystick_0_rumble(status[8] ? 16'h0000 : joystick1_rumble), 
 	.ps2_mouse(ps2_mouse),
 	.ps2_key(ps2_key),
 

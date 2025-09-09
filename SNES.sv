@@ -843,6 +843,17 @@ wire[23:0] addr_download = ssbin_download ? ssbin_addr_download : cart_addr_down
 
 wire       sdram_download = cart_download | ssbin_download;
 
+reg [23:0] sdram_download_addr;
+reg [15:0] sdram_download_data;
+reg        sdram_download_wr;
+reg        sdram_download_en;
+always @(posedge clk_mem) begin
+	sdram_download_addr <= addr_download;
+	sdram_download_data <= ioctl_dout;
+	sdram_download_wr <= ioctl_wr;
+	sdram_download_en <= sdram_download;
+end
+
 reg READ_PULSE;
 always @(posedge clk_sys)
 	READ_PULSE <= SNES_SYSCLKR_CE;
@@ -865,12 +876,12 @@ sdram sdram
 	.init(0), //~clock_locked),
 	.clk(clk_mem),
 	
-	.addr0(sdram_download ? addr_download : ROM_ADDR),
-	.din0(sdram_download ? ioctl_dout : ROM_D),
+	.addr0(sdram_download_en ? sdram_download_addr : ROM_ADDR),
+	.din0(sdram_download_en ? sdram_download_data : ROM_D),
 	.dout0(ROM_Q),
-	.rd0(~sdram_download & (RESET_N ? ~ROM_OE_N : RFSH)),
-	.wr0(sdram_download ? ioctl_wr : ~ROM_WE_N),
-	.word0(sdram_download | ROM_WORD),
+	.rd0(~sdram_download_en & (RESET_N ? ~ROM_OE_N : RFSH)),
+	.wr0(sdram_download_en ? sdram_download_wr : ~ROM_WE_N),
+	.word0(sdram_download_en | ROM_WORD),
 	
 	.addr1(clearing_ram ? {7'b0000000,mem_fill_addr} : {7'b0000000,WRAM_ADDR}),
 	.din1(clearing_ram ? {8'h00,wram_fill_data} : {8'h00,WRAM_D}),

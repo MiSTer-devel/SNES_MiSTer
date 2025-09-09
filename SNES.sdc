@@ -12,7 +12,7 @@ derive_clock_uncertainty
 set_clock_groups -asynchronous -group [get_clocks { GSU_CACHE_CLK CX4_MEM_CLK }] 
 
 
-set_max_delay 23 -from [get_registers { emu|hps_io|* \
+set_max_delay 20 -from [get_registers { emu|hps_io|* \
 													 emu|main|* \
 													 emu|bsram|* \
 													 emu|rom_mask[*] \

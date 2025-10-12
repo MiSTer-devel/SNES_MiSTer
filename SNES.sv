@@ -741,12 +741,12 @@ assign AUDIO_L = audio_l;
 assign AUDIO_R = audio_r;
 
 reg RESET_N = 0;
-reg RFSH = 0;
+reg RESET_REFRESH = 0;
 always @(posedge clk_sys) begin
 	reg [1:0] div;
 	
 	div <= div + 1'd1;
-	RFSH <= !div;
+	RESET_REFRESH <= !div;
 	
 	if (div == 2) RESET_N <= ~reset;
 end
@@ -879,7 +879,7 @@ sdram sdram
 	.addr0(sdram_download_en ? sdram_download_addr : ROM_ADDR),
 	.din0(sdram_download_en ? sdram_download_data : ROM_D),
 	.dout0(ROM_Q),
-	.rd0(~sdram_download_en & (RESET_N ? ~ROM_OE_N : RFSH)),
+	.rd0(sdram_download_en ? 1'b0 : !RESET_N ? RESET_REFRESH : ~ROM_OE_N),
 	.wr0(sdram_download_en ? sdram_download_wr : ~ROM_WE_N),
 	.word0(sdram_download_en | ROM_WORD),
 	
@@ -888,7 +888,7 @@ sdram sdram
 	.dout1(sdr_dout1),
 	.rd1(clearing_ram ? 1'b0 : ~WRAM_CE_N & ~WRAM_OE_N & READ_PULSE),
 	.wr1(clearing_ram ? mem_fill_we : ~WRAM_CE_N & ~WRAM_WE_N & SNES_SYSCLKF_CE),
-	.rfs1(clearing_ram ? 1'b0 : SNES_REFRESH),
+	.rfs1(clearing_ram ? 1'b0 : !RESET_N ? RESET_REFRESH : SNES_REFRESH),
 	.word1(0)
 );
 

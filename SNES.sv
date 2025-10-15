@@ -207,8 +207,8 @@ video_freak video_freak
 (
 	.*,
 	.VGA_DE_IN(vga_de),
-	.ARX((!ar) ? (!V224_MODE ? 12'd64 : 12'd2048) : (ar - 1'd1)),
-	.ARY((!ar) ? (!V224_MODE ? 12'd49 : 12'd1673) : 12'd0),
+	.ARX((!ar) ? (V224_MODE ? 12'd64 : 12'd2048) : (ar - 1'd1)),
+	.ARY((!ar) ? (V224_MODE ? 12'd49 : 12'd1673) : 12'd0),
 	.CROP_SIZE((en216p & vcrop_en) ? 10'd216 : 10'd0),
 	.CROP_OFF(voff),
 	.SCALE(status[41:40])

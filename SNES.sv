@@ -207,8 +207,8 @@ video_freak video_freak
 (
 	.*,
 	.VGA_DE_IN(vga_de),
-	.ARX((!ar) ? 12'd64 : (ar - 1'd1)),
-	.ARY((!ar) ? 12'd49 : 12'd0),
+	.ARX((!ar) ? (V224_MODE ? 12'd64 : 12'd2048) : (ar - 1'd1)),
+	.ARY((!ar) ? (V224_MODE ? 12'd49 : 12'd1673) : 12'd0),
 	.CROP_SIZE((en216p & vcrop_en) ? 10'd216 : 10'd0),
 	.CROP_OFF(voff),
 	.SCALE(status[41:40])
@@ -663,6 +663,7 @@ main main
 	.FIELD(FIELD),
 	.INTERLACE(INTERLACE),
 	.HIGH_RES(HIGH_RES),
+	.V224_MODE(V224_MODE),
 	.DOTCLK(DOTCLK_out),
 	
 	.HBLANKn(HBlank_out),
@@ -993,7 +994,7 @@ reg  HSync, HSYNC;
 reg  VSync, VSYNC;
 reg  HBlank;
 reg  VBlank;
-wire HIGH_RES;
+wire HIGH_RES,V224_MODE;
 reg  DOTCLK;
 
 reg interlace;

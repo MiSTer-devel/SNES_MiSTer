@@ -176,21 +176,28 @@ module emu
 );
 
 assign ADC_BUS  = 'Z;
+assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
+assign {SDRAM_DQ, SDRAM_A, SDRAM_BA, SDRAM_CLK, SDRAM_CKE, SDRAM_DQML, SDRAM_DQMH, SDRAM_nWE, SDRAM_nCAS, SDRAM_nRAS, SDRAM_nCS} = 'Z;
+assign {UART_RTS, UART_DTR} = 0;
 
-assign AUDIO_S   = 1;
-assign AUDIO_MIX = status[20:19];
-
-assign LED_USER  = cart_download | ssbin_download | spc_download | (status[23] & bk_pending);
-assign LED_DISK  = 0;
-assign LED_POWER = 0;
-assign BUTTONS   = osd_btn;
-assign VGA_SCALER= 0;
+assign VGA_SCALER  = 0;
 assign VGA_DISABLE = 0;
 assign HDMI_FREEZE = 0;
 assign HDMI_BLACKOUT = 0;
 assign HDMI_BOB_DEINT = 0;
 
-assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
+assign AUDIO_S = 1;
+assign AUDIO_MIX = status[20:19];
+
+assign LED_DISK = 0;
+assign LED_POWER = 0;
+assign BUTTONS   = osd_btn;
+
+//////////////////////////////////////////////////////////////////
+
+reg  [26:0] act_cnt;
+always @(posedge clk_sys) act_cnt <= act_cnt + 1'd1;
+assign LED_USER = cart_download | ssbin_download | spc_download | (status[23] & bk_pending) | (act_cnt[26]  ? act_cnt[25:18]  > act_cnt[7:0]  : act_cnt[25:18]  <= act_cnt[7:0]);
 
 wire [1:0] ar       = status[33:32];
 wire       vcrop_en = status[39];
@@ -1043,7 +1050,6 @@ video_mixer #(.LINE_LENGTH(520), .GAMMA(1)) video_mixer
 
 ////////////////////////////  I/O PORTS  ////////////////////////////////
 
-assign {UART_RTS, UART_DTR} = 1;
 wire [15:0] uart_data;
 wire piano_joypad_do;
 wire piano = status[43];
@@ -1156,6 +1162,7 @@ reg snac_p2 = 0;
 assign USER_OUT[2] = 1'b1;
 assign USER_OUT[5] = 1'b1;
 assign USER_OUT[6] = 1'b1;
+// USER_OUT[0], [1], [3], [4] are driven by always_comb block below
 
 wire  [1:0] datajoy0_DI = snac_p2 ? {1'b1, USER_IN[6]} : JOY1_DO;
 wire  [1:0] datajoy1_DI = snac_p2 ? {USER_IN[2], USER_IN[6]} : JOY2_DO;

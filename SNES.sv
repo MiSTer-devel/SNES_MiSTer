@@ -293,7 +293,7 @@ wire reset = RESET | buttons[1] | status[0] | cart_download | spc_download | bk_
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX X XXXXXXXXXXXXXXXXX XXXXXXXX
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXX XXXXXXXX
 
 `include "build_id.v"
 parameter CONF_STR = {
@@ -351,6 +351,7 @@ parameter CONF_STR = {
 	"D1P3OI,SuperFX Speed,Normal,Turbo;",
 	"D1P3oE,SuperFX FastROM,Yes,No;",
 	"D3P3O4,CPU Speed,Normal,Turbo;",
+	"P3OU,Sound frequency,Typical,Real;",
 	"P3OV,Sufami Cart swapping,No,Yes;",
 	"P3oMP,Competition Cart time,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18;",
 	"P3-;",
@@ -698,6 +699,8 @@ main main
 	
 	.TURBO(status[4] & turbo_allow),
 	.TURBO_ALLOW(turbo_allow),
+	
+	.DSP_FREQ(status[30]),
 	
 `ifdef DEBUG
 	.DBG_BG_EN(DBG_BG_EN),

@@ -653,6 +653,7 @@ main main
 	.VRAM2_DI(VRAM2_Q),
 	.VRAM2_DO(VRAM2_D),
 	.VRAM2_WE_N(VRAM2_WE_N),
+	.VRAM_OE_N(VRAM_OE_N),
 
 	.ARAM_ADDR(ARAM_ADDR),
 	.ARAM_D(ARAM_D),
@@ -901,37 +902,46 @@ sdram sdram
 
 assign WRAM_Q = sdr_dout1[7:0];
 
+wire        VRAM_OE_N;
+reg         VRAM_OE_N_DELAYED;
+always @(posedge clk_sys)
+	VRAM_OE_N_DELAYED <= VRAM_OE_N;
+	
 wire [15:0] VRAM1_ADDR;
 wire        VRAM1_WE_N;
-wire  [7:0] VRAM1_D, VRAM1_Q;
+wire  [7:0] VRAM1_D;
+wire  [7:0] vram1_q;
 dpram #(15)	vram1
 (
 	.clock(clk_sys),
 	.address_a(VRAM1_ADDR[14:0]),
 	.data_a(VRAM1_D),
 	.wren_a(~VRAM1_WE_N),
-	.q_a(VRAM1_Q),
+	.q_a(vram1_q),
 
 	// clear the RAM on loading
 	.address_b(mem_fill_addr[14:0]),
 	.wren_b(mem_fill_we)
 );
+wire  [7:0] VRAM1_Q = !VRAM_OE_N && !VRAM_OE_N_DELAYED ? vram1_q : '1;
 
 wire [15:0] VRAM2_ADDR;
 wire        VRAM2_WE_N;
-wire  [7:0] VRAM2_D, VRAM2_Q;
+wire  [7:0] VRAM2_D;
+wire  [7:0] vram2_q;
 dpram #(15) vram2
 (
 	.clock(clk_sys),
 	.address_a(VRAM2_ADDR[14:0]),
 	.data_a(VRAM2_D),
 	.wren_a(~VRAM2_WE_N),
-	.q_a(VRAM2_Q),
+	.q_a(vram2_q),
 
 	// clear the RAM on loading
 	.address_b(mem_fill_addr[14:0]),
 	.wren_b(mem_fill_we)
 );
+wire  [7:0] VRAM2_Q = !VRAM_OE_N && !VRAM_OE_N_DELAYED ? vram2_q : '1; 
 
 wire [15:0] ARAM_ADDR;
 wire        ARAM_CE_N;

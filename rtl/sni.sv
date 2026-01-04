@@ -10,8 +10,15 @@ module sni(
 	input wire[7:0]		sdram_q,
 	output wire			sdram_rd_req,
 	output wire			sdram_wr_req,
-
 	input wire			sdram_ready,
+
+	input wire [63:0]	joypad,
+
+	output wire[19:0]	bsram_addr,
+	input  wire[7:0]	bsram_q,
+	output wire			bsram_wr,
+	output wire[7:0]	bsram_data,
+	input  wire			bsram_ready,
 
 	output wire			rbf,
 	input wire			txint,
@@ -22,6 +29,7 @@ module sni(
 	);
 
 	reg [8:0] inbuffer_raddr;
+	reg [8:0] last_inbuffer_raddr;
 	reg [8:0] inbuffer_waddr;
 	wire [7:0] inbuffer_rdata;
 	wire [7:0] inbuffer_wdata;
@@ -45,9 +53,11 @@ module sni(
 
 	reg last_vblank;
 	reg[23:0] addr;
-	wire rom_sel  = addr[23:20] != 4'hF;
-	wire wram_sel = (addr[23:16] == 8'hF5 || addr[23:16] == 8'hF6);
-	wire sdram_sel = rom_sel | wram_sel;
+	wire rom_sel	= addr[23:21] != 3'h7;
+	wire wram_sel	= (addr[23:16] == 8'hF5 || addr[23:16] == 8'hF6);
+	wire sdram_sel	= rom_sel | wram_sel;
+	wire joypad_sel = (addr[23:4] == 20'hF9071 && addr[3] == 1'b1);
+	wire bsram_sel	= (addr[23:20] == 4'hE);
 	wire[16:0] wram_addr = {~addr[16], addr[15:0]};
 
 	reg rd_req = 0, wr_req = 0;
@@ -55,6 +65,12 @@ module sni(
 	assign sdram_wr_req = wr_req;
 
 	assign sdram_addr = wram_sel ? {1'b1, 7'h0, wram_addr} : {1'b0,addr};
+	assign sdram_data = inbuffer_rdata;
+	assign bsram_addr = addr[19:0];
+	assign bsram_data = inbuffer_rdata;
+	reg last_bsram_ready;
+	reg bsram_wr_ = 0;
+	assign bsram_wr = bsram_wr_;
 
 	reg[7:0] len;
 
@@ -69,7 +85,7 @@ module sni(
 	// UART RX buffer
 	dpram #(9) inbuffer
 	(
-		.clock(~clk),
+		.clock(clk),
 		.address_a(inbuffer_waddr),
 		.data_a(inbuffer_wdata),
 		.wren_a(1'b1),
@@ -95,6 +111,9 @@ module sni(
 		last_rxint <= rxint;
 		tdata_i <= 1'b0;
 		last_vblank <= vblank;
+		bsram_wr_ <= 1'b0;
+		last_inbuffer_raddr <= inbuffer_raddr;
+		last_bsram_ready <= bsram_ready;
 
 		if (reset) begin
 			inbuffer_raddr <= 9'h000;
@@ -114,6 +133,8 @@ module sni(
 			if (tinprogress) begin
 				// If we're currently transmitting, don't do anything until the transmission finishes.
 				if (!txint && last_txint) tinprogress <= 1'b0;
+			end else if (last_inbuffer_raddr != inbuffer_raddr) begin
+				// Wait for  DPRAM read result to be available next cycle.
 			end else if (state[3] == 0) begin
 				// If we're in a command-parsing state, and we have a data byte available...
 				if (inbuffer_raddr != inbuffer_waddr) begin
@@ -175,19 +196,26 @@ module sni(
 						if (sdram_sel && !sdram_busy) begin
 							wr_req <= 1'b1;
 							sdram_busy <= 1'b1;
-							sdram_data <= inbuffer_rdata;
 						end
-						if (!sdram_sel || (sdram_busy && sdram_ready)) begin
+						if (bsram_sel) begin
+							bsram_wr_ <= 1'b1;
+						end
+						if ((!sdram_sel || (sdram_busy && sdram_ready)) && 
+							(!bsram_sel || (bsram_wr_ && bsram_ready))) begin
 							addr <= addr + 24'b1;
 							len <= len - 1'b1;
 							sdram_busy <= 1'b0;
 							inbuffer_raddr <= inbuffer_raddr + 1'b1;
+							bsram_wr_ <= 1'b0;
 						end
 					end
 				end else begin
 					// Read
-					if (!sdram_sel || (sdram_busy && sdram_ready)) begin
-						tdata <= sdram_sel ? sdram_q : 8'b0;
+					if ((!sdram_sel || (sdram_busy && sdram_ready)) && (!bsram_sel || last_bsram_ready)) begin
+						if (sdram_sel) tdata <= sdram_q;
+						else if (bsram_sel) tdata <= bsram_q;
+						else if (joypad_sel) tdata <= joypad[addr[2:0]*8 +: 8];
+						else tdata <= 8'b0;
 						tinprogress <= 1'b1;
 						tdata_i <= 1'b1;
 						addr <= addr + 24'b1;

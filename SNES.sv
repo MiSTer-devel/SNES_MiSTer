@@ -639,6 +639,7 @@ main main
 	.BSRAM_D(BSRAM_D),			
 	.BSRAM_Q(BSRAM_Q),			
 	.BSRAM_CE_N(BSRAM_CE_N),
+	.BSRAM_OE_N(BSRAM_OE_N),
 	.BSRAM_WE_N(BSRAM_WE_N),
 
 	.WRAM_ADDR(WRAM_ADDR),
@@ -688,6 +689,7 @@ main main
 	.JOY1_P6(JOY1_P6),
 	.JOY2_P6(JOY2_P6),
 	.JOY2_P6_in(JOY2_P6_DI),
+	.SNI_JOY(SNI_JOY),
 
 	.EXT_RTC(RTC),
 
@@ -902,9 +904,9 @@ sdram sdram
 	.din0(sdram_download_en ? sdram_download_data : ROM_D),
 	.dout0(ROM_Q),
 
-	.rd0(~sdram_download & (RESET_N ? ~ROM_OE_N : RFSH)),
-	.wr0(sdram_download ? ioctl_wr : ~ROM_WE_N),
-	.word0(sdram_download | ROM_WORD),
+	.rd0(sdram_download_en ? 1'b0 : !RESET_N ? RESET_REFRESH : ~ROM_OE_N),
+	.wr0(sdram_download_en ? sdram_download_wr : ~ROM_WE_N),
+	.word0(sdram_download_en | ROM_WORD),
 
 	.addr1(clearing_ram ? {7'b0000000,mem_fill_addr} : {7'b0000000,WRAM_ADDR}),
 	.din1(clearing_ram ? {8'h00,wram_fill_data} : {8'h00,WRAM_D}),
@@ -990,16 +992,21 @@ dpram_dif #(16,8,15,16) aram
 localparam  BSRAM_BITS = 18; // 256Kbyte
 wire [19:0] BSRAM_ADDR;
 wire        BSRAM_CE_N;
-wire        BSRAM_WE_N;
+wire        BSRAM_OE_N, BSRAM_WE_N;
 wire  [7:0] BSRAM_Q, BSRAM_D;
+wire [19:0] BSRAM_SNI_ADDR;
+wire        BSRAM_SNI_WR;
+wire [7:0]  BSRAM_SNI_D;
+wire        BSRAM_SNI_READY = BSRAM_CE_N | (BSRAM_OE_N & BSRAM_WE_N);
+
 dpram_dif #(BSRAM_BITS,8,BSRAM_BITS-1,16) bsram 
 (
 	.clock(clk_sys),
 
 	//Thrash the BSRAM upon ROM loading
-	.address_a(clearing_ram ? mem_fill_addr[BSRAM_BITS-1:0] : BSRAM_ADDR[BSRAM_BITS-1:0]),
-	.data_a(clearing_ram ? 8'hFF : BSRAM_D),
-	.wren_a(clearing_ram ? mem_fill_we : ~BSRAM_CE_N & ~BSRAM_WE_N),
+	.address_a(clearing_ram ? mem_fill_addr[BSRAM_BITS-1:0] : BSRAM_SNI_READY ? BSRAM_SNI_ADDR : BSRAM_ADDR[BSRAM_BITS-1:0]),
+	.data_a(clearing_ram ? 8'hFF : BSRAM_SNI_READY ? BSRAM_SNI_D : BSRAM_D),
+	.wren_a(clearing_ram ? mem_fill_we : BSRAM_SNI_READY ? BSRAM_SNI_WR : ~BSRAM_WE_N),
 	.q_a(BSRAM_Q),
 
 	.address_b({sd_lba[BSRAM_BITS-10:0],sd_buff_addr}),
@@ -1128,6 +1135,7 @@ miraclepiano miracle(
 	.rdata_m(data_o)
 );
 
+wire [63:0] SNI_JOY;
 sni sni(
 	.clk(clk_sys),
 	.reset(reset || uart_mode != 6),
@@ -1139,6 +1147,14 @@ sni sni(
 	.sdram_rd_req(SDRAM_SNI_RD),
 	.sdram_wr_req(SDRAM_SNI_WR),
 	.sdram_ready(SDRAM_SNI_READY),
+
+	.bsram_addr(BSRAM_SNI_ADDR),
+	.bsram_q(BSRAM_Q),
+	.bsram_wr(BSRAM_SNI_WR),
+	.bsram_data(BSRAM_SNI_D),
+	.bsram_ready(BSRAM_SNI_READY),
+
+	.joypad(SNI_JOY),
 
 	.rbf(rbf),
 	.txint(txint),

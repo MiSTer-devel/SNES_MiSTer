@@ -284,27 +284,20 @@ module sdram
 			end
 			
 			if (rd0 && !old_rd0) begin
-				if (raw_req_test) begin
-					// Make sure we don't accidentally preempt a regular write
-					// that already preempted a SNI write.
-					if (sni_write_ch1 && !(wr1 && !old_wr1)) begin
-						write[1] <= 0;
-						is_sni[1] <= 0;
-					end
-					if (sni_write_ch0 && !(wr0 && !old_wr0)) begin
-						is_sni[0] <= 0;
-						write[0] <= 0;
-					end
-					addr[0] <= addr0;
-					word[0] <= word0;
-					is_sni[0] <= 0;
-					read[0] <= 1;
-					write[0] <= 0;
-					st_num <= 1;
+				// Make sure we don't accidentally preempt a regular write
+				// that already preempted a SNI write.
+				if (sni_write_ch1 && !(wr1 && !old_wr1)) begin
+					write[1] <= 0;
+					is_sni[1] <= 0;
 				end
 
+				is_sni[0] <= 0;
+				write[0] <= 0;
+				addr[0] <= addr0;
+				word[0] <= word0;
+				read[0] <= raw_req_test;
 				rfs <= ~raw_req_test & rfs1;
-				if (~raw_req_test & rfs1) st_num <= 1;
+				st_num <= 1;
 			end
 			if (rd1 && !old_rd1) begin
 				if (sni_write_ch0 && !(wr0 && !old_wr0)) begin
@@ -337,8 +330,8 @@ module sdram
 			// waiting for state 0 or 4. This reduces the latency of memory
 			// access requests by one cycle since we don't have to wait for
 			// the request to reach registers.
-			if (rd0 && !old_rd0 && raw_req_test) begin
-							state[0].CMD  <= CTRL_RAS;
+			if (rd0 && !old_rd0) begin
+							state[0].CMD  <= raw_req_test ? CTRL_RAS : CTRL_IDLE;
 								state[0].ADDR <= addr0[22:0];
 								state[0].BANK <= {1'b0,addr0[23]};
 			end else if (wr0 && !old_wr0 && !rd0) begin

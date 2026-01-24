@@ -286,7 +286,7 @@ module sdram
 			if (rd0 && !old_rd0) begin
 				// Make sure we don't accidentally preempt a regular write
 				// that already preempted a SNI write.
-				if (sni_write_ch1 && !(wr1 && !old_wr1)) begin
+				if (raw_req_test && sni_write_ch1 && !(wr1 && !old_wr1)) begin
 					write[1] <= 0;
 					is_sni[1] <= 0;
 				end
@@ -297,7 +297,8 @@ module sdram
 				word[0] <= word0;
 				read[0] <= raw_req_test;
 				rfs <= ~raw_req_test & rfs1;
-				st_num <= 1;
+
+				if (raw_req_test || rfs1) st_num <= 1;
 			end
 			if (rd1 && !old_rd1) begin
 				if (sni_write_ch0 && !(wr0 && !old_wr0)) begin

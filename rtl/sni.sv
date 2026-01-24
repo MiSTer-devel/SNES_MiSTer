@@ -47,9 +47,12 @@ module sni(
 
 		// command-responding states
 		STATE_TRANSFER	= 4'h8,		// 8, 9
-		STATE_WAITNMI	= 4'hA		// A
+		STATE_WAITNMI	= 4'hA,		// A
+		STATE_VERSION   = 4'hB		// B
 	} State;
 	reg[3:0] state;
+
+	localparam[7:0] PROTOCOL_VERSION = 8'b0;
 
 	reg last_vblank;
 	reg[23:0] addr;
@@ -78,7 +81,8 @@ module sni(
 		CMD_PING	= 8'h00,
 		CMD_READ	= 8'h1,
 		CMD_WRITE	= 8'h2,
-		CMD_WAITNMI = 8'h3
+		CMD_WAITNMI = 8'h3,
+		CMD_VERSION = 8'h4
 	} Cmd;
 	reg rw;
 
@@ -151,6 +155,14 @@ module sni(
 									tinprogress <= 1'b1;
 									tdata <= 1'b1;
 									state <= STATE_PING;
+								end
+								CMD_VERSION: begin
+									// Respond with a length of 1, then the
+									// protocol version
+									tdata_i <= 1'b1;
+									tinprogress <= 1'b1;
+									tdata <= 1'b1;
+									state <= STATE_VERSION;
 								end
 								CMD_READ: rw <= 0;	// go to STATE_ADDR
 								CMD_WRITE: rw <= 1; // go to STATE_ADDR
@@ -235,6 +247,12 @@ module sni(
 					tdata <= 8'b0;
 					state <= STATE_CMD;
 				end
+			end else if (state == STATE_VERSION) begin
+				// Respond with the protocol version
+				tinprogress <= 1'b1;
+				tdata_i <= 1'b1;
+				tdata <= PROTOCOL_VERSION;
+				state <= STATE_CMD;
 			end
 		end
 	end

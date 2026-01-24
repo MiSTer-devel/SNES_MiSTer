@@ -23,6 +23,7 @@ set_max_delay 20 -from [get_registers { emu|hps_io|* \
 													 emu|sdram|write[*] \
 													 emu|sdram|read[*] \
 													 emu|sdram|word[*] \
+													 emu|sdram|old_* \
 													 emu|sdram|is_sni[*] \
 													 emu|sdram|st_num[*]* \
 													 emu|sdram|state[1]* \

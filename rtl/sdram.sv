@@ -337,19 +337,21 @@ module sdram
 			// waiting for state 0 or 4. This reduces the latency of memory
 			// access requests by one cycle since we don't have to wait for
 			// the request to reach registers.
-			//
-			// Check for SNI reads/writes on ch0 as well, because SNI should
-			// not change the timing of the state machine to avoid impacting
-			// regular requests.
-			if ((rd0 && !old_rd0 && raw_req_test) || (sni_read_ch0 && !(wr0 && !old_wr0) && !(wr1 && !old_wr1))) begin
+			if (rd0 && !old_rd0 && raw_req_test) begin
 							state[0].CMD  <= CTRL_RAS;
-								state[0].ADDR <= (rd0 && !old_rd0 && raw_req_test) ? addr0[22:0] : sni_addr[22:0];
-								state[0].BANK <= {1'b0,((rd0 && !old_rd0 && raw_req_test) ? addr0[23] : sni_addr[23])};
-			end else if ((wr0 && !old_wr0 && !rd0) ||
-				(sni_write_ch0 && !(rd0 && !old_rd0 && raw_req_test) && !(rd1 && !old_rd1))) begin
+								state[0].ADDR <= addr0[22:0];
+								state[0].BANK <= {1'b0,addr0[23]};
+			end else if (wr0 && !old_wr0 && !rd0) begin
 							state[0].CMD  <= CTRL_RAS;
-								state[0].ADDR <= wr0 && !old_wr0 ? addr0[22:0] : sni_addr[22:0];
-								state[0].BANK <= {1'b0,wr0 && !old_wr0 ? addr0[23] : sni_addr[23]};
+								state[0].ADDR <= addr0[22:0];
+								state[0].BANK <= {1'b0,addr0[23]};
+			end else if (sni_read_ch0 && !(wr1 && !old_wr1) || sni_write_ch0 && !(rd1 && !old_rd1)) begin
+							// Handle SNI reads/writes on ch0 as well, because SNI should
+							// not change the timing of the state machine to avoid impacting
+							// regular requests.
+							state[0].CMD  <= CTRL_RAS;
+								state[0].ADDR <= sni_addr[22:0];
+								state[0].BANK <= {1'b0,sni_addr[23]};
 			end else
 			case (st_num[2:0])
 //				3'd0: begin state[0].CMD  <= read[0]     ? CTRL_RAS : CTRL_IDLE;

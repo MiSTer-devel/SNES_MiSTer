@@ -72,6 +72,7 @@ always @(posedge clk) begin
 					audio_sector <= resuming ? resume_sector : 22'd0;
 					if (~track_processing & ctl_play) begin
 						audio_seek <= 1;
+						resuming <= 0;
 						state <= WAITING_ACK_STATE;
 					end
 				end
@@ -80,7 +81,6 @@ always @(posedge clk) begin
 				if (audio_ack) begin
 					audio_req <= 0;
 					audio_seek <= 0;
-					resuming <= 0;
 					state <= PLAYING_STATE;
 				end
 

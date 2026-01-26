@@ -143,20 +143,18 @@ always @(posedge CLK) begin
 			data_addr <= data_addr + 1;
 			data_req <= 1'b1;
 		end
-	end
-end
 
-always @(*) begin
-	case (ADDR[2:0])
-		0: DOUT = MSU_STATUS;
-		1: DOUT = data;
-		2: DOUT = "S";
-		3: DOUT = "-";
-		4: DOUT = "M";
-		5: DOUT = "S";
-		6: DOUT = "U";
-		7: DOUT = "1";
-	endcase
+		case (ADDR[2:0])
+			0: DOUT <= MSU_STATUS;
+			1: DOUT <= data;
+			2: DOUT <= "S";
+			3: DOUT <= "-";
+			4: DOUT <= "M";
+			5: DOUT <= "S";
+			6: DOUT <= "U";
+			7: DOUT <= "1";
+		endcase
+	end
 end
 
 endmodule

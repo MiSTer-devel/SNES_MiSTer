@@ -34,7 +34,7 @@ module sni(
 	wire [7:0] inbuffer_rdata;
 	wire [7:0] inbuffer_wdata;
 
-	// recieve buffer is full if head = tail - 1
+	// receive buffer is full if head = tail - 1
 	assign rbf = (inbuffer_waddr == inbuffer_raddr - 1);
 
 	// State machine for UART interface
@@ -63,7 +63,7 @@ module sni(
 	wire bsram_sel	= (addr[23:20] == 4'hE);
 	wire[16:0] wram_addr = {~addr[16], addr[15:0]};
 
-	reg rd_req = 0, wr_req = 0;
+	reg rd_req, wr_req;
 	assign sdram_rd_req = rd_req;
 	assign sdram_wr_req = wr_req;
 
@@ -72,7 +72,7 @@ module sni(
 	assign bsram_addr = addr[19:0];
 	assign bsram_data = inbuffer_rdata;
 	reg last_bsram_ready;
-	reg bsram_wr_ = 0;
+	reg bsram_wr_;
 	assign bsram_wr = bsram_wr_;
 
 	reg[7:0] len;
@@ -84,7 +84,7 @@ module sni(
 		CMD_WAITNMI = 8'h3,
 		CMD_VERSION = 8'h4
 	} Cmd;
-	reg rw;
+	reg wNr;
 
 	// UART RX buffer
 	dpram #(9) inbuffer
@@ -113,26 +113,27 @@ module sni(
 	always @(posedge clk) begin
 		last_txint <= txint;
 		last_rxint <= rxint;
-		tdata_i <= 1'b0;
 		last_vblank <= vblank;
-		bsram_wr_ <= 1'b0;
 		last_inbuffer_raddr <= inbuffer_raddr;
 		last_bsram_ready <= bsram_ready;
 
+		{rd_req, wr_req} <= 2'b0;
+		tdata_i <= 1'b0;
+		bsram_wr_ <= 1'b0;
+
 		if (reset) begin
+			addr <= 24'b0;
+			len <= 8'b0;
 			inbuffer_raddr <= 9'h000;
 			inbuffer_waddr <= 9'h000;
 			tinprogress <= 1'b0;
-			last_vblank <= 1'b0;
 			sdram_busy <= 1'b0;
 			state <= STATE_CMD;
 		end else begin
 			if (!rxint && last_rxint) begin
-				// We've recieved data, update the write address for the next byte
+				// We've received data, update the write address for the next byte
 				inbuffer_waddr <= inbuffer_waddr + 1'b1;
 			end
-
-			{rd_req, wr_req} <= 2'b0;
 
 			if (tinprogress) begin
 				// If we're currently transmitting, don't do anything until the transmission finishes.
@@ -164,8 +165,8 @@ module sni(
 									tdata <= 1'b1;
 									state <= STATE_VERSION;
 								end
-								CMD_READ: rw <= 0;	// go to STATE_ADDR
-								CMD_WRITE: rw <= 1; // go to STATE_ADDR
+								CMD_READ:  wNr <= 0; // go to STATE_ADDR
+								CMD_WRITE: wNr <= 1; // go to STATE_ADDR
 								CMD_WAITNMI: state <= STATE_WAITNMI;
 
 								// Invalid command, ignore
@@ -181,7 +182,7 @@ module sni(
 							tinprogress <= 1'b1;
 							state <= STATE_TRANSFER;
 							sdram_busy <= 1'b0;
-							if (rw) begin
+							if (wNr) begin
 								// write, response length is 0
 								tdata <= 8'b0;
 							end else begin
@@ -190,7 +191,7 @@ module sni(
 							end
 						end
 						STATE_PING: begin
-							// Echo the data byte we recieved.
+							// Echo the data byte we received.
 							tdata_i <= 1'b1;
 							tinprogress <= 1'b1;
 							tdata <= inbuffer_rdata;
@@ -201,7 +202,7 @@ module sni(
 			end else if ((state == STATE_TRANSFER || state == STATE_TRANSFER+1) && !(rd_req || wr_req)) begin
 				// If length is 0, we're done
 				if (len == 24'b0) state <= STATE_CMD;
-				else if (rw) begin
+				else if (wNr) begin
 					// Write
 					if (inbuffer_raddr != inbuffer_waddr) begin
 						// If we have data available, write it to memory.
@@ -230,7 +231,10 @@ module sni(
 						else tdata <= 8'b0;
 						tinprogress <= 1'b1;
 						tdata_i <= 1'b1;
-						addr <= addr + 24'b1;
+
+						// Use blocking assignments so that the if statement below can issue another SDRAM read
+						// request immediately, allowing read requests to be pipelined with UART transmissionss.
+						addr = addr + 24'b1;
 						len = len - 1'b1;
 						sdram_busy = 1'b0;
 					end

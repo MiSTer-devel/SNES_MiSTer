@@ -865,6 +865,52 @@ always @(posedge clk_mem) begin
 	sdram_download_en <= sdram_download;
 end
 
+// Rom address mirroring when rom size is not a power of 2 (SNESdev wiki)
+reg  [23:0] rom_mirror_split, rom_mirror_rmask, rom_file_sz;
+reg         rom_mirror_en;
+
+always @(posedge clk_sys) begin
+	if (~old_downloading & cart_download) begin
+		rom_file_sz   <= 24'd0;
+		rom_mirror_en <= 1'b0;
+	end
+
+	if (cart_download & ioctl_wr) begin
+		if (ioctl_addr == 8)  rom_file_sz[15:0]  <= ioctl_dout;
+		if (ioctl_addr == 10) rom_file_sz[23:16] <= ioctl_dout[7:0];
+	end
+
+	if (old_downloading & ~cart_download) begin
+		if (|(rom_file_sz & (rom_file_sz - 24'd1))) begin
+			rom_mirror_en <= 1'b1;
+			if (rom_file_sz[23]) begin
+				rom_mirror_split <= 24'h800000;
+				rom_mirror_rmask <= rom_file_sz - 24'h800001;
+			end else if (rom_file_sz[22]) begin
+				rom_mirror_split <= 24'h400000;
+				rom_mirror_rmask <= rom_file_sz - 24'h400001;
+			end else if (rom_file_sz[21]) begin
+				rom_mirror_split <= 24'h200000;
+				rom_mirror_rmask <= rom_file_sz - 24'h200001;
+			end else if (rom_file_sz[20]) begin
+				rom_mirror_split <= 24'h100000;
+				rom_mirror_rmask <= rom_file_sz - 24'h100001;
+			end else if (rom_file_sz[19]) begin
+				rom_mirror_split <= 24'h080000;
+				rom_mirror_rmask <= rom_file_sz - 24'h080001;
+			end else begin
+				rom_mirror_split <= 24'h040000;
+				rom_mirror_rmask <= rom_file_sz - 24'h040001;
+			end
+		end
+	end
+end
+
+wire        rom_in_mirror = rom_mirror_en & |(ROM_ADDR & rom_mirror_split);
+wire [23:0] rom_addr_out  = rom_in_mirror
+             ? (rom_mirror_split | (ROM_ADDR & rom_mirror_rmask))
+             : ROM_ADDR;
+
 reg READ_PULSE;
 always @(posedge clk_sys)
 	READ_PULSE <= SNES_SYSCLKR_CE;
@@ -887,7 +933,7 @@ sdram sdram
 	.init(0), //~clock_locked),
 	.clk(clk_mem),
 	
-	.addr0(sdram_download_en ? sdram_download_addr : ROM_ADDR),
+	.addr0(sdram_download_en ? sdram_download_addr : rom_addr_out),
 	.din0(sdram_download_en ? sdram_download_data : ROM_D),
 	.dout0(ROM_Q),
 	.rd0(sdram_download_en ? 1'b0 : !RESET_N ? RESET_REFRESH : ~ROM_OE_N),

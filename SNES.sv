@@ -406,6 +406,8 @@ wire [15:0] joystick1_rumble;
 
 wire  [7:0] joy0_x,joy0_y,joy1_x,joy1_y;
 
+reg  [7:0] uart_mode;
+
 wire [64:0] RTC;
 
 wire [21:0] gamma_bus;
@@ -456,6 +458,8 @@ hps_io #(.CONF_STR(CONF_STR), .WIDE(1)) hps_io
 	.img_mounted(img_mounted),
 	.img_readonly(img_readonly),
 	.img_size(img_size),
+
+	.uart_mode(uart_mode),
 
 	.RTC(RTC),
 
@@ -635,6 +639,7 @@ main main
 	.BSRAM_D(BSRAM_D),			
 	.BSRAM_Q(BSRAM_Q),			
 	.BSRAM_CE_N(BSRAM_CE_N),
+	.BSRAM_OE_N(BSRAM_OE_N),
 	.BSRAM_WE_N(BSRAM_WE_N),
 
 	.WRAM_ADDR(WRAM_ADDR),
@@ -684,7 +689,8 @@ main main
 	.JOY1_P6(JOY1_P6),
 	.JOY2_P6(JOY2_P6),
 	.JOY2_P6_in(JOY2_P6_DI),
-	
+	.SNI_JOY(SNI_JOY),
+
 	.EXT_RTC(RTC),
 
 	.GG_EN(status[24]),
@@ -848,6 +854,13 @@ wire       WRAM_OE_N;
 wire       WRAM_WE_N;
 wire [7:0] WRAM_Q, WRAM_D;
 
+wire[24:0]  SDRAM_SNI_ADDR;
+wire[7:0]   SDRAM_SNI_DATA;
+wire[7:0]   SDRAM_SNI_Q;
+wire        SDRAM_SNI_RD;
+wire        SDRAM_SNI_WR;
+wire        SDRAM_SNI_READY;
+
 wire[24:0] cart_addr_download = ioctl_addr-10'd512;
 wire[23:0] ssbin_addr_download = { 8'hFF, ioctl_addr[15:0] };
 wire[23:0] addr_download = ssbin_download ? ssbin_addr_download : cart_addr_download[23:0];
@@ -915,7 +928,7 @@ reg READ_PULSE;
 always @(posedge clk_sys)
 	READ_PULSE <= SNES_SYSCLKR_CE;
 
-wire [15:0] sdr_dout1;
+wire [15:0] sdr_dout1, sdr_sni_dout;
 sdram sdram
 (
 	.SDRAM_CLK(SDRAM_CLK),
@@ -929,27 +942,39 @@ sdram sdram
 	.SDRAM_nRAS(SDRAM_nRAS),
 	.SDRAM_nCAS(SDRAM_nCAS),
 	.SDRAM_CKE(SDRAM_CKE),
-		
+
 	.init(0), //~clock_locked),
 	.clk(clk_mem),
 	
 	.addr0(sdram_download_en ? sdram_download_addr : rom_addr_out),
 	.din0(sdram_download_en ? sdram_download_data : ROM_D),
 	.dout0(ROM_Q),
+
 	.rd0(sdram_download_en ? 1'b0 : !RESET_N ? RESET_REFRESH : ~ROM_OE_N),
 	.wr0(sdram_download_en ? sdram_download_wr : ~ROM_WE_N),
 	.word0(sdram_download_en | ROM_WORD),
-	
+
 	.addr1(clearing_ram ? {7'b0000000,mem_fill_addr} : {7'b0000000,WRAM_ADDR}),
 	.din1(clearing_ram ? {8'h00,wram_fill_data} : {8'h00,WRAM_D}),
+
 	.dout1(sdr_dout1),
+
 	.rd1(clearing_ram ? 1'b0 : ~WRAM_CE_N & ~WRAM_OE_N & READ_PULSE),
 	.wr1(clearing_ram ? mem_fill_we : ~WRAM_CE_N & ~WRAM_WE_N & SNES_SYSCLKF_CE),
 	.rfs1(clearing_ram ? 1'b0 : !RESET_N ? RESET_REFRESH : SNES_REFRESH),
-	.word1(0)
+	.word1(0),
+
+	.sni_addr(SDRAM_SNI_ADDR),
+	.sni_din({8'h00,SDRAM_SNI_DATA}),
+	.sni_dout(sdr_sni_dout),
+	.sni_rd_req(SDRAM_SNI_RD),
+	.sni_wr_req(SDRAM_SNI_WR),
+	.sni_ready(SDRAM_SNI_READY),
+	.sni_word(0)
 );
 
 assign WRAM_Q = sdr_dout1[7:0];
+assign SDRAM_SNI_Q = sdr_sni_dout[7:0];
 
 wire        VRAM_OE_N;
 reg         VRAM_OE_N_DELAYED;
@@ -1013,16 +1038,21 @@ dpram_dif #(16,8,15,16) aram
 localparam  BSRAM_BITS = 18; // 256Kbyte
 wire [19:0] BSRAM_ADDR;
 wire        BSRAM_CE_N;
-wire        BSRAM_WE_N;
+wire        BSRAM_OE_N, BSRAM_WE_N;
 wire  [7:0] BSRAM_Q, BSRAM_D;
+wire [19:0] BSRAM_SNI_ADDR;
+wire        BSRAM_SNI_WR;
+wire [7:0]  BSRAM_SNI_D;
+wire        BSRAM_SNI_READY = BSRAM_CE_N | (BSRAM_OE_N & BSRAM_WE_N);
+
 dpram_dif #(BSRAM_BITS,8,BSRAM_BITS-1,16) bsram 
 (
 	.clock(clk_sys),
 
 	//Thrash the BSRAM upon ROM loading
-	.address_a(clearing_ram ? mem_fill_addr[BSRAM_BITS-1:0] : BSRAM_ADDR[BSRAM_BITS-1:0]),
-	.data_a(clearing_ram ? 8'hFF : BSRAM_D),
-	.wren_a(clearing_ram ? mem_fill_we : ~BSRAM_CE_N & ~BSRAM_WE_N),
+	.address_a(clearing_ram ? mem_fill_addr[BSRAM_BITS-1:0] : BSRAM_SNI_READY ? BSRAM_SNI_ADDR : BSRAM_ADDR[BSRAM_BITS-1:0]),
+	.data_a(clearing_ram ? 8'hFF : BSRAM_SNI_READY ? BSRAM_SNI_D : BSRAM_D),
+	.wren_a(clearing_ram ? mem_fill_we : BSRAM_SNI_READY ? BSRAM_SNI_WR : ~BSRAM_WE_N),
 	.q_a(BSRAM_Q),
 
 	.address_b({sd_lba[BSRAM_BITS-10:0],sd_buff_addr}),
@@ -1109,18 +1139,75 @@ video_mixer #(.LINE_LENGTH(520), .GAMMA(1)) video_mixer
 ////////////////////////////  I/O PORTS  ////////////////////////////////
 
 assign {UART_RTS, UART_DTR} = 1;
-wire [15:0] uart_data;
+
+wire piano = status[43] & (uart_mode == 3);
+reg last_piano = 1'b0;
+always @(posedge clk_sys) last_piano <= piano;
+reg piano_tdata_i;
+reg sni_tdata_i;
+wire [15:0] piano_data_i;
+wire [15:0] sni_data_i;
+wire [15:0] data_o;
+wire rbf;
+wire txint;
+wire rxint;
+
+uart uart(
+	.clk(clk_sys),
+	.reset(reset || (piano ^ last_piano)),
+	.midi_speed_sel(piano),
+	.tdata_i(piano ? piano_tdata_i : sni_tdata_i),
+	.data_i(piano ? piano_data_i : sni_data_i),
+	.data_o(data_o),
+	.uartbrk(1'b0),//reset),
+	.rbfmirror(rbf),
+	.txint(txint),
+	.rxint(rxint),
+	.txd(UART_TXD),
+	.rxd(UART_RXD)
+);
+
 wire piano_joypad_do;
-wire piano = status[43];
 miraclepiano miracle(
 	.clk(clk_sys),
 	.reset(reset || !piano),
 	.strobe(JOY_STRB),
 	.joypad_o(piano_joypad_do),
 	.joypad_clock(JOY1_CLK),
-	.data_o(uart_data),
-	.txd(UART_TXD),
-	.rxd(UART_RXD)
+	.txint(txint),
+	.rxint(rxint),
+	.tdata_i(piano_tdata_i),
+	.tdata_m(piano_data_i),
+	.rdata_m(data_o)
+);
+
+wire [63:0] SNI_JOY;
+sni sni(
+	.clk(clk_sys),
+	.reset(reset || uart_mode != 6),
+	.vblank(VBlank),
+
+	.sdram_addr(SDRAM_SNI_ADDR),
+	.sdram_data(SDRAM_SNI_DATA),
+	.sdram_q(SDRAM_SNI_Q),
+	.sdram_rd_req(SDRAM_SNI_RD),
+	.sdram_wr_req(SDRAM_SNI_WR),
+	.sdram_ready(SDRAM_SNI_READY),
+
+	.bsram_addr(BSRAM_SNI_ADDR),
+	.bsram_q(BSRAM_Q),
+	.bsram_wr(BSRAM_SNI_WR),
+	.bsram_data(BSRAM_SNI_D),
+	.bsram_ready(BSRAM_SNI_READY),
+
+	.joypad(SNI_JOY),
+
+	.rbf(rbf),
+	.txint(txint),
+	.rxint(rxint),
+	.tdata_i(sni_tdata_i),
+	.tdata_m(sni_data_i),
+	.rdata_m(data_o)
 );
 wire [1:0] JOY1_DO = piano ? {1'b1,piano_joypad_do} : JOY1_DO_t;
 

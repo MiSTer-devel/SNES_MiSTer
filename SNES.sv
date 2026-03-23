@@ -871,6 +871,7 @@ reg         rom_mirror_en;
 
 always @(posedge clk_sys) begin
 	if (~old_downloading & cart_download) begin
+		rom_file_sz   <= 24'd0;
 		rom_mirror_en <= 1'b0;
 	end
 
@@ -905,8 +906,7 @@ always @(posedge clk_sys) begin
 	end
 end
 
-wire        rom_in_range  = !(|(ROM_ADDR & ~rom_mask));
-wire        rom_in_mirror = rom_mirror_en & rom_in_range & |(ROM_ADDR & rom_mirror_split);
+wire        rom_in_mirror = rom_mirror_en & |(ROM_ADDR & rom_mirror_split);
 wire [23:0] rom_addr_out  = rom_in_mirror
              ? (rom_mirror_split | (ROM_ADDR & rom_mirror_rmask))
              : ROM_ADDR;

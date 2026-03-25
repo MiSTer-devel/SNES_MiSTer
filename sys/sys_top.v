@@ -721,6 +721,9 @@ wire         bob_deint;
 		.DOWNSCALE_NN("true"),
 	`endif
 		.FRAC(8),
+`ifdef MENU_CORE
+		.N_BURST(2048),
+`endif
 		.N_DW(128),
 		.N_AW(28)
 	)

@@ -574,7 +574,7 @@ always @(posedge clk_sys) begin
 	if (RESET) last_rst <= 0;
 	if (status[0]) last_rst <= 1;
 
-	if (cart_download & ioctl_wr & status[0]) has_bootrom <= 1;
+	if (cart_download) has_bootrom <= 1;
 
 	if(last_rst & ~status[0]) begin
 		osd_btn <= 0;

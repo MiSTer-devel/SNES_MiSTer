@@ -230,7 +230,7 @@ always @(posedge clk) begin
 				dbg_first_addr  <= 16'd0;
 				// Write header with busy=1
 				ddram_wr_addr <= DDRAM_BASE;
-				ddram_wr_din  <= {16'h0100, 8'h01, 8'd0, 32'h52414348};
+				ddram_wr_din  <= {16'h0200, 8'h01, 8'd0, 32'h52414348};
 				ddram_wr_be   <= 8'hFF;
 				ddram_wr_req  <= ~ddram_wr_req;
 				return_state  <= S_READ_HDR;
@@ -496,7 +496,7 @@ always @(posedge clk) begin
 		// =============================================================
 		S_WR_HDR0: begin
 			ddram_wr_addr <= DDRAM_BASE;
-			ddram_wr_din  <= {16'h0100, 8'h00, 8'd0, 32'h52414348};
+			ddram_wr_din  <= {16'h0200, 8'h00, 8'd0, 32'h52414348};
 			ddram_wr_be   <= 8'hFF;
 			ddram_wr_req  <= ~ddram_wr_req;
 			return_state  <= S_WR_HDR1;

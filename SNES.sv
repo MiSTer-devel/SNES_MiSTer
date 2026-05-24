@@ -309,7 +309,7 @@ parameter CONF_STR = {
 	"OEF,Video Region,Auto,NTSC,PAL;",
 	"O13,ROM Header,Auto,No Header,LoROM,HiROM,ExHiROM;",
 	"-;",
-	"H2C,Cheats;",
+	"H8C,Cheats;",
 	"H2OO,Cheats Enabled,Yes,No;",
 	"-;",
 	"D0RC,Load Backup RAM;",
@@ -381,7 +381,7 @@ parameter CONF_STR = {
 wire  [1:0] buttons;
 wire [63:0] status;
 wire hardcore = status[58];
-wire [15:0] status_menumask = {ss_allow_no_hc, (ss_allow & ~hardcore), en216p, !GUN_MODE, ~turbo_allow, (~gg_available | hardcore), ~GSU_ACTIVE, ~bk_ena};
+wire [15:0] status_menumask = {7'b0, hardcore, ss_allow_no_hc, (ss_allow & ~hardcore), en216p, !GUN_MODE, ~turbo_allow, (~gg_available | hardcore), ~GSU_ACTIVE, ~bk_ena};
 wire        forced_scandoubler;
 reg  [31:0] sd_lba;
 reg         sd_rd = 0;

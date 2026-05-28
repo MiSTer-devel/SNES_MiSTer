@@ -122,7 +122,7 @@ localparam S_DISPATCH    = 5'd7;   // Route to WRAM or BSRAM fetch
 localparam S_FETCH_WRAM  = 5'd8;   // Issue SDRAM SNI read
 localparam S_WRAM_WAIT   = 5'd9;   // Wait for SDRAM ready
 localparam S_FETCH_BSRAM = 5'd10;  // Issue BSRAM read
-localparam S_BSRAM_WAIT  = 5'd11;  // 1-cycle BSRAM latency
+localparam S_BSRAM_WAIT  = 5'd11;  // 1st wait: present address to altsyncram
 localparam S_STORE_VAL   = 5'd12;  // Store byte in collect buffer
 localparam S_FLUSH_BUF   = 5'd13;  // Write collect buffer to DDRAM
 localparam S_WRITE_RESP  = 5'd14;  // Write response header
@@ -140,6 +140,8 @@ localparam S_QRY_WR_RESP = 5'd24;
 localparam S_QRY_WR_CTRL = 5'd25;
 localparam S_RD_ARMCFG    = 5'd26;  // initiate read of ARM config word
 localparam S_PARSE_ARMCFG = 5'd27;  // latch rtquery_armed from rd_data[0]
+localparam S_BSRAM_WAIT2  = 5'd28;  // 2nd wait: BSRAM data valid (altsyncram registers addr at edge N, output valid after edge N)
+localparam S_QRY_LATCH_B  = 5'd29;  // extra wait for BSRAM data valid (rtquery path)
 
 reg [4:0]  state;
 reg [4:0]  return_state;
@@ -408,7 +410,9 @@ always @(posedge clk) begin
 		end
 
 		// =============================================================
-		// BSRAM: 1-cycle block RAM read
+		// BSRAM: 2-cycle block RAM read
+		// altsyncram (outdata_reg_a=UNREGISTERED): address registered at edge N,
+		// bsram_dout (q_a) valid after edge N => capture in S_BSRAM_WAIT2 at edge N+2.
 		// =============================================================
 		S_FETCH_BSRAM: begin
 			if (bsram_ready) begin
@@ -419,7 +423,12 @@ always @(posedge clk) begin
 		end
 
 		S_BSRAM_WAIT: begin
-			fetch_byte <= bsram_dout;
+			// Address presented to altsyncram this edge; wait one more cycle for data.
+			state <= S_BSRAM_WAIT2;
+		end
+
+		S_BSRAM_WAIT2: begin
+			fetch_byte <= bsram_dout;  // valid now
 			state      <= S_STORE_VAL;
 		end
 
@@ -521,7 +530,7 @@ always @(posedge clk) begin
 		// =============================================================
 		S_WR_DBG: begin
 			ddram_wr_addr <= DDRAM_BASE + 29'd2;
-			ddram_wr_din  <= {8'h0B, dbg_dispatch_cnt, dbg_first_dout, dbg_timeout_cnt, dbg_ok_cnt};
+			ddram_wr_din  <= {8'h0C, dbg_dispatch_cnt, dbg_first_dout, dbg_timeout_cnt, dbg_ok_cnt};
 			ddram_wr_be   <= 8'hFF;
 			ddram_wr_req  <= ~ddram_wr_req;
 			return_state  <= S_WR_DBG2;
@@ -593,7 +602,7 @@ always @(posedge clk) begin
 			end else begin
 				bsram_addr <= rd_data[31:0] - 32'h20000;
 				bsram_rd   <= 1'b1;
-				state      <= S_QRY_WAIT_B;
+				state      <= S_QRY_LATCH_B;  // extra cycle for altsyncram latency
 			end
 		end
 
@@ -629,8 +638,13 @@ always @(posedge clk) begin
 			end
 		end
 
+		S_QRY_LATCH_B: begin
+			// altsyncram registered address at previous edge; bsram_dout valid now.
+			state <= S_QRY_WAIT_B;
+		end
+
 		S_QRY_WAIT_B: begin
-			// BSRAM is 1-cycle block RAM
+			// Capture BSRAM byte (valid after 2-cycle altsyncram latency)
 			qry_value    <= qry_value | ({24'd0, bsram_dout} << (qry_byte_idx * 8));
 			qry_byte_idx <= qry_byte_idx + 3'd1;
 			if (qry_byte_idx + 3'd1 >= qry_num_bytes[2:0]) begin
@@ -639,6 +653,7 @@ always @(posedge clk) begin
 				qry_addr   <= qry_addr + 32'd1;
 				bsram_addr <= qry_addr + 32'd1 - 32'h20000;
 				bsram_rd   <= 1'b1;
+				state      <= S_QRY_LATCH_B;  // wait again for next byte
 			end
 		end
 

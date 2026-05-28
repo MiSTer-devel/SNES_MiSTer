@@ -97,7 +97,7 @@ reg vblank_prev;
 wire vblank_rising = vblank & ~vblank_prev;
 always @(posedge clk) vblank_prev <= vblank;
 
-// Sticky vblank flag — captures edge even when busy in query states
+// Sticky vblank flag — captures edge; consumed in S_IDLE without triggering scan
 reg vblank_pending;
 always @(posedge clk) begin
 	if (reset)
@@ -106,6 +106,42 @@ always @(posedge clk) begin
 		vblank_pending <= 1'b1;
 	else if (state == S_IDLE && vblank_pending)
 		vblank_pending <= 1'b0;
+end
+
+// Pre-VBlank scan trigger — fires at ~line 215 (pre-NMI, end of active display).
+// WRAM is scanned BEFORE the SNES NMI handler writes 0x1FFC=160,
+// matching the timing used by RASnes9x for achievement evaluation.
+// SDRAM arbitration (can_start_sni in sdram.sv) handles contention safely.
+//
+// Two-counter design (line + sub-line) avoids large 19-bit constants that
+// trigger a known Quartus 17.0 SGN_EXTRACTOR crash.
+// Line period: 1364 clk_sys cycles (NTSC). Trigger at start of line 215.
+localparam [10:0] CYCLES_PER_LINE = 11'd1363;   // 0..1363 = 1364 cycles
+localparam [8:0]  PRE_VBL_LINE    = 9'd222;
+
+reg [10:0] subline_cnt;   // 0..1363, cycle within current scanline
+reg [8:0]  line_cnt;      // 0..261, current scanline since vblank fell
+
+always @(posedge clk) begin
+	if (reset || vblank) begin
+		subline_cnt <= 11'd0;
+		line_cnt    <= 9'd0;
+	end else if (subline_cnt == CYCLES_PER_LINE) begin
+		subline_cnt <= 11'd0;
+		line_cnt    <= line_cnt + 9'd1;
+	end else begin
+		subline_cnt <= subline_cnt + 11'd1;
+	end
+end
+
+reg pre_vbl_pending;
+always @(posedge clk) begin
+	if (reset)
+		pre_vbl_pending <= 1'b0;
+	else if (~vblank && line_cnt == PRE_VBL_LINE && subline_cnt == 11'd0)
+		pre_vbl_pending <= 1'b1;
+	else if (state == S_IDLE && pre_vbl_pending)
+		pre_vbl_pending <= 1'b0;
 end
 
 // ======================================================================
@@ -212,12 +248,14 @@ always @(posedge clk) begin
 		case (state)
 
 		// =============================================================
-		// IDLE: Wait for VBlank rising edge
+		// IDLE: wait for pre-VBlank trigger (~line 215)
 		// =============================================================
 		S_IDLE: begin
 			active   <= 1'b0;
 			sni_word <= 1'b0;
-			if (vblank_pending) begin
+			// pre_vbl_pending fires at ~line 215 so WRAM is captured pre-NMI.
+			// vblank_pending is still cleared by its own always block; no scan here.
+			if (pre_vbl_pending) begin
 				active <= 1'b1;
 				qry_poll_timer   <= 10'd0;
 				// Reset debug counters for this frame
@@ -232,7 +270,7 @@ always @(posedge clk) begin
 				dbg_first_addr  <= 16'd0;
 				// Write header with busy=1
 				ddram_wr_addr <= DDRAM_BASE;
-				ddram_wr_din  <= {16'h0200, 8'h01, 8'd0, 32'h52414348};
+				ddram_wr_din  <= {16'h0300, 8'h01, 8'd0, 32'h52414348};
 				ddram_wr_be   <= 8'hFF;
 				ddram_wr_req  <= ~ddram_wr_req;
 				return_state  <= S_READ_HDR;
@@ -363,20 +401,18 @@ always @(posedge clk) begin
 		// =============================================================
 		// WRAM: byte-mode SDRAM SNI read (matches sni.sv protocol exactly)
 		// Uses sni_word=0 (byte read) so sdram.sv handles byte selection.
-		// VBlank gate: only start new reads while vblank is HIGH to avoid
-		// SDRAM contention with PPU/CPU during active scanlines.
+		// No vblank gate: scan starts pre-NMI (~line 215) so we capture
+		// active-display WRAM values before the NMI handler runs.
+		// can_start_sni in sdram.sv serializes with CPU/PPU safely.
 		// =============================================================
 		S_FETCH_WRAM: begin
-			if (vblank) begin
-				// Byte address directly (sdram.sv uses addr[0] for byte select)
-				sni_addr     <= {1'b1, 7'd0, cur_addr[16:0]};
-				sni_word     <= 1'b0;     // byte mode (matches sni.sv)
-				sni_rd_req   <= 1'b1;     // ONE cycle pulse
-				sni_phase    <= 1'b0;
-				timeout      <= 16'd0;
-				state        <= S_WRAM_WAIT;
-			end
-			// else: stay in S_FETCH_WRAM until vblank goes HIGH again
+			// Read immediately — SDRAM arbitration handles contention
+			sni_addr     <= {1'b1, 7'd0, cur_addr[16:0]};
+			sni_word     <= 1'b0;     // byte mode (matches sni.sv)
+			sni_rd_req   <= 1'b1;     // ONE cycle pulse
+			sni_phase    <= 1'b0;
+			timeout      <= 16'd0;
+			state        <= S_WRAM_WAIT;
 		end
 
 		S_WRAM_WAIT: begin
@@ -415,11 +451,14 @@ always @(posedge clk) begin
 		// bsram_dout (q_a) valid after edge N => capture in S_BSRAM_WAIT2 at edge N+2.
 		// =============================================================
 		S_FETCH_BSRAM: begin
-			if (bsram_ready) begin
+			// VBlank gate: keep BSRAM in same VBlank window as WRAM
+			// to prevent delta-condition frame skew on SA-1 games.
+			if (vblank && bsram_ready) begin
 				bsram_addr <= cur_addr - 32'h20000;
 				bsram_rd   <= 1'b1;
 				state      <= S_BSRAM_WAIT;
 			end
+			// else: stay here until vblank returns (same as S_FETCH_WRAM)
 		end
 
 		S_BSRAM_WAIT: begin
@@ -505,7 +544,7 @@ always @(posedge clk) begin
 		// =============================================================
 		S_WR_HDR0: begin
 			ddram_wr_addr <= DDRAM_BASE;
-			ddram_wr_din  <= {16'h0200, 8'h00, 8'd0, 32'h52414348};
+			ddram_wr_din  <= {16'h0300, 8'h00, 8'd0, 32'h52414348};
 			ddram_wr_be   <= 8'hFF;
 			ddram_wr_req  <= ~ddram_wr_req;
 			return_state  <= S_WR_HDR1;
@@ -530,7 +569,7 @@ always @(posedge clk) begin
 		// =============================================================
 		S_WR_DBG: begin
 			ddram_wr_addr <= DDRAM_BASE + 29'd2;
-			ddram_wr_din  <= {8'h0C, dbg_dispatch_cnt, dbg_first_dout, dbg_timeout_cnt, dbg_ok_cnt};
+			ddram_wr_din  <= {8'h0E, dbg_dispatch_cnt, dbg_first_dout, dbg_timeout_cnt, dbg_ok_cnt};
 			ddram_wr_be   <= 8'hFF;
 			ddram_wr_req  <= ~ddram_wr_req;
 			return_state  <= S_WR_DBG2;

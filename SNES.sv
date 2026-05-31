@@ -293,7 +293,7 @@ wire reset = RESET | buttons[1] | status[0] | cart_download | spc_download | bk_
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXX XXXXXXXX X
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXX XXXXXXXX
 
 `include "build_id.v"
 parameter CONF_STR = {
@@ -380,7 +380,16 @@ parameter CONF_STR = {
 
 wire  [1:0] buttons;
 wire [63:0] status;
-wire hardcore = status[58];
+
+// ============================================================================
+// RetroAchievements feature toggle
+//   ENABLE_RA = 1'b1 -> RA mirror hardware present (SNI/BSRAM/DDRAM mirror).
+//   ENABLE_RA = 1'b0 -> all RA hardware tied off and pruned by synthesis,
+//                       yielding behavior identical to Release 20260325.
+// ============================================================================
+localparam bit ENABLE_RA = 1'b1;
+wire hardcore = ENABLE_RA ? status[58] : 1'b0;
+
 wire [15:0] status_menumask = {7'b0, hardcore, ss_allow_no_hc, (ss_allow & ~hardcore), en216p, !GUN_MODE, ~turbo_allow, (~gg_available | hardcore), ~GSU_ACTIVE, ~bk_ena};
 wire        forced_scandoubler;
 reg  [31:0] sd_lba;
@@ -406,8 +415,6 @@ wire [10:0] ps2_key;
 wire [15:0] joystick1_rumble;
 
 wire  [7:0] joy0_x,joy0_y,joy1_x,joy1_y;
-
-reg  [7:0] uart_mode;
 
 wire [64:0] RTC;
 
@@ -459,8 +466,6 @@ hps_io #(.CONF_STR(CONF_STR), .WIDE(1)) hps_io
 	.img_mounted(img_mounted),
 	.img_readonly(img_readonly),
 	.img_size(img_size),
-
-	.uart_mode(uart_mode),
 
 	.RTC(RTC),
 
@@ -575,7 +580,7 @@ always @(posedge clk_sys) begin
 	if (RESET) last_rst <= 0;
 	if (status[0]) last_rst <= 1;
 
-	if (cart_download & ioctl_wr & status[0]) has_bootrom <= 1;
+	if (cart_download) has_bootrom <= 1;
 
 	if(last_rst & ~status[0]) begin
 		osd_btn <= 0;
@@ -690,8 +695,7 @@ main main
 	.JOY1_P6(JOY1_P6),
 	.JOY2_P6(JOY2_P6),
 	.JOY2_P6_in(JOY2_P6_DI),
-	.SNI_JOY(SNI_JOY),
-
+	
 	.EXT_RTC(RTC),
 
 	.GG_EN(status[24] | hardcore),
@@ -855,41 +859,6 @@ wire       WRAM_OE_N;
 wire       WRAM_WE_N;
 wire [7:0] WRAM_Q, WRAM_D;
 
-wire[24:0]  SDRAM_SNI_ADDR;
-wire[7:0]   SDRAM_SNI_DATA;
-wire[7:0]   SDRAM_SNI_Q;
-wire        SDRAM_SNI_RD;
-wire        SDRAM_SNI_WR;
-wire        SDRAM_SNI_READY;
-
-// --- RetroAchievements RAM Mirror signals ---
-wire [24:0] ra_sni_addr;
-wire        ra_sni_rd_req;
-wire        ra_sni_word;
-wire [17:0] ra_bsram_addr;
-wire        ra_bsram_rd;
-wire        ra_active;
-wire [28:0] ra_ddram_addr;
-wire [63:0] ra_ddram_din;
-wire  [7:0] ra_ddram_be;
-wire        ra_ddram_req;
-wire        ra_ddram_ack;
-wire [28:0] ra_ddram_rd_addr;
-wire        ra_ddram_rd_req;
-wire        ra_ddram_rd_ack;
-wire [63:0] ra_ddram_rd_dout;
-wire [31:0] ra_dbg_frame;
-
-// SNI SDRAM mux: RA mirror takes over SNI port during transfer
-wire [24:0] sdram_sni_addr_mux = ra_active ? ra_sni_addr : SDRAM_SNI_ADDR;
-wire [15:0] sdram_sni_din_mux  = ra_active ? 16'h0000 : {8'h00, SDRAM_SNI_DATA};
-wire        sdram_sni_rd_mux   = ra_active ? ra_sni_rd_req : SDRAM_SNI_RD;
-wire        sdram_sni_wr_mux   = ra_active ? 1'b0 : SDRAM_SNI_WR;
-wire        sdram_sni_word_mux = ra_active ? ra_sni_word : 1'b0;
-
-// BSRAM save RAM size (bytes) from cart header
-wire [17:0] ra_bsram_size = |ram_mask[17:0] ? (ram_mask[17:0] + 18'd1) : 18'd0;
-
 wire[24:0] cart_addr_download = ioctl_addr-10'd512;
 wire[23:0] ssbin_addr_download = { 8'hFF, ioctl_addr[15:0] };
 wire[23:0] addr_download = ssbin_download ? ssbin_addr_download : cart_addr_download[23:0];
@@ -911,7 +880,36 @@ reg READ_PULSE;
 always @(posedge clk_sys)
 	READ_PULSE <= SNES_SYSCLKR_CE;
 
-wire [15:0] sdr_dout1, sdr_sni_dout;
+wire [15:0] sdr_dout1;
+
+// --- RetroAchievements RAM Mirror signals ---
+wire [24:0] ra_sni_addr;
+wire        ra_sni_rd_req;
+wire        ra_sni_word;
+wire [15:0] sdr_sni_dout;
+wire        SDRAM_SNI_READY;
+wire [17:0] ra_bsram_addr;
+wire        ra_bsram_rd;
+wire        ra_active;
+wire [28:0] ra_ddram_addr;
+wire [63:0] ra_ddram_din;
+wire  [7:0] ra_ddram_be;
+wire        ra_ddram_req;
+wire        ra_ddram_ack;
+wire [28:0] ra_ddram_rd_addr;
+wire        ra_ddram_rd_req;
+wire        ra_ddram_rd_ack;
+wire [63:0] ra_ddram_rd_dout;
+wire [31:0] ra_dbg_frame;
+
+// BSRAM "cart idle" gate (matches the original RA branch). Idle when the
+// chip is deselected OR (not reading AND not writing). The permissive form
+// is essential for SA-1 games: the SA-1 keeps BW-RAM (=BSRAM) selected most
+// of the time, so a CE_N-only gate would starve RA's BW-RAM reads.
+wire        BSRAM_RA_READY = BSRAM_CE_N | (BSRAM_OE_N & BSRAM_WE_N);
+// BSRAM save RAM size (bytes) from cart header
+wire [17:0] ra_bsram_size = |ram_mask[17:0] ? (ram_mask[17:0] + 18'd1) : 18'd0;
+
 sdram sdram
 (
 	.SDRAM_CLK(SDRAM_CLK),
@@ -925,39 +923,37 @@ sdram sdram
 	.SDRAM_nRAS(SDRAM_nRAS),
 	.SDRAM_nCAS(SDRAM_nCAS),
 	.SDRAM_CKE(SDRAM_CKE),
-
+		
 	.init(0), //~clock_locked),
 	.clk(clk_mem),
 	
 	.addr0(sdram_download_en ? sdram_download_addr : ROM_ADDR),
 	.din0(sdram_download_en ? sdram_download_data : ROM_D),
 	.dout0(ROM_Q),
-
 	.rd0(sdram_download_en ? 1'b0 : !RESET_N ? RESET_REFRESH : ~ROM_OE_N),
 	.wr0(sdram_download_en ? sdram_download_wr : ~ROM_WE_N),
 	.word0(sdram_download_en | ROM_WORD),
-
+	
 	.addr1(clearing_ram ? {7'b0000000,mem_fill_addr} : {7'b0000000,WRAM_ADDR}),
 	.din1(clearing_ram ? {8'h00,wram_fill_data} : {8'h00,WRAM_D}),
-
 	.dout1(sdr_dout1),
-
 	.rd1(clearing_ram ? 1'b0 : ~WRAM_CE_N & ~WRAM_OE_N & READ_PULSE),
 	.wr1(clearing_ram ? mem_fill_we : ~WRAM_CE_N & ~WRAM_WE_N & SNES_SYSCLKF_CE),
 	.rfs1(clearing_ram ? 1'b0 : !RESET_N ? RESET_REFRESH : SNES_REFRESH),
 	.word1(0),
 
-	.sni_addr(sdram_sni_addr_mux),
-	.sni_din(sdram_sni_din_mux),
-	.sni_dout(sdr_sni_dout),
-	.sni_rd_req(sdram_sni_rd_mux),
-	.sni_wr_req(sdram_sni_wr_mux),
-	.sni_ready(SDRAM_SNI_READY),
-	.sni_word(sdram_sni_word_mux)
+	// RetroAchievements SNI read port (WRAM). Dormant when ENABLE_RA=0
+	// (ra_sni_rd_req tied low -> no SNI accesses, port optimized away).
+	.sni_addr  (ra_sni_addr),
+	.sni_din   (16'h0000),
+	.sni_dout  (sdr_sni_dout),
+	.sni_rd_req(ra_sni_rd_req),
+	.sni_wr_req(1'b0),
+	.sni_ready (SDRAM_SNI_READY),
+	.sni_word  (ra_sni_word)
 );
 
 assign WRAM_Q = sdr_dout1[7:0];
-assign SDRAM_SNI_Q = sdr_sni_dout[7:0];
 
 wire        VRAM_OE_N;
 reg         VRAM_OE_N_DELAYED;
@@ -1021,21 +1017,17 @@ dpram_dif #(16,8,15,16) aram
 localparam  BSRAM_BITS = 18; // 256Kbyte
 wire [19:0] BSRAM_ADDR;
 wire        BSRAM_CE_N;
-wire        BSRAM_OE_N, BSRAM_WE_N;
+wire        BSRAM_OE_N;
+wire        BSRAM_WE_N;
 wire  [7:0] BSRAM_Q, BSRAM_D;
-wire [19:0] BSRAM_SNI_ADDR;
-wire        BSRAM_SNI_WR;
-wire [7:0]  BSRAM_SNI_D;
-wire        BSRAM_SNI_READY = BSRAM_CE_N | (BSRAM_OE_N & BSRAM_WE_N);
-
 dpram_dif #(BSRAM_BITS,8,BSRAM_BITS-1,16) bsram 
 (
 	.clock(clk_sys),
 
 	//Thrash the BSRAM upon ROM loading
-	.address_a(clearing_ram ? mem_fill_addr[BSRAM_BITS-1:0] : (BSRAM_SNI_READY && ra_active && ra_bsram_rd) ? ra_bsram_addr[BSRAM_BITS-1:0] : BSRAM_SNI_READY ? BSRAM_SNI_ADDR : BSRAM_ADDR[BSRAM_BITS-1:0]),
-	.data_a(clearing_ram ? 8'hFF : BSRAM_SNI_READY ? (ra_active ? 8'h00 : BSRAM_SNI_D) : BSRAM_D),
-	.wren_a(clearing_ram ? mem_fill_we : BSRAM_SNI_READY ? (ra_active ? 1'b0 : BSRAM_SNI_WR) : ~BSRAM_WE_N),
+	.address_a(clearing_ram ? mem_fill_addr[BSRAM_BITS-1:0] : (BSRAM_RA_READY && ra_active && ra_bsram_rd) ? ra_bsram_addr[BSRAM_BITS-1:0] : BSRAM_ADDR[BSRAM_BITS-1:0]),
+	.data_a(clearing_ram ? 8'hFF : BSRAM_D),
+	.wren_a(clearing_ram ? mem_fill_we : ~BSRAM_CE_N & ~BSRAM_WE_N),
 	.q_a(BSRAM_Q),
 
 	.address_b({sd_lba[BSRAM_BITS-10:0],sd_buff_addr}),
@@ -1122,75 +1114,18 @@ video_mixer #(.LINE_LENGTH(520), .GAMMA(1)) video_mixer
 ////////////////////////////  I/O PORTS  ////////////////////////////////
 
 assign {UART_RTS, UART_DTR} = 1;
-
-wire piano = status[43] & (uart_mode == 3);
-reg last_piano = 1'b0;
-always @(posedge clk_sys) last_piano <= piano;
-reg piano_tdata_i;
-reg sni_tdata_i;
-wire [15:0] piano_data_i;
-wire [15:0] sni_data_i;
-wire [15:0] data_o;
-wire rbf;
-wire txint;
-wire rxint;
-
-uart uart(
-	.clk(clk_sys),
-	.reset(reset || (piano ^ last_piano)),
-	.midi_speed_sel(piano),
-	.tdata_i(piano ? piano_tdata_i : sni_tdata_i),
-	.data_i(piano ? piano_data_i : sni_data_i),
-	.data_o(data_o),
-	.uartbrk(1'b0),//reset),
-	.rbfmirror(rbf),
-	.txint(txint),
-	.rxint(rxint),
-	.txd(UART_TXD),
-	.rxd(UART_RXD)
-);
-
+wire [15:0] uart_data;
 wire piano_joypad_do;
+wire piano = status[43];
 miraclepiano miracle(
 	.clk(clk_sys),
 	.reset(reset || !piano),
 	.strobe(JOY_STRB),
 	.joypad_o(piano_joypad_do),
 	.joypad_clock(JOY1_CLK),
-	.txint(txint),
-	.rxint(rxint),
-	.tdata_i(piano_tdata_i),
-	.tdata_m(piano_data_i),
-	.rdata_m(data_o)
-);
-
-wire [63:0] SNI_JOY;
-sni sni(
-	.clk(clk_sys),
-	.reset(reset || uart_mode != 6),
-	.vblank(VBlank),
-
-	.sdram_addr(SDRAM_SNI_ADDR),
-	.sdram_data(SDRAM_SNI_DATA),
-	.sdram_q(SDRAM_SNI_Q),
-	.sdram_rd_req(SDRAM_SNI_RD),
-	.sdram_wr_req(SDRAM_SNI_WR),
-	.sdram_ready(SDRAM_SNI_READY),
-
-	.bsram_addr(BSRAM_SNI_ADDR),
-	.bsram_q(BSRAM_Q),
-	.bsram_wr(BSRAM_SNI_WR),
-	.bsram_data(BSRAM_SNI_D),
-	.bsram_ready(BSRAM_SNI_READY),
-
-	.joypad(SNI_JOY),
-
-	.rbf(rbf),
-	.txint(txint),
-	.rxint(rxint),
-	.tdata_i(sni_tdata_i),
-	.tdata_m(sni_data_i),
-	.rdata_m(data_o)
+	.data_o(uart_data),
+	.txd(UART_TXD),
+	.rxd(UART_RXD)
 );
 wire [1:0] JOY1_DO = piano ? {1'b1,piano_joypad_do} : JOY1_DO_t;
 
@@ -1292,6 +1227,9 @@ assign USER_OUT[2] = 1'b1;
 assign USER_OUT[5] = 1'b1;
 assign USER_OUT[6] = 1'b1;
 
+wire  [1:0] datajoy0_DI = snac_p2 ? {1'b1, USER_IN[6]} : JOY1_DO;
+wire  [1:0] datajoy1_DI = snac_p2 ? {USER_IN[2], USER_IN[6]} : JOY2_DO;
+
 // JOYX_DO[0] is P4, JOYX_DO[1] is P5
 wire [1:0] JOY1_DI;
 wire [1:0] JOY2_DI;
@@ -1311,17 +1249,10 @@ always_comb begin
 		USER_OUT[0] = JOY_STRB;
 		USER_OUT[1] = joy_swap ? ~JOY2_CLK : ~JOY1_CLK;
 		USER_OUT[3] = joy_swap ? ~JOY1_CLK : ~JOY2_CLK;
-		if (snac_p2) begin
-			USER_OUT[4] = joy_swap ? JOY1_P6 : JOY2_P6;
-			JOY1_DI = joy_swap ? {1'b1, USER_IN[6]} : {1'b1, USER_IN[5]};
-			JOY2_DI = joy_swap ? {USER_IN[2], USER_IN[5]} : {USER_IN[2], USER_IN[6]};
-			JOY2_P6_DI = USER_IN[4];
-		end else begin
-			USER_OUT[4] = joy_swap ? JOY2_P6 : JOY1_P6;
-			JOY1_DI = joy_swap ? JOY1_DO : {USER_IN[2], USER_IN[5]};
-			JOY2_DI = joy_swap ? {USER_IN[2], USER_IN[5]} : JOY2_DO;
-			JOY2_P6_DI = joy_swap ? USER_IN[4] : (LG_P6_out | !GUN_MODE);
-		end
+		USER_OUT[4] = joy_swap ? JOY2_P6 : snac_p2 ? JOY2_P6 : JOY1_P6;
+		JOY1_DI = joy_swap ? datajoy0_DI : snac_p2 ? {1'b1, USER_IN[5]} : {USER_IN[2], USER_IN[5]};
+		JOY2_DI = joy_swap ? {USER_IN[2], USER_IN[5]} : datajoy1_DI;		
+		JOY2_P6_DI = joy_swap ? USER_IN[4] : snac_p2 ? USER_IN[4] : (LG_P6_out | !GUN_MODE);
 	end else begin
 		USER_OUT[0] = 1'b1;
 		USER_OUT[1] = 1'b1;
@@ -1596,33 +1527,53 @@ ddram ddram
 	.ra_dout(ra_ddram_rd_dout)
 );
 
-// --- RetroAchievements RAM Mirror ---
-ra_ram_mirror_snes ra_mirror (
-	.clk             (clk_sys),
-	.reset           (reset),
-	.vblank          (VBlank),
-	.sni_addr        (ra_sni_addr),
-	.sni_rd_req      (ra_sni_rd_req),
-	.sni_dout        (sdr_sni_dout),
-	.sni_ready       (SDRAM_SNI_READY),
-	.sni_word        (ra_sni_word),
-	.bsram_addr      (ra_bsram_addr),
-	.bsram_dout      (BSRAM_Q),
-	.bsram_rd        (ra_bsram_rd),
-	.bsram_ready     (BSRAM_SNI_READY),
-	.bsram_size      (ra_bsram_size),
-	.ddram_wr_addr   (ra_ddram_addr),
-	.ddram_wr_din    (ra_ddram_din),
-	.ddram_wr_be     (ra_ddram_be),
-	.ddram_wr_req    (ra_ddram_req),
-	.ddram_wr_ack    (ra_ddram_ack),
-	.ddram_rd_addr   (ra_ddram_rd_addr),
-	.ddram_rd_req    (ra_ddram_rd_req),
-	.ddram_rd_ack    (ra_ddram_rd_ack),
-	.ddram_rd_dout   (ra_ddram_rd_dout),
-	.active          (ra_active),
-	.dbg_frame_counter(ra_dbg_frame)
-);
+// --- RetroAchievements RAM Mirror (feature-gated) ---
+generate
+if (ENABLE_RA) begin : ra_gen
+	ra_ram_mirror_snes ra_mirror (
+		.clk             (clk_sys),
+		.reset           (reset),
+		.vblank          (VBlank),
+		.sni_addr        (ra_sni_addr),
+		.sni_rd_req      (ra_sni_rd_req),
+		.sni_dout        (sdr_sni_dout),
+		.sni_ready       (SDRAM_SNI_READY),
+		.sni_word        (ra_sni_word),
+		.bsram_addr      (ra_bsram_addr),
+		.bsram_dout      (BSRAM_Q),
+		.bsram_rd        (ra_bsram_rd),
+		.bsram_ready     (BSRAM_RA_READY),
+		.bsram_size      (ra_bsram_size),
+		.ddram_wr_addr   (ra_ddram_addr),
+		.ddram_wr_din    (ra_ddram_din),
+		.ddram_wr_be     (ra_ddram_be),
+		.ddram_wr_req    (ra_ddram_req),
+		.ddram_wr_ack    (ra_ddram_ack),
+		.ddram_rd_addr   (ra_ddram_rd_addr),
+		.ddram_rd_req    (ra_ddram_rd_req),
+		.ddram_rd_ack    (ra_ddram_rd_ack),
+		.ddram_rd_dout   (ra_ddram_rd_dout),
+		.active          (ra_active),
+		.dbg_frame_counter(ra_dbg_frame)
+	);
+end else begin : ra_gen
+	// RA disabled: tie off all RA-module outputs so synthesis prunes the
+	// SNI/BSRAM/DDRAM mirror paths entirely (clean 20260325 behavior).
+	assign ra_sni_addr      = 25'd0;
+	assign ra_sni_rd_req    = 1'b0;
+	assign ra_sni_word      = 1'b0;
+	assign ra_bsram_addr    = 18'd0;
+	assign ra_bsram_rd      = 1'b0;
+	assign ra_active        = 1'b0;
+	assign ra_ddram_addr    = 29'd0;
+	assign ra_ddram_din     = 64'd0;
+	assign ra_ddram_be      = 8'd0;
+	assign ra_ddram_req     = 1'b0;
+	assign ra_ddram_rd_addr = 29'd0;
+	assign ra_ddram_rd_req  = 1'b0;
+	assign ra_dbg_frame     = 32'd0;
+end
+endgenerate
 
 
 // saving with keyboard/OSD/gamepad

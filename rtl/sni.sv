@@ -121,7 +121,7 @@ module sni(
 
 		{rd_req, wr_req} <= 2'b0;
 		tdata_i <= 1'b0;
-		{bsram_rd_, bsram_wr_} <= 1'b0;
+		{bsram_rd_, bsram_wr_} <= 2'b0;
 
 		if (reset) begin
 			addr <= 24'b0;

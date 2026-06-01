@@ -889,7 +889,6 @@ wire        ra_sni_word;
 wire [15:0] sdr_sni_dout;
 wire        SDRAM_SNI_READY;
 wire [17:0] ra_bsram_addr;
-wire        ra_bsram_rd;
 wire        ra_active;
 wire [28:0] ra_ddram_addr;
 wire [63:0] ra_ddram_din;
@@ -902,11 +901,16 @@ wire        ra_ddram_rd_ack;
 wire [63:0] ra_ddram_rd_dout;
 wire [31:0] ra_dbg_frame;
 
-// BSRAM "cart idle" gate (matches the original RA branch). Idle when the
-// chip is deselected OR (not reading AND not writing). The permissive form
-// is essential for SA-1 games: the SA-1 keeps BW-RAM (=BSRAM) selected most
-// of the time, so a CE_N-only gate would starve RA's BW-RAM reads.
-wire        BSRAM_RA_READY = BSRAM_CE_N | (BSRAM_OE_N & BSRAM_WE_N);
+// Port B of bsram DPRAM: 16-bit, word-addressed. Used for SD card save/load
+// (bk_state=1) or RA reads (otherwise). SD save/load is infrequent and user-
+// initiated, so RA VBlank reads are safe when bk_state=0. Port B is fully
+// independent of Port A (SA-1 BW-RAM bus), eliminating any race condition.
+wire [BSRAM_BITS-2:0] bsram_b_addr = bk_state
+		? {sd_lba[BSRAM_BITS-10:0], sd_buff_addr}
+		: ra_bsram_addr[BSRAM_BITS-1:1]; // RA word address (byte addr >> 1)
+wire [15:0] bsram_port_b_q;  // Port B raw 16-bit output
+// Byte select: LSB of RA byte address picks low or high byte of Port B word.
+wire  [7:0] ra_bsram_dout_b = ra_bsram_addr[0] ? bsram_port_b_q[15:8] : bsram_port_b_q[7:0];
 // BSRAM save RAM size (bytes) from cart header
 wire [17:0] ra_bsram_size = |ram_mask[17:0] ? (ram_mask[17:0] + 18'd1) : 18'd0;
 
@@ -1025,16 +1029,18 @@ dpram_dif #(BSRAM_BITS,8,BSRAM_BITS-1,16) bsram
 	.clock(clk_sys),
 
 	//Thrash the BSRAM upon ROM loading
-	.address_a(clearing_ram ? mem_fill_addr[BSRAM_BITS-1:0] : (BSRAM_RA_READY && ra_active && ra_bsram_rd) ? ra_bsram_addr[BSRAM_BITS-1:0] : BSRAM_ADDR[BSRAM_BITS-1:0]),
+	.address_a(clearing_ram ? mem_fill_addr[BSRAM_BITS-1:0] : BSRAM_ADDR[BSRAM_BITS-1:0]),
 	.data_a(clearing_ram ? 8'hFF : BSRAM_D),
 	.wren_a(clearing_ram ? mem_fill_we : ~BSRAM_CE_N & ~BSRAM_WE_N),
 	.q_a(BSRAM_Q),
 
-	.address_b({sd_lba[BSRAM_BITS-10:0],sd_buff_addr}),
+	// Port B: SD card save/load -or- RA byte reads (see bsram_b_addr mux above)
+	.address_b(bsram_b_addr),
 	.data_b(sd_buff_dout),
 	.wren_b(sd_buff_wr & sd_ack),
-	.q_b(sd_buff_din)
+	.q_b(bsram_port_b_q)
 );
+assign sd_buff_din = bsram_port_b_q;  // SD card reads BSRAM via Port B
 
 ////////////////////////////  VIDEO  ////////////////////////////////////
 
@@ -1540,9 +1546,7 @@ if (ENABLE_RA) begin : ra_gen
 		.sni_ready       (SDRAM_SNI_READY),
 		.sni_word        (ra_sni_word),
 		.bsram_addr      (ra_bsram_addr),
-		.bsram_dout      (BSRAM_Q),
-		.bsram_rd        (ra_bsram_rd),
-		.bsram_ready     (BSRAM_RA_READY),
+		.bsram_dout      (ra_bsram_dout_b), // Port B: independent of SA-1 Port A
 		.bsram_size      (ra_bsram_size),
 		.ddram_wr_addr   (ra_ddram_addr),
 		.ddram_wr_din    (ra_ddram_din),
@@ -1563,7 +1567,6 @@ end else begin : ra_gen
 	assign ra_sni_rd_req    = 1'b0;
 	assign ra_sni_word      = 1'b0;
 	assign ra_bsram_addr    = 18'd0;
-	assign ra_bsram_rd      = 1'b0;
 	assign ra_active        = 1'b0;
 	assign ra_ddram_addr    = 29'd0;
 	assign ra_ddram_din     = 64'd0;

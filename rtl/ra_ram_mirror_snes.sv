@@ -38,8 +38,6 @@ module ra_ram_mirror_snes #(
 	// BSRAM read interface
 	output reg [17:0] bsram_addr,
 	input       [7:0] bsram_dout,
-	output reg        bsram_rd,
-	input             bsram_ready,
 
 	// BSRAM actual size (bytes, from cart header ram_mask+1)
 	input      [17:0] bsram_size,
@@ -231,7 +229,6 @@ reg [19:0] ddram_wait_timeout;
 // Main state machine
 // ======================================================================
 always @(posedge clk) begin
-	bsram_rd <= 1'b0;
 
 	if (reset) begin
 		state        <= S_IDLE;
@@ -453,9 +450,8 @@ always @(posedge clk) begin
 		S_FETCH_BSRAM: begin
 			// VBlank gate: keep BSRAM in same VBlank window as WRAM
 			// to prevent delta-condition frame skew on SA-1 games.
-			if (vblank && bsram_ready) begin
+			if (vblank) begin
 				bsram_addr <= cur_addr - 32'h20000;
-				bsram_rd   <= 1'b1;
 				state      <= S_BSRAM_WAIT;
 			end
 			// else: stay here until vblank returns (same as S_FETCH_WRAM)
@@ -640,7 +636,6 @@ always @(posedge clk) begin
 				state         <= S_QRY_WAIT_W;
 			end else begin
 				bsram_addr <= rd_data[31:0] - 32'h20000;
-				bsram_rd   <= 1'b1;
 				state      <= S_QRY_LATCH_B;  // extra cycle for altsyncram latency
 			end
 		end
@@ -691,7 +686,6 @@ always @(posedge clk) begin
 			end else begin
 				qry_addr   <= qry_addr + 32'd1;
 				bsram_addr <= qry_addr + 32'd1 - 32'h20000;
-				bsram_rd   <= 1'b1;
 				state      <= S_QRY_LATCH_B;  // wait again for next byte
 			end
 		end

@@ -995,9 +995,9 @@ wire        BSRAM_CE_N;
 wire        BSRAM_OE_N, BSRAM_WE_N;
 wire  [7:0] BSRAM_Q, BSRAM_D;
 wire [19:0] BSRAM_SNI_ADDR;
-wire        BSRAM_SNI_WR;
+wire        BSRAM_SNI_RD, BSRAM_SNI_WR;
 wire [7:0]  BSRAM_SNI_D;
-wire        BSRAM_SNI_READY = BSRAM_CE_N | (BSRAM_OE_N & BSRAM_WE_N);
+wire        BSRAM_SNI_READY = (BSRAM_SNI_RD | BSRAM_SNI_WR) & (BSRAM_CE_N | (BSRAM_OE_N & BSRAM_WE_N));
 
 dpram_dif #(BSRAM_BITS,8,BSRAM_BITS-1,16) bsram 
 (
@@ -1150,6 +1150,7 @@ sni sni(
 
 	.bsram_addr(BSRAM_SNI_ADDR),
 	.bsram_q(BSRAM_Q),
+	.bsram_rd(BSRAM_SNI_RD),
 	.bsram_wr(BSRAM_SNI_WR),
 	.bsram_data(BSRAM_SNI_D),
 	.bsram_ready(BSRAM_SNI_READY),

@@ -995,9 +995,9 @@ wire        BSRAM_CE_N;
 wire        BSRAM_OE_N, BSRAM_WE_N;
 wire  [7:0] BSRAM_Q, BSRAM_D;
 wire [19:0] BSRAM_SNI_ADDR;
-wire        BSRAM_SNI_WR;
+wire        BSRAM_SNI_RD, BSRAM_SNI_WR;
 wire [7:0]  BSRAM_SNI_D;
-wire        BSRAM_SNI_READY = BSRAM_CE_N | (BSRAM_OE_N & BSRAM_WE_N);
+wire        BSRAM_SNI_READY = (BSRAM_SNI_RD | BSRAM_SNI_WR) & (BSRAM_CE_N | (BSRAM_OE_N & BSRAM_WE_N));
 
 dpram_dif #(BSRAM_BITS,8,BSRAM_BITS-1,16) bsram 
 (
@@ -1006,7 +1006,7 @@ dpram_dif #(BSRAM_BITS,8,BSRAM_BITS-1,16) bsram
 	//Thrash the BSRAM upon ROM loading
 	.address_a(clearing_ram ? mem_fill_addr[BSRAM_BITS-1:0] : BSRAM_SNI_READY ? BSRAM_SNI_ADDR : BSRAM_ADDR[BSRAM_BITS-1:0]),
 	.data_a(clearing_ram ? 8'hFF : BSRAM_SNI_READY ? BSRAM_SNI_D : BSRAM_D),
-	.wren_a(clearing_ram ? mem_fill_we : BSRAM_SNI_READY ? BSRAM_SNI_WR : ~BSRAM_WE_N),
+	.wren_a(clearing_ram ? mem_fill_we : BSRAM_SNI_READY ? BSRAM_SNI_WR : ~BSRAM_CE_N & ~BSRAM_WE_N),
 	.q_a(BSRAM_Q),
 
 	.address_b({sd_lba[BSRAM_BITS-10:0],sd_buff_addr}),
@@ -1150,6 +1150,7 @@ sni sni(
 
 	.bsram_addr(BSRAM_SNI_ADDR),
 	.bsram_q(BSRAM_Q),
+	.bsram_rd(BSRAM_SNI_RD),
 	.bsram_wr(BSRAM_SNI_WR),
 	.bsram_data(BSRAM_SNI_D),
 	.bsram_ready(BSRAM_SNI_READY),

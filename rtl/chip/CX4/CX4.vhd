@@ -32,7 +32,27 @@ entity CX4 is
 		
 		BUS_RD_N		: out std_logic;
 		
-		MAPPER		: in std_logic
+		MAPPER		: in std_logic;
+
+		SS_BUSY    : in  std_logic;
+		SS_SAVE    : in  std_logic := '0';
+		SS_WR      : in  std_logic;
+		SS_DO      : out std_logic_vector(7 downto 0);
+		SS_RAM_A   : in  std_logic_vector(11 downto 0);
+		SS_RAM_SEL : in  std_logic;
+		SS_RAM_WR  : in  std_logic;
+		SS_RAM_DI  : in  std_logic_vector(7 downto 0);
+		SS_RAM_DO  : out std_logic_vector(7 downto 0);
+
+		-- Program cache serialized over SS_CACHE_*: A(0) selects L/H lane, A(9:1) is the 9-bit index.
+		SS_CACHE_A   : in  std_logic_vector(9 downto 0) := (others => '0');
+		SS_CACHE_SEL : in  std_logic := '0';
+		SS_CACHE_WR  : in  std_logic := '0';
+		SS_CACHE_DI  : in  std_logic_vector(7 downto 0) := (others => '0');
+		SS_CACHE_DO  : out std_logic_vector(7 downto 0);
+
+		-- '1' when the CX4 is fully idle (BUSY=0): lets the SS controller defer the snapshot until no op is in flight.
+		SS_IDLE      : out std_logic
 	);
 end CX4;
 
@@ -143,6 +163,10 @@ architecture rtl of CX4 is
 	signal CACHE_DI : std_logic_vector(7 downto 0);
 	signal CACHE_Q_L, CACHE_Q_H : std_logic_vector(7 downto 0);
 	signal CACHE_WE : std_logic;
+	-- Muxed cache ports (normal CPU/fill path vs SS save/restore path)
+	signal CACHE_RDADDR, CACHE_WRADDR : std_logic_vector(8 downto 0);
+	signal CACHE_WDATA : std_logic_vector(7 downto 0);
+	signal CACHEL_WE, CACHEH_WE : std_logic;
 	signal DATA_RAM_ADDR_A, DATA_RAM_ADDR_B : std_logic_vector(11 downto 0);
 	signal DATA_RAM_DI_A, DATA_RAM_DI_B : std_logic_vector(7 downto 0);
 	signal DATA_RAM_Q_A, DATA_RAM_Q_B : std_logic_vector(7 downto 0);
@@ -151,7 +175,7 @@ architecture rtl of CX4 is
 	signal DATA_ROM_Q : std_logic_vector(23 downto 0);
 	
 	signal BUS_RD_CNT : unsigned(1 downto 0);
-	
+
 	impure function BitToInt (v : in std_logic) return integer is
         variable ret : integer range 0 to 1;
     begin   
@@ -165,7 +189,7 @@ architecture rtl of CX4 is
 	
 begin
 
-	EN <= ENABLE and CE;
+	EN <= ENABLE and CE and not SS_BUSY;
 	CPU_EN <= EN and CPU_RUN and (not CACHE_RUN) and (not DMA_RUN) and (not SUSPEND);
 	
 	--I/O Ports
@@ -183,8 +207,9 @@ begin
 		end if;
 	end process; 
 	
-	MMIO_WR <= not WR_N and MMIO_SEL and SYSCLKF_CE;
-	RAMIO_WR <= not WR_N and RAMIO_SEL and SYSCLKF_CE;
+	-- Open CX4 MMIO during a LOAD only (SA1-style ~(ss_busy & save_en)) so restore writes pass; a SAVE stays frozen.
+	MMIO_WR  <= not WR_N and MMIO_SEL  and SYSCLKF_CE and not (SS_BUSY and SS_SAVE);
+	RAMIO_WR <= not WR_N and RAMIO_SEL and SYSCLKF_CE and not SS_BUSY;
 	
 	process(CLK, RST_N, WR_Nr, RAMIO_SEL, MMIO_SEL, SYSCLKF_CE)
 	begin
@@ -261,10 +286,23 @@ begin
 					end if;
 				end if;
 			end if;
+			-- HW-kept MMIO regs only (their writes side-effect); the rest restore via MMIO in savestates_cx4.asm.
+			if SS_WR = '1' then
+				case ADDR(7 downto 0) is
+					when x"6E" => DMA_DST(7 downto 0)   <= DI;
+					when x"6F" => DMA_DST(15 downto 8)  <= DI;
+					when x"70" => DMA_DST(23 downto 16) <= DI;
+					when x"78" => PAGE_SEL              <= DI(0);
+					when x"79" => PAGE_LOCK             <= DI(1 downto 0);
+					when x"7E" => IRQ_EN                <= DI(0);
+					when others => null;
+				end case;
+			end if;
 		end if;
-	end process; 
-	
+	end process;
+
 	BUSY <= CPU_RUN or CACHE_RUN or DMA_RUN;
+	SS_IDLE <= not BUSY;
 
 	process( MMIO_SEL, RAMIO_SEL, ADDR, DMA_SRC, DMA_LEN, DMA_DST, PAGE_SEL, PAGE_LOCK, ROM_BASE, ROM_PAGE, WS1, WS2, IRQ_EN, ROM_MODE, 
 			   ROM_ACCESS, SRAM_ACCESS, VEC_MEM, GPR, CPU_RUN, DATA_RAM_Q_B, BUS_DI, IRQ_FLAG, SUSPEND, BUSY )
@@ -391,6 +429,14 @@ begin
 			if SYSCLKR_CE = '1' then
 				SNES_ADDR <= ADDR;
 			end if;
+			if SS_WR = '1' then
+				case ADDR(7 downto 0) is
+					when x"B9" => SNES_ADDR(7 downto 0)   <= DI;
+					when x"BA" => SNES_ADDR(15 downto 8)  <= DI;
+					when x"BB" => SNES_ADDR(23 downto 16) <= DI;
+					when others => null;
+				end case;
+			end if;
 		end if;
 	end process;
 	
@@ -506,6 +552,12 @@ begin
 					BUS_RD_CNT <= (others => '0');
 				end if;
 			end if;
+			if SS_WR = '1' then
+				case ADDR(7 downto 0) is
+					when x"B7" => BUS_RD_CNT <= unsigned(DI(1 downto 0));
+					when others => null;
+				end case;
+			end if;
 		end if;
 	end process;
 
@@ -565,14 +617,31 @@ begin
 							CACHE_RUN <= '0';
 						end if;
 						CACHE_WAIT_CNT <= (others => '0');
-						
+
 						CACHE_BUS_ADDR <= std_logic_vector(unsigned(CACHE_BUS_ADDR) + 1);
 					end if;
 				end if;
 			end if;
+			if SS_WR = '1' then
+				case ADDR(7 downto 0) is
+					when x"AB" => CACHE_RUN                  <= DI(0);
+					when x"AC" => CACHE_BANK                 <= DI(0);
+					when x"AD" => CACHE_PAGE(0)(7 downto 0)  <= DI;
+					when x"AE" => CACHE_PAGE(0)(15 downto 8) <= DI;  -- incl. valid bit; cache RAM is serialized so the page stays coherent
+					when x"AF" => CACHE_PAGE(1)(7 downto 0)  <= DI;
+					when x"B0" => CACHE_PAGE(1)(15 downto 8) <= DI;
+					when x"B1" => CACHE_ADDR(7 downto 0)    <= DI;
+					when x"B2" => CACHE_ADDR(8)              <= DI(0);
+					when x"B3" => CACHE_WAIT_CNT             <= unsigned(DI(2 downto 0));
+					when x"B4" => CACHE_BUS_ADDR(7 downto 0)  <= DI;
+					when x"B5" => CACHE_BUS_ADDR(15 downto 8) <= DI;
+					when x"B6" => CACHE_BUS_ADDR(23 downto 16)<= DI;
+					when others => null;
+				end case;
+			end if;
 		end if;
 	end process;
-	
+
 	--DMA
 	process(CLK, RST_N)
 	begin
@@ -605,7 +674,7 @@ begin
 							DMA_WAIT_CNT <= DMA_WAIT_CNT + 1;
 						end if;
 					else
-						if (DMA_WAIT_CNT = unsigned(WS2) and SRAM_SEL = '1') or 
+						if (DMA_WAIT_CNT = unsigned(WS2) and SRAM_SEL = '1') or
 							(DMA_WAIT_CNT = 0 and RAM_SEL = '1') then
 							DMA_WAIT_CNT <= (others => '0');
 							DMA_DST_ADDR <= std_logic_vector(unsigned(DMA_DST_ADDR) + 1);
@@ -620,9 +689,26 @@ begin
 					end if;
 				end if;
 			end if;
+			if SS_WR = '1' then
+				case ADDR(7 downto 0) is
+					when x"9F" => DMA_RUN                   <= DI(0);
+					when x"A0" => DMA_SRC_ADDR(7 downto 0)  <= DI;
+					when x"A1" => DMA_SRC_ADDR(15 downto 8) <= DI;
+					when x"A2" => DMA_SRC_ADDR(23 downto 16)<= DI;
+					when x"A3" => DMA_DST_ADDR(7 downto 0)  <= DI;
+					when x"A4" => DMA_DST_ADDR(15 downto 8) <= DI;
+					when x"A5" => DMA_DST_ADDR(23 downto 16)<= DI;
+					when x"A6" => DMA_CNT(7 downto 0)       <= unsigned(DI);
+					when x"A7" => DMA_CNT(15 downto 8)      <= unsigned(DI);
+					when x"A8" => DMA_WAIT_CNT              <= unsigned(DI(2 downto 0));
+					when x"A9" => DMA_DAT                   <= DI;
+					when x"AA" => DMA_STATE                 <= DI(0);
+					when others => null;
+				end case;
+			end if;
 		end if;
 	end process;
-	
+
 	BUS_DO <= DMA_DAT when DMA_RUN = '1' else
 		  DI when (SRAM_SEL = '1' and SRAM_ACCESS = '0' and WR_n = '0') else
 		  MBR;
@@ -850,9 +936,15 @@ begin
 				
 				FLAGS(FLAG_V) <= '0';-----------------------------------------------
 			end if;
+			if SS_WR = '1' then
+				case ADDR(7 downto 0) is
+					when x"03" => FLAGS <= DI(3 downto 0);
+					when others => null;
+				end case;
+			end if;
 		end if;
-	end process; 
-	
+	end process;
+
 	--MUL
 	process(CLK, RST_N)
 		variable TEMP : signed(47 downto 0);
@@ -877,10 +969,27 @@ begin
 				MACL <= std_logic_vector(TEMP(23 downto 0));
 				MACH <= std_logic_vector(TEMP(47 downto 24));
 			end if;
+			if SS_WR = '1' then
+				case ADDR(7 downto 0) is
+					when x"4A" => MACL(7 downto 0)   <= DI;
+					when x"4B" => MACL(15 downto 8)  <= DI;
+					when x"4C" => MACL(23 downto 16) <= DI;
+					when x"4D" => MACH(7 downto 0)   <= DI;
+					when x"4E" => MACH(15 downto 8)  <= DI;
+					when x"4F" => MACH(23 downto 16) <= DI;
+					when x"50" => MULA(7 downto 0)   <= signed(DI);
+					when x"51" => MULA(15 downto 8)  <= signed(DI);
+					when x"52" => MULA(23 downto 16) <= signed(DI);
+					when x"53" => MULB(7 downto 0)   <= signed(DI);
+					when x"54" => MULB(15 downto 8)  <= signed(DI);
+					when x"55" => MULB(23 downto 16) <= signed(DI);
+					when others => null;
+				end case;
+			end if;
 		end if;
-	end process; 
-	
-		
+	end process;
+
+
 	--Registers
 	process(CLK, RST_N)
 	begin
@@ -888,7 +997,7 @@ begin
 			A <= (others => '0');
 		elsif rising_edge(CLK) then
 			if CPU_EN = '1' then
-				if INST = I_MOV then 
+				if INST = I_MOV then
 					if IR(10 downto 8) = "000" then
 						A <= RDB;
 					elsif IR(10 downto 8) = "100" then
@@ -901,6 +1010,14 @@ begin
 				elsif INST = I_CLR then
 					A <= (others => '0');
 				end if;
+			end if;
+			if SS_WR = '1' then
+				case ADDR(7 downto 0) is
+					when x"00" => A(7 downto 0)   <= DI;
+					when x"01" => A(15 downto 8)  <= DI;
+					when x"02" => A(23 downto 16) <= DI;
+					when others => null;
+				end case;
 			end if;
 		end if;
 	end process;
@@ -968,9 +1085,25 @@ begin
 					end if;
 				end if;
 			end if;
+			if SS_WR = '1' then
+				case ADDR(7 downto 0) is
+					when x"56" => MAR(7 downto 0)         <= DI;
+					when x"57" => MAR(15 downto 8)        <= DI;
+					when x"58" => MAR(23 downto 16)       <= DI;
+					when x"59" => MBR                     <= DI;
+					when x"5A" => ROM_ACCESS               <= DI(0);
+					when x"5B" => SRAM_ACCESS              <= DI(0);
+					when x"5C" => SRAM_WR                  <= DI(0);
+					when x"5D" => BUS_ACCESS_CNT           <= unsigned(DI(2 downto 0));
+					when x"5E" => EXT_BUS_ADDR(7 downto 0)  <= DI;
+					when x"5F" => EXT_BUS_ADDR(15 downto 8) <= DI;
+					when x"60" => EXT_BUS_ADDR(23 downto 16)<= DI;
+					when others => null;
+				end case;
+			end if;
 		end if;
-	end process; 
-			
+	end process;
+
 	process(CLK, RST_N)
 	begin
 		if RST_N = '0' then
@@ -995,8 +1128,15 @@ begin
 					P <= (others => '0');
 				end if;
 			end if;
+			if SS_WR = '1' then
+				case ADDR(7 downto 0) is
+					when x"69" => P(7 downto 0)  <= DI;
+					when x"6A" => P(14 downto 8) <= DI(6 downto 0);
+					when others => null;
+				end case;
+			end if;
 		end if;
-	end process; 
+	end process;
 
 	process(CLK, RST_N, INST, FLAGS, IR)
 		variable NEXT_PC : std_logic_vector(7 downto 0);
@@ -1116,9 +1256,44 @@ begin
 					IRQ_FLAG <= IRQ_EN;
 				end if;
 			end if;
+			if SS_WR = '1' then
+				case ADDR(7 downto 0) is
+					when x"04" => PC                       <= DI;
+					when x"05" => BANK                     <= DI(0);
+					when x"06" => STACK_RAM(0)(7 downto 0) <= DI;
+					when x"07" => STACK_RAM(0)(8)          <= DI(0);
+					when x"08" => STACK_RAM(1)(7 downto 0) <= DI;
+					when x"09" => STACK_RAM(1)(8)          <= DI(0);
+					when x"0A" => STACK_RAM(2)(7 downto 0) <= DI;
+					when x"0B" => STACK_RAM(2)(8)          <= DI(0);
+					when x"0C" => STACK_RAM(3)(7 downto 0) <= DI;
+					when x"0D" => STACK_RAM(3)(8)          <= DI(0);
+					when x"0E" => STACK_RAM(4)(7 downto 0) <= DI;
+					when x"0F" => STACK_RAM(4)(8)          <= DI(0);
+					when x"10" => STACK_RAM(5)(7 downto 0) <= DI;
+					when x"11" => STACK_RAM(5)(8)          <= DI(0);
+					when x"12" => STACK_RAM(6)(7 downto 0) <= DI;
+					when x"13" => STACK_RAM(6)(8)          <= DI(0);
+					when x"14" => STACK_RAM(7)(7 downto 0) <= DI;
+					when x"15" => STACK_RAM(7)(8)          <= DI(0);
+					when x"16" => SP                       <= unsigned(DI(2 downto 0));
+					when x"17" => CPU_RUN                  <= DI(0);
+					when x"18" => IRQ                      <= DI(0);
+					when x"19" => IRQ_FLAG                 <= DI(0);
+					when x"B8" =>
+						-- EXTRA_CYCLES range is 0 to 2; saturate the out-of-range
+						-- "11" encoding so a corrupt SS blob cannot trip a range-check.
+						if DI(1 downto 0) = "11" then
+							EXTRA_CYCLES <= 2;
+						else
+							EXTRA_CYCLES <= to_integer(unsigned(DI(1 downto 0)));
+						end if;
+					when others => null;
+				end case;
+			end if;
 		end if;
-	end process; 
-	
+	end process;
+
 	IRQ_N <= not IRQ;
 	
 	process(CLK, RST_N)
@@ -1131,9 +1306,16 @@ begin
 					DPR <= A(11 downto 0);
 				end if;
 			end if;
+			if SS_WR = '1' then
+				case ADDR(7 downto 0) is
+					when x"67" => DPR(7 downto 0)  <= DI;
+					when x"68" => DPR(11 downto 8) <= DI(3 downto 0);
+					when others => null;
+				end case;
+			end if;
 		end if;
-	end process; 
-	
+	end process;
+
 	process(CLK, RST_N)
 	begin
 		if RST_N = '0' then
@@ -1198,9 +1380,10 @@ begin
 					GPR(to_integer(unsigned(IR(3 downto 0)))) <= A;
 				end if;
 			end if;
+			-- GPR (0x1A-0x49) restores via MMIO ($7F80-$7FAF) in savestates_cx4.asm.
 		end if;
-	end process; 
-	
+	end process;
+
 	process( IR, A, DPR, RAMB, DMA_RUN, DMA_DST_ADDR, RAM_SEL, DMA_DAT)
 	begin
 		if DMA_RUN = '1' and RAM_SEL = '1' then
@@ -1241,9 +1424,17 @@ begin
 					RAMB <= (others => '0');
 				end if;
 			end if;
+			if SS_WR = '1' then
+				case ADDR(7 downto 0) is
+					when x"64" => RAMB(7 downto 0)   <= DI;
+					when x"65" => RAMB(15 downto 8)  <= DI;
+					when x"66" => RAMB(23 downto 16) <= DI;
+					when others => null;
+				end case;
+			end if;
 		end if;
-	end process; 
-	
+	end process;
+
 	process(CLK, RST_N, IR, A)
 	begin
 		if IR(10) = '0' then
@@ -1251,7 +1442,7 @@ begin
 		else
 			DATA_ROM_ADDR <= IR(9 downto 0);
 		end if;
-		
+
 		if RST_N = '0' then
 			ROMB <= (others => '0');
 		elsif rising_edge(CLK) then
@@ -1260,8 +1451,16 @@ begin
 					ROMB <= DATA_ROM_Q;
 				end if;
 			end if;
+			if SS_WR = '1' then
+				case ADDR(7 downto 0) is
+					when x"61" => ROMB(7 downto 0)   <= DI;
+					when x"62" => ROMB(15 downto 8)  <= DI;
+					when x"63" => ROMB(23 downto 16) <= DI;
+					when others => null;
+				end case;
+			end if;
 		end if;
-	end process; 
+	end process;
 
 	DATA_ROM : entity work.spram generic map(10, 24, "rtl/chip/CX4/drom.mif")
 	port map(
@@ -1271,9 +1470,11 @@ begin
 	);
 	
 	DATA_RAM_WE_A <= '1' when (CPU_EN = '1' and INST = I_WRRAM) or (EN = '1' and DMA_RUN = '1' and RAM_SEL = '1' and DMA_STATE = '1') else '0';
-	DATA_RAM_ADDR_B <= ADDR(11 downto 0);
-	DATA_RAM_DI_B <= DI;
-	DATA_RAM_WE_B <= '1' when ENABLE = '1' and RAMIO_WR = '1' and CPU_RUN = '0' else '0';
+	DATA_RAM_ADDR_B <= SS_RAM_A             when SS_BUSY = '1' else ADDR(11 downto 0);
+	DATA_RAM_DI_B   <= SS_RAM_DI            when SS_BUSY = '1' else DI;
+	DATA_RAM_WE_B   <= SS_RAM_WR            when SS_BUSY = '1'
+	               else '1' when ENABLE = '1' and RAMIO_WR = '1' and CPU_RUN = '0' else '0';
+	SS_RAM_DO       <= DATA_RAM_Q_B;
 	DATA_RAM : entity work.dpram_difclk generic map(12, 8, 12, 8)
 	port map(
 		clock0		=> not CLK,
@@ -1289,28 +1490,132 @@ begin
 		q_b			=> DATA_RAM_Q_B
 	);
 
+	-- Registered save mux -- must be clocked, never combinational (no latch)
+	process(CLK)
+	begin
+		if rising_edge(CLK) then
+			if SS_RAM_SEL = '1' then
+				SS_DO <= DATA_RAM_Q_B;               -- 8-bit port B; no byte-lane mux needed
+			else
+				-- GPR (0x1A-0x49) and VEC_MEM (0x7F-0x9E) go through MMIO in savestates_cx4.asm.
+				if unsigned(ADDR(7 downto 0)) >= 16#06# and unsigned(ADDR(7 downto 0)) <= 16#15# then
+					if ADDR(0) = '0' then SS_DO <= STACK_RAM(to_integer(unsigned(ADDR(7 downto 1))) - 3)(7 downto 0);
+					else                  SS_DO <= "0000000" & STACK_RAM(to_integer(unsigned(ADDR(7 downto 1))) - 3)(8);
+					end if;
+				else
+				case ADDR(7 downto 0) is
+					when x"00" => SS_DO <= A(7 downto 0);
+					when x"01" => SS_DO <= A(15 downto 8);
+					when x"02" => SS_DO <= A(23 downto 16);
+					when x"03" => SS_DO <= "0000" & FLAGS;
+					when x"04" => SS_DO <= PC;
+					when x"05" => SS_DO <= "0000000" & BANK;
+					when x"16" => SS_DO <= "00000" & std_logic_vector(SP);
+					when x"17" => SS_DO <= "0000000" & CPU_RUN;
+					when x"18" => SS_DO <= "0000000" & IRQ;
+					when x"19" => SS_DO <= "0000000" & IRQ_FLAG;
+					when x"4A" => SS_DO <= MACL(7 downto 0);
+					when x"4B" => SS_DO <= MACL(15 downto 8);
+					when x"4C" => SS_DO <= MACL(23 downto 16);
+					when x"4D" => SS_DO <= MACH(7 downto 0);
+					when x"4E" => SS_DO <= MACH(15 downto 8);
+					when x"4F" => SS_DO <= MACH(23 downto 16);
+					when x"50" => SS_DO <= std_logic_vector(MULA(7 downto 0));
+					when x"51" => SS_DO <= std_logic_vector(MULA(15 downto 8));
+					when x"52" => SS_DO <= std_logic_vector(MULA(23 downto 16));
+					when x"53" => SS_DO <= std_logic_vector(MULB(7 downto 0));
+					when x"54" => SS_DO <= std_logic_vector(MULB(15 downto 8));
+					when x"55" => SS_DO <= std_logic_vector(MULB(23 downto 16));
+					when x"56" => SS_DO <= MAR(7 downto 0);
+					when x"57" => SS_DO <= MAR(15 downto 8);
+					when x"58" => SS_DO <= MAR(23 downto 16);
+					when x"59" => SS_DO <= MBR;
+					when x"5A" => SS_DO <= "0000000" & ROM_ACCESS;
+					when x"5B" => SS_DO <= "0000000" & SRAM_ACCESS;
+					when x"5C" => SS_DO <= "0000000" & SRAM_WR;
+					when x"5D" => SS_DO <= "00000" & std_logic_vector(BUS_ACCESS_CNT);
+					when x"5E" => SS_DO <= EXT_BUS_ADDR(7 downto 0);
+					when x"5F" => SS_DO <= EXT_BUS_ADDR(15 downto 8);
+					when x"60" => SS_DO <= EXT_BUS_ADDR(23 downto 16);
+					when x"61" => SS_DO <= ROMB(7 downto 0);
+					when x"62" => SS_DO <= ROMB(15 downto 8);
+					when x"63" => SS_DO <= ROMB(23 downto 16);
+					when x"64" => SS_DO <= RAMB(7 downto 0);
+					when x"65" => SS_DO <= RAMB(15 downto 8);
+					when x"66" => SS_DO <= RAMB(23 downto 16);
+					when x"67" => SS_DO <= DPR(7 downto 0);
+					when x"68" => SS_DO <= "0000" & DPR(11 downto 8);
+					when x"69" => SS_DO <= P(7 downto 0);
+					when x"6A" => SS_DO <= "0" & P(14 downto 8);
+					-- DMA_DST/PAGE_SEL/PAGE_LOCK/IRQ_EN (0x6E-70/78/79/7E) read via MMIO on save (restored in HW); off this mux.
+					when x"9F" => SS_DO <= "0000000" & DMA_RUN;
+					when x"A0" => SS_DO <= DMA_SRC_ADDR(7 downto 0);
+					when x"A1" => SS_DO <= DMA_SRC_ADDR(15 downto 8);
+					when x"A2" => SS_DO <= DMA_SRC_ADDR(23 downto 16);
+					when x"A3" => SS_DO <= DMA_DST_ADDR(7 downto 0);
+					when x"A4" => SS_DO <= DMA_DST_ADDR(15 downto 8);
+					when x"A5" => SS_DO <= DMA_DST_ADDR(23 downto 16);
+					when x"A6" => SS_DO <= std_logic_vector(DMA_CNT(7 downto 0));
+					when x"A7" => SS_DO <= std_logic_vector(DMA_CNT(15 downto 8));
+					when x"A8" => SS_DO <= "00000" & std_logic_vector(DMA_WAIT_CNT);
+					when x"A9" => SS_DO <= DMA_DAT;
+					when x"AA" => SS_DO <= "0000000" & DMA_STATE;
+					when x"AB" => SS_DO <= "0000000" & CACHE_RUN;
+					when x"AC" => SS_DO <= "0000000" & CACHE_BANK;
+					when x"AD" => SS_DO <= CACHE_PAGE(0)(7 downto 0);
+					when x"AE" => SS_DO <= CACHE_PAGE(0)(15 downto 8);
+					when x"AF" => SS_DO <= CACHE_PAGE(1)(7 downto 0);
+					when x"B0" => SS_DO <= CACHE_PAGE(1)(15 downto 8);
+					when x"B1" => SS_DO <= CACHE_ADDR(7 downto 0);
+					when x"B2" => SS_DO <= "0000000" & CACHE_ADDR(8);
+					when x"B3" => SS_DO <= "00000" & std_logic_vector(CACHE_WAIT_CNT);
+					when x"B4" => SS_DO <= CACHE_BUS_ADDR(7 downto 0);
+					when x"B5" => SS_DO <= CACHE_BUS_ADDR(15 downto 8);
+					when x"B6" => SS_DO <= CACHE_BUS_ADDR(23 downto 16);
+					when x"B7" => SS_DO <= "000000" & std_logic_vector(BUS_RD_CNT);
+					when x"B8" => SS_DO <= std_logic_vector(to_unsigned(EXTRA_CYCLES, 8));
+					when x"B9" => SS_DO <= SNES_ADDR(7 downto 0);
+					when x"BA" => SS_DO <= SNES_ADDR(15 downto 8);
+					when x"BB" => SS_DO <= SNES_ADDR(23 downto 16);
+					when others => SS_DO <= x"00";
+				end case;
+				end if;
+			end if;
+		end if;
+	end process;
+
 	CACHE_ADDR_RD <= BANK & PC;
 	CACHE_ADDR_WR <= CACHE_BANK & CACHE_ADDR;
 	CACHE_WE <= '1' when CACHE_RUN = '1' and EN = '1' and CACHE_WAIT_CNT = unsigned(WS1) else '0';
 	CACHE_DI <= BUS_DI;
-	
+
+	-- Cache port mux: SS serializes the program cache over SS_CACHE_* (A(0)=L/H, A(9:1)=index); else the normal CPU/fill paths drive it.
+	CACHE_RDADDR <= SS_CACHE_A(9 downto 1) when SS_BUSY = '1' else CACHE_ADDR_RD;
+	CACHE_WRADDR <= SS_CACHE_A(9 downto 1) when SS_BUSY = '1' else CACHE_ADDR_WR(9 downto 1);
+	CACHE_WDATA  <= SS_CACHE_DI            when SS_BUSY = '1' else CACHE_DI;
+	CACHEL_WE    <= (SS_CACHE_WR and not SS_CACHE_A(0)) when SS_BUSY = '1'
+	              else (CACHE_WE and not CACHE_ADDR_WR(0));
+	CACHEH_WE    <= (SS_CACHE_WR and SS_CACHE_A(0))     when SS_BUSY = '1'
+	              else (CACHE_WE and CACHE_ADDR_WR(0));
+	SS_CACHE_DO  <= CACHE_Q_H when SS_CACHE_A(0) = '1' else CACHE_Q_L;
+
 	CACHEL : entity work.cx4cache
 	port map(
 		clock			=> CLK,
-		wraddress	=> CACHE_ADDR_WR(9 downto 1),
-		data			=> CACHE_DI,
-		wren			=> CACHE_WE and not CACHE_ADDR_WR(0),
-		rdaddress	=> CACHE_ADDR_RD,
+		wraddress	=> CACHE_WRADDR,
+		data			=> CACHE_WDATA,
+		wren			=> CACHEL_WE,
+		rdaddress	=> CACHE_RDADDR,
 		q				=> CACHE_Q_L
 	);
-	
+
 	CACHEH : entity work.cx4cache
 	port map(
 		clock			=> CLK,
-		wraddress	=> CACHE_ADDR_WR(9 downto 1),
-		data			=> CACHE_DI,
-		wren			=> CACHE_WE and CACHE_ADDR_WR(0),
-		rdaddress	=> CACHE_ADDR_RD,
+		wraddress	=> CACHE_WRADDR,
+		data			=> CACHE_WDATA,
+		wren			=> CACHEH_WE,
+		rdaddress	=> CACHE_RDADDR,
 		q				=> CACHE_Q_H
 	);
 	

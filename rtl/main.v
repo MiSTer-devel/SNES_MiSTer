@@ -472,10 +472,33 @@ CX4Map CX4Map
 	.map_active(MAP_ACTIVE[0]),
 	.map_ctrl(ROM_TYPE),
 	.rom_mask(ROM_MASK),
-	.bsram_mask(RAM_MASK)
+	.bsram_mask(RAM_MASK),
+
+	.ss_busy   (SS_BUSY),
+	.ss_save   (SS_SAVE_EN),
+	.ss_wr     (SS_BUSY & SS_CX4_SEL & ~CPUWR_N),
+	.ss_do     (SS_CX4_DO_REG),
+	.ss_ram_a  (SS_EXT_ADDR[11:0]),
+	.ss_ram_sel(SS_CX4_RAM_SEL),
+	.ss_ram_di (SS_DO),
+	.ss_ram_do (SS_CX4_DO_RAM),
+
+	.ss_cache_a  (SS_EXT_ADDR[9:0]),
+	.ss_cache_sel(SS_CX4_CACHE_SEL),
+	.ss_cache_di (SS_DO),
+	.ss_cache_do (SS_CX4_DO_CACHE),
+
+	.ss_idle     (SS_CX4_IDLE)
 );
-end else
+end else begin
 assign MAP_ACTIVE[0] = 0;
+// Stub CX4Map SS readback wires when CX4 is compiled out so the
+// SS_CX4_DI mux does not read undriven nets in the USE_CX4==0 config.
+assign SS_CX4_DO_REG = 8'h00;
+assign SS_CX4_DO_RAM = 8'h00;
+assign SS_CX4_DO_CACHE = 8'h00;
+assign SS_CX4_IDLE = 1'b1;   // not a CX4 cart -> never holds the snapshot
+end
 endgenerate
 
 wire [7:0]  SDD_DO;
@@ -883,6 +906,7 @@ assign MAP_ACTIVE[6] = 0;
 endgenerate
 
 wire        SS_BUSY;
+wire        SS_SAVE_EN;   // savestates.save_en -> CX4 MMIO gate (SA1-style ~(ss_busy & save_en))
 wire  [7:0] SS_DO;
 wire [23:0] SS_ROM_ADDR;
 
@@ -897,6 +921,19 @@ wire        SS_ARAM_SEL, SS_DSP_REGS_SEL, SS_SMP_SEL;
 wire        SS_BSRAM_SEL;
 wire        SS_DSPN_REGS_SEL, SS_DSPN_RAM_SEL;
 wire        SS_GSU_SEL;
+
+wire  [7:0] SS_CX4_DO_REG;
+wire  [7:0] SS_CX4_DO_RAM;
+wire  [7:0] SS_CX4_DO_CACHE;
+wire  [7:0] SS_CX4_DI;
+wire        SS_CX4_SEL;
+wire        SS_CX4_RAM_SEL;
+wire        SS_CX4_CACHE_SEL;
+wire        SS_CX4_IDLE;
+assign SS_CX4_DI = SS_CX4_CACHE_SEL ? SS_CX4_DO_CACHE :
+                   SS_CX4_RAM_SEL   ? SS_CX4_DO_RAM   : SS_CX4_DO_REG;
+// Hold the snapshot until the CX4 is idle (only when a CX4 cart is active).
+wire        CX4_SS_OK = ~MAP_ACTIVE[0] | SS_CX4_IDLE;
 
 
 generate
@@ -960,6 +997,12 @@ savestates ss
 	.gsu_regs_sel(SS_GSU_SEL),
 	.gsu_di(SS_GSU_DI),
 
+	.cx4_regs_sel(SS_CX4_SEL),
+	.cx4_di(SS_CX4_DI),
+	.cx4_ram_sel(SS_CX4_RAM_SEL),
+	.cx4_cache_sel(SS_CX4_CACHE_SEL),
+	.cx4_ss_ok(CX4_SS_OK),
+
 	.sa1_active(MAP_ACTIVE[3]),
 	.sa1_a(SA1_P65_A),
 	.sa1_di(SA1_P65_DO),
@@ -970,7 +1013,8 @@ savestates ss
 
 	.ss_do_ovr(SS_DO_OVR),
 	.ss_rom_ovr(SS_ROM_OVR),
-	.ss_busy(SS_BUSY)
+	.ss_busy(SS_BUSY),
+	.ss_save_active(SS_SAVE_EN)
 );
 end else begin
 	assign SS_DO = 0;
@@ -988,13 +1032,17 @@ end else begin
 	assign SS_DSPN_REGS_SEL = 0;
 	assign SS_DSPN_RAM_SEL = 0;
 	assign SS_GSU_SEL = 0;
+	assign SS_CX4_SEL = 0;
+	assign SS_CX4_RAM_SEL = 0;
+	assign SS_CX4_CACHE_SEL = 0;
 	assign SS_DO_OVR = 0;
 	assign SS_ROM_OVR = 0;
 	assign SS_BUSY = 0;
+	assign SS_SAVE_EN = 0;
 end
 endgenerate
 
-assign SS_AVAIL = ~|{ROM_TYPE[7:4]} | MAP_ACTIVE[3] | (ROM_TYPE[7:6] == 2'b10) | MAP_ACTIVE[2]; // Basic carts + SA1 + DSPn + GSU
+assign SS_AVAIL = ~|{ROM_TYPE[7:4]} | MAP_ACTIVE[3] | (ROM_TYPE[7:6] == 2'b10) | MAP_ACTIVE[2] | MAP_ACTIVE[0]; // Basic carts + SA1 + DSPn + GSU + CX4
 
 assign TURBO_ALLOW = ~(MAP_ACTIVE[3] | MAP_ACTIVE[1] | SS_BUSY);
 

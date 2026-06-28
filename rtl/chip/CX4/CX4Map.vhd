@@ -53,10 +53,6 @@ entity CX4Map is
 		SS_SAVE    : in  std_logic := '0';
 		SS_WR      : in  std_logic;
 		SS_DO      : out std_logic_vector(7 downto 0);
-		SS_RAM_A   : in  std_logic_vector(11 downto 0);
-		SS_RAM_SEL : in  std_logic;
-		SS_RAM_DI  : in  std_logic_vector(7 downto 0);
-		SS_RAM_DO  : out std_logic_vector(7 downto 0);
 
 		SS_CACHE_A   : in  std_logic_vector(9 downto 0);
 		SS_CACHE_SEL : in  std_logic;
@@ -125,11 +121,6 @@ begin
 		SS_SAVE    => SS_SAVE,
 		SS_WR      => SS_WR,
 		SS_DO      => SS_DO,
-		SS_RAM_A   => SS_RAM_A,
-		SS_RAM_SEL => SS_RAM_SEL,
-		SS_RAM_WR  => not PAWR_N and SS_RAM_SEL,
-		SS_RAM_DI  => SS_RAM_DI,
-		SS_RAM_DO  => SS_RAM_DO,
 
 		SS_CACHE_A   => SS_CACHE_A,
 		SS_CACHE_SEL => SS_CACHE_SEL,

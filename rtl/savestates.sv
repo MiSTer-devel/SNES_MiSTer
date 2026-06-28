@@ -60,7 +60,6 @@ module savestates
 	input       [7:0] gsu_di,
 
 	output            cx4_regs_sel,
-	output            cx4_ram_sel,
 	output            cx4_cache_sel,
 	input       [7:0] cx4_di,
 	input             cx4_ss_ok,   // 1 = ok to snapshot (CX4 idle or not a CX4 cart)
@@ -158,7 +157,6 @@ wire spc_read = spc_sel & ~pard_n;
 wire bsram_read = bsram_sel & ~pard_n;
 
 wire dspn_ram_read = dspn_ram_sel & ~pard_n;
-wire cx4_ram_read = cx4_ram_sel & ~pard_n;
 wire cx4_cache_read = cx4_cache_sel & ~pard_n;
 
 reg [3:0] ddr_state;
@@ -289,7 +287,7 @@ always @(posedge clk) begin
 		end
 
 		if (pawr_ce | pard_ce) begin
-			if (spc_sel | bsram_sel | dspn_ram_sel | cx4_ram_sel | cx4_cache_sel) begin
+			if (spc_sel | bsram_sel | dspn_ram_sel | cx4_cache_sel) begin
 				ss_ext_addr_inc <= 1;
 			end
 		end
@@ -480,12 +478,11 @@ always @(*) begin
 	if (spc_read) ddr_data = spc_di;
 	if (bsram_read) ddr_data = bsram_di;
 	if (dspn_ram_read) ddr_data = dspn_di;
-	if (cx4_ram_read) ddr_data = cx4_di;
 	if (cx4_cache_read) ddr_data = cx4_di;
 end
 
 assign ss_do_ovr = ss_busy & ss_oe;
-assign ss_save_active = save_en;   // 1 during a SAVE, 0 during LOAD -- CX4 MMIO gate (SA1-style ~(ss_busy & save_en))
+assign ss_save_active = save_en;   // 1 during a SAVE, 0 during LOAD -- opens the CX4 RAMIO window on a LOAD
 assign ss_rom_ovr = map_active ? map_rom_ovr : ss_busy;
 
 assign aram_sel = ss_busy & (pa == 8'h84);
@@ -493,7 +490,6 @@ assign dsp_regs_sel = ss_busy & (pa == 8'h85);
 assign smp_regs_sel = ss_busy & (pa == 8'h86);
 assign bsram_sel = ss_busy & (pa == 8'h87);
 assign dspn_ram_sel = ss_busy & (pa == 8'h88);
-assign cx4_ram_sel = ss_busy & (pa == 8'h89);
 assign cx4_cache_sel = ss_busy & (pa == 8'h8A);
 assign ext_addr = ss_ext_addr;
 

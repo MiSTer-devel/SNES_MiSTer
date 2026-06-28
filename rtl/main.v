@@ -478,10 +478,6 @@ CX4Map CX4Map
 	.ss_save   (SS_SAVE_EN),
 	.ss_wr     (SS_BUSY & SS_CX4_SEL & ~CPUWR_N),
 	.ss_do     (SS_CX4_DO_REG),
-	.ss_ram_a  (SS_EXT_ADDR[11:0]),
-	.ss_ram_sel(SS_CX4_RAM_SEL),
-	.ss_ram_di (SS_DO),
-	.ss_ram_do (SS_CX4_DO_RAM),
 
 	.ss_cache_a  (SS_EXT_ADDR[9:0]),
 	.ss_cache_sel(SS_CX4_CACHE_SEL),
@@ -495,7 +491,6 @@ assign MAP_ACTIVE[0] = 0;
 // Stub CX4Map SS readback wires when CX4 is compiled out so the
 // SS_CX4_DI mux does not read undriven nets in the USE_CX4==0 config.
 assign SS_CX4_DO_REG = 8'h00;
-assign SS_CX4_DO_RAM = 8'h00;
 assign SS_CX4_DO_CACHE = 8'h00;
 assign SS_CX4_IDLE = 1'b1;   // not a CX4 cart -> never holds the snapshot
 end
@@ -923,15 +918,12 @@ wire        SS_DSPN_REGS_SEL, SS_DSPN_RAM_SEL;
 wire        SS_GSU_SEL;
 
 wire  [7:0] SS_CX4_DO_REG;
-wire  [7:0] SS_CX4_DO_RAM;
 wire  [7:0] SS_CX4_DO_CACHE;
 wire  [7:0] SS_CX4_DI;
 wire        SS_CX4_SEL;
-wire        SS_CX4_RAM_SEL;
 wire        SS_CX4_CACHE_SEL;
 wire        SS_CX4_IDLE;
-assign SS_CX4_DI = SS_CX4_CACHE_SEL ? SS_CX4_DO_CACHE :
-                   SS_CX4_RAM_SEL   ? SS_CX4_DO_RAM   : SS_CX4_DO_REG;
+assign SS_CX4_DI = SS_CX4_CACHE_SEL ? SS_CX4_DO_CACHE : SS_CX4_DO_REG;
 // Hold the snapshot until the CX4 is idle (only when a CX4 cart is active).
 wire        CX4_SS_OK = ~MAP_ACTIVE[0] | SS_CX4_IDLE;
 
@@ -999,7 +991,6 @@ savestates ss
 
 	.cx4_regs_sel(SS_CX4_SEL),
 	.cx4_di(SS_CX4_DI),
-	.cx4_ram_sel(SS_CX4_RAM_SEL),
 	.cx4_cache_sel(SS_CX4_CACHE_SEL),
 	.cx4_ss_ok(CX4_SS_OK),
 
@@ -1033,7 +1024,6 @@ end else begin
 	assign SS_DSPN_RAM_SEL = 0;
 	assign SS_GSU_SEL = 0;
 	assign SS_CX4_SEL = 0;
-	assign SS_CX4_RAM_SEL = 0;
 	assign SS_CX4_CACHE_SEL = 0;
 	assign SS_DO_OVR = 0;
 	assign SS_ROM_OVR = 0;

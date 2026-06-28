@@ -38,11 +38,6 @@ entity CX4 is
 		SS_SAVE    : in  std_logic := '0';
 		SS_WR      : in  std_logic;
 		SS_DO      : out std_logic_vector(7 downto 0);
-		SS_RAM_A   : in  std_logic_vector(11 downto 0);
-		SS_RAM_SEL : in  std_logic;
-		SS_RAM_WR  : in  std_logic;
-		SS_RAM_DI  : in  std_logic_vector(7 downto 0);
-		SS_RAM_DO  : out std_logic_vector(7 downto 0);
 
 		-- Program cache serialized over SS_CACHE_*: A(0) selects L/H lane, A(9:1) is the 9-bit index.
 		SS_CACHE_A   : in  std_logic_vector(9 downto 0) := (others => '0');
@@ -208,8 +203,10 @@ begin
 	end process; 
 	
 	-- Open CX4 MMIO during a LOAD only (SA1-style ~(ss_busy & save_en)) so restore writes pass; a SAVE stays frozen.
-	MMIO_WR  <= not WR_N and MMIO_SEL  and SYSCLKF_CE and not (SS_BUSY and SS_SAVE);
-	RAMIO_WR <= not WR_N and RAMIO_SEL and SYSCLKF_CE and not SS_BUSY;
+	MMIO_WR  <= not WR_N and MMIO_SEL  and SYSCLKF_CE;
+	-- Open the RAMIO ($6000) window during a LOAD so the firmware can copy the Data RAM back in;
+	-- blocked during a SAVE (SS_SAVE) so the frozen RAM is read, not written.
+	RAMIO_WR <= not WR_N and RAMIO_SEL and SYSCLKF_CE and not (SS_BUSY and SS_SAVE);
 	
 	process(CLK, RST_N, WR_Nr, RAMIO_SEL, MMIO_SEL, SYSCLKF_CE)
 	begin
@@ -286,12 +283,11 @@ begin
 					end if;
 				end if;
 			end if;
-			-- HW-kept MMIO regs only (their writes side-effect); the rest restore via MMIO in savestates_cx4.asm.
+			-- HW-kept restores: only the regs whose MMIO write side-effects.  DMA_DST[7:0]/[15:8]
+			-- write through $7F45/$7F46 with no side effect, so they restore via MMIO in the asm.
 			if SS_WR = '1' then
 				case ADDR(7 downto 0) is
-					when x"6E" => DMA_DST(7 downto 0)   <= DI;
-					when x"6F" => DMA_DST(15 downto 8)  <= DI;
-					when x"70" => DMA_DST(23 downto 16) <= DI;
+					when x"70" => DMA_DST(23 downto 16) <= DI;  -- $7F47 write starts a DMA -> restore in HW
 					when x"78" => PAGE_SEL              <= DI(0);
 					when x"79" => PAGE_LOCK             <= DI(1 downto 0);
 					when x"7E" => IRQ_EN                <= DI(0);
@@ -429,14 +425,6 @@ begin
 			if SYSCLKR_CE = '1' then
 				SNES_ADDR <= ADDR;
 			end if;
-			if SS_WR = '1' then
-				case ADDR(7 downto 0) is
-					when x"B9" => SNES_ADDR(7 downto 0)   <= DI;
-					when x"BA" => SNES_ADDR(15 downto 8)  <= DI;
-					when x"BB" => SNES_ADDR(23 downto 16) <= DI;
-					when others => null;
-				end case;
-			end if;
 		end if;
 	end process;
 	
@@ -552,12 +540,6 @@ begin
 					BUS_RD_CNT <= (others => '0');
 				end if;
 			end if;
-			if SS_WR = '1' then
-				case ADDR(7 downto 0) is
-					when x"B7" => BUS_RD_CNT <= unsigned(DI(1 downto 0));
-					when others => null;
-				end case;
-			end if;
 		end if;
 	end process;
 
@@ -630,12 +612,6 @@ begin
 					when x"AE" => CACHE_PAGE(0)(15 downto 8) <= DI;  -- incl. valid bit; cache RAM is serialized so the page stays coherent
 					when x"AF" => CACHE_PAGE(1)(7 downto 0)  <= DI;
 					when x"B0" => CACHE_PAGE(1)(15 downto 8) <= DI;
-					when x"B1" => CACHE_ADDR(7 downto 0)    <= DI;
-					when x"B2" => CACHE_ADDR(8)              <= DI(0);
-					when x"B3" => CACHE_WAIT_CNT             <= unsigned(DI(2 downto 0));
-					when x"B4" => CACHE_BUS_ADDR(7 downto 0)  <= DI;
-					when x"B5" => CACHE_BUS_ADDR(15 downto 8) <= DI;
-					when x"B6" => CACHE_BUS_ADDR(23 downto 16)<= DI;
 					when others => null;
 				end case;
 			end if;
@@ -692,17 +668,6 @@ begin
 			if SS_WR = '1' then
 				case ADDR(7 downto 0) is
 					when x"9F" => DMA_RUN                   <= DI(0);
-					when x"A0" => DMA_SRC_ADDR(7 downto 0)  <= DI;
-					when x"A1" => DMA_SRC_ADDR(15 downto 8) <= DI;
-					when x"A2" => DMA_SRC_ADDR(23 downto 16)<= DI;
-					when x"A3" => DMA_DST_ADDR(7 downto 0)  <= DI;
-					when x"A4" => DMA_DST_ADDR(15 downto 8) <= DI;
-					when x"A5" => DMA_DST_ADDR(23 downto 16)<= DI;
-					when x"A6" => DMA_CNT(7 downto 0)       <= unsigned(DI);
-					when x"A7" => DMA_CNT(15 downto 8)      <= unsigned(DI);
-					when x"A8" => DMA_WAIT_CNT              <= unsigned(DI(2 downto 0));
-					when x"A9" => DMA_DAT                   <= DI;
-					when x"AA" => DMA_STATE                 <= DI(0);
 					when others => null;
 				end case;
 			end if;
@@ -1470,11 +1435,11 @@ begin
 	);
 	
 	DATA_RAM_WE_A <= '1' when (CPU_EN = '1' and INST = I_WRRAM) or (EN = '1' and DMA_RUN = '1' and RAM_SEL = '1' and DMA_STATE = '1') else '0';
-	DATA_RAM_ADDR_B <= SS_RAM_A             when SS_BUSY = '1' else ADDR(11 downto 0);
-	DATA_RAM_DI_B   <= SS_RAM_DI            when SS_BUSY = '1' else DI;
-	DATA_RAM_WE_B   <= SS_RAM_WR            when SS_BUSY = '1'
-	               else '1' when ENABLE = '1' and RAMIO_WR = '1' and CPU_RUN = '0' else '0';
-	SS_RAM_DO       <= DATA_RAM_Q_B;
+	-- Port B always follows the SNES CPU bus.  During a savestate the firmware reaches the Data
+	-- RAM through the RAMIO $6000 window (read on save, write on load), so no dedicated SS port.
+	DATA_RAM_ADDR_B <= ADDR(11 downto 0);
+	DATA_RAM_DI_B   <= DI;
+	DATA_RAM_WE_B   <= '1' when ENABLE = '1' and RAMIO_WR = '1' and CPU_RUN = '0' else '0';
 	DATA_RAM : entity work.dpram_difclk generic map(12, 8, 12, 8)
 	port map(
 		clock0		=> not CLK,
@@ -1494,9 +1459,6 @@ begin
 	process(CLK)
 	begin
 		if rising_edge(CLK) then
-			if SS_RAM_SEL = '1' then
-				SS_DO <= DATA_RAM_Q_B;               -- 8-bit port B; no byte-lane mux needed
-			else
 				-- GPR (0x1A-0x49) and VEC_MEM (0x7F-0x9E) go through MMIO in savestates_cx4.asm.
 				if unsigned(ADDR(7 downto 0)) >= 16#06# and unsigned(ADDR(7 downto 0)) <= 16#15# then
 					if ADDR(0) = '0' then SS_DO <= STACK_RAM(to_integer(unsigned(ADDR(7 downto 1))) - 3)(7 downto 0);
@@ -1549,38 +1511,16 @@ begin
 					when x"6A" => SS_DO <= "0" & P(14 downto 8);
 					-- DMA_DST/PAGE_SEL/PAGE_LOCK/IRQ_EN (0x6E-70/78/79/7E) read via MMIO on save (restored in HW); off this mux.
 					when x"9F" => SS_DO <= "0000000" & DMA_RUN;
-					when x"A0" => SS_DO <= DMA_SRC_ADDR(7 downto 0);
-					when x"A1" => SS_DO <= DMA_SRC_ADDR(15 downto 8);
-					when x"A2" => SS_DO <= DMA_SRC_ADDR(23 downto 16);
-					when x"A3" => SS_DO <= DMA_DST_ADDR(7 downto 0);
-					when x"A4" => SS_DO <= DMA_DST_ADDR(15 downto 8);
-					when x"A5" => SS_DO <= DMA_DST_ADDR(23 downto 16);
-					when x"A6" => SS_DO <= std_logic_vector(DMA_CNT(7 downto 0));
-					when x"A7" => SS_DO <= std_logic_vector(DMA_CNT(15 downto 8));
-					when x"A8" => SS_DO <= "00000" & std_logic_vector(DMA_WAIT_CNT);
-					when x"A9" => SS_DO <= DMA_DAT;
-					when x"AA" => SS_DO <= "0000000" & DMA_STATE;
 					when x"AB" => SS_DO <= "0000000" & CACHE_RUN;
 					when x"AC" => SS_DO <= "0000000" & CACHE_BANK;
 					when x"AD" => SS_DO <= CACHE_PAGE(0)(7 downto 0);
 					when x"AE" => SS_DO <= CACHE_PAGE(0)(15 downto 8);
 					when x"AF" => SS_DO <= CACHE_PAGE(1)(7 downto 0);
 					when x"B0" => SS_DO <= CACHE_PAGE(1)(15 downto 8);
-					when x"B1" => SS_DO <= CACHE_ADDR(7 downto 0);
-					when x"B2" => SS_DO <= "0000000" & CACHE_ADDR(8);
-					when x"B3" => SS_DO <= "00000" & std_logic_vector(CACHE_WAIT_CNT);
-					when x"B4" => SS_DO <= CACHE_BUS_ADDR(7 downto 0);
-					when x"B5" => SS_DO <= CACHE_BUS_ADDR(15 downto 8);
-					when x"B6" => SS_DO <= CACHE_BUS_ADDR(23 downto 16);
-					when x"B7" => SS_DO <= "000000" & std_logic_vector(BUS_RD_CNT);
 					when x"B8" => SS_DO <= std_logic_vector(to_unsigned(EXTRA_CYCLES, 8));
-					when x"B9" => SS_DO <= SNES_ADDR(7 downto 0);
-					when x"BA" => SS_DO <= SNES_ADDR(15 downto 8);
-					when x"BB" => SS_DO <= SNES_ADDR(23 downto 16);
 					when others => SS_DO <= x"00";
 				end case;
 				end if;
-			end if;
 		end if;
 	end process;
 

@@ -59,6 +59,11 @@ module savestates
 	output            gsu_regs_sel,
 	input       [7:0] gsu_di,
 
+	output            cx4_regs_sel,
+	output            cx4_cache_sel,
+	input       [7:0] cx4_di,
+	input             cx4_ss_ok,   // 1 = ok to snapshot (CX4 idle or not a CX4 cart)
+
 	input             sa1_active,
 	input      [23:0] sa1_a,
 	input       [7:0] sa1_di,
@@ -69,7 +74,8 @@ module savestates
 
 	output            ss_do_ovr,
 	output            ss_rom_ovr,
-	output reg        ss_busy
+	output reg        ss_busy,
+	output            ss_save_active
 );
 
 reg cpurd_n_old, cpuwr_n_old;
@@ -136,6 +142,7 @@ wire ss_status_sel = ss_reg_sel & (ca[15:0] == 16'h600F);
 
 assign dspn_regs_sel = ss_reg_sel & (ca[15:8] == 8'h61);
 assign gsu_regs_sel = ss_reg_sel & (ca[15:8] == 8'h62);
+assign cx4_regs_sel = ss_reg_sel & (ca[15:8] == 8'h63);
 
 wire ppu_sel = (ca[23:16] == 8'hC1) & (ca[15:8] == 8'h21);
 
@@ -150,6 +157,7 @@ wire spc_read = spc_sel & ~pard_n;
 wire bsram_read = bsram_sel & ~pard_n;
 
 wire dspn_ram_read = dspn_ram_sel & ~pard_n;
+wire cx4_cache_read = cx4_cache_sel & ~pard_n;
 
 reg [3:0] ddr_state;
 reg [7:0] ddr_data;
@@ -208,7 +216,11 @@ always @(posedge clk) begin
 
 		if (cpurd_ce) begin
 			if (nmi_vect_l | (~ss_use_nmi & irq_vect_l)) begin // Prefer to use NMI
-				if (~ss_busy & (save_en | (load_en & load_ready))) begin
+				// Hold a SAVE until the coprocessor is idle (cx4_ss_ok). The
+				// save_en latch persists, so the snapshot just waits for the CX4 to
+				// finish its current burst -- no in-flight CPU/cache/DMA state is ever
+				// captured. Load is unaffected.
+				if (~ss_busy & ((save_en & cx4_ss_ok) | (load_en & load_ready))) begin
 					ss_busy <= 1; // Override NMI/IRQ vector
 					if (save_en) begin
 						ss_count <= ss_count + 1'b1;
@@ -275,7 +287,7 @@ always @(posedge clk) begin
 		end
 
 		if (pawr_ce | pard_ce) begin
-			if (spc_sel | bsram_sel | dspn_ram_sel) begin
+			if (spc_sel | bsram_sel | dspn_ram_sel | cx4_cache_sel) begin
 				ss_ext_addr_inc <= 1;
 			end
 		end
@@ -433,7 +445,7 @@ savestates_map ss_map
 
 wire ss_oe = ss_data_sel | ss_status_sel | nmi_vect | irq_vect |
 			ss_ramsize_sel | ss_romtype_sel | ssr_oe | map_ss_oe |
-			ppu_sel | dspn_regs_sel | gsu_regs_sel;
+			ppu_sel | dspn_regs_sel | gsu_regs_sel | cx4_regs_sel;
 
 always @(posedge clk) begin
 	ss_do <= 8'h00;
@@ -448,6 +460,7 @@ always @(posedge clk) begin
 	if (ppu_sel) ss_do <= ppu_di;
 	if (dspn_regs_sel) ss_do <= dspn_di;
 	if (gsu_regs_sel) ss_do <= gsu_di;
+	if (cx4_regs_sel) ss_do <= cx4_di;
 end
 
 always @(*) begin
@@ -465,9 +478,11 @@ always @(*) begin
 	if (spc_read) ddr_data = spc_di;
 	if (bsram_read) ddr_data = bsram_di;
 	if (dspn_ram_read) ddr_data = dspn_di;
+	if (cx4_cache_read) ddr_data = cx4_di;
 end
 
 assign ss_do_ovr = ss_busy & ss_oe;
+assign ss_save_active = save_en;   // 1 during a SAVE, 0 during LOAD -- opens the CX4 RAMIO window on a LOAD
 assign ss_rom_ovr = map_active ? map_rom_ovr : ss_busy;
 
 assign aram_sel = ss_busy & (pa == 8'h84);
@@ -475,6 +490,7 @@ assign dsp_regs_sel = ss_busy & (pa == 8'h85);
 assign smp_regs_sel = ss_busy & (pa == 8'h86);
 assign bsram_sel = ss_busy & (pa == 8'h87);
 assign dspn_ram_sel = ss_busy & (pa == 8'h88);
+assign cx4_cache_sel = ss_busy & (pa == 8'h8A);
 assign ext_addr = ss_ext_addr;
 
 assign ddr_addr = { ss_slot[1:0], ss_ddr_addr[19:3] };

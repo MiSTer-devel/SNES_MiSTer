@@ -266,6 +266,7 @@ SNES SNES
 	.ss_regs_sel(SS_DSP_REGS_SEL),
 	.ss_smp_sel(SS_SMP_SEL),
 	.ss_busy(SS_BUSY),
+	.ss_nmi_force(SS_NMI_FORCE),
 	.ss_wr(~PAWR_N),
 	.ss_di(SS_DO),
 	.ss_spc_do(SS_SPC_DI),
@@ -893,6 +894,7 @@ wire  [7:0] SS_DSPN_DI;
 wire  [7:0] SS_GSU_DI;
 wire        SS_DO_OVR;
 wire        SS_ROM_OVR;
+wire        SS_NMI_FORCE;
 wire        SS_ARAM_SEL, SS_DSP_REGS_SEL, SS_SMP_SEL;
 wire        SS_BSRAM_SEL;
 wire        SS_DSPN_REGS_SEL, SS_DSPN_RAM_SEL;
@@ -970,7 +972,8 @@ savestates ss
 
 	.ss_do_ovr(SS_DO_OVR),
 	.ss_rom_ovr(SS_ROM_OVR),
-	.ss_busy(SS_BUSY)
+	.ss_busy(SS_BUSY),
+	.ss_nmi_force(SS_NMI_FORCE)
 );
 end else begin
 	assign SS_DO = 0;
@@ -991,6 +994,7 @@ end else begin
 	assign SS_DO_OVR = 0;
 	assign SS_ROM_OVR = 0;
 	assign SS_BUSY = 0;
+	assign SS_NMI_FORCE = 0;
 end
 endgenerate
 

@@ -748,7 +748,6 @@ wire [24:0] ra_sni_addr;
 wire        ra_sni_rd_req;
 wire        ra_sni_word;
 wire [15:0] sdr_sni_dout;
-wire        SDRAM_SNI_READY;
 wire [17:0] ra_bsram_addr;
 wire        ra_active;
 wire [28:0] ra_ddram_addr;

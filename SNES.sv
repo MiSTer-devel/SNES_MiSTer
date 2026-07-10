@@ -264,6 +264,8 @@ wire [15:0] joystick1_rumble;
 
 wire  [7:0] joy0_x,joy0_y,joy1_x,joy1_y;
 
+reg  [7:0] uart_mode;
+
 wire [64:0] RTC;
 
 wire [21:0] gamma_bus;
@@ -314,6 +316,8 @@ hps_io #(.CONF_STR(CONF_STR), .WIDE(1)) hps_io
 	.img_mounted(img_mounted),
 	.img_readonly(img_readonly),
 	.img_size(img_size),
+
+	.uart_mode(uart_mode),
 
 	.RTC(RTC),
 
@@ -543,7 +547,8 @@ main main
 	.JOY1_P6(JOY1_P6),
 	.JOY2_P6(JOY2_P6),
 	.JOY2_P6_in(JOY2_P6_DI),
-	
+	.SNI_JOY(SNI_JOY),
+
 	.EXT_RTC(RTC),
 
 	.GG_EN(status[24] | hardcore),
@@ -730,6 +735,14 @@ always @(posedge clk_sys)
 
 wire [15:0] sdr_dout1;
 
+// --- SNI (host PC access over UART) signals ---
+wire[24:0]  SDRAM_SNI_ADDR;
+wire[7:0]   SDRAM_SNI_DATA;
+wire[7:0]   SDRAM_SNI_Q;
+wire        SDRAM_SNI_RD;
+wire        SDRAM_SNI_WR;
+wire        SDRAM_SNI_READY;
+
 // --- RetroAchievements RAM Mirror signals ---
 wire [24:0] ra_sni_addr;
 wire        ra_sni_rd_req;
@@ -748,6 +761,14 @@ wire        ra_ddram_rd_req;
 wire        ra_ddram_rd_ack;
 wire [63:0] ra_ddram_rd_dout;
 wire [31:0] ra_dbg_frame;
+
+// SNI SDRAM mux: RA mirror takes over the shared SNI port during its
+// VBlank transfer window (ra_active); SNI host accesses wait meanwhile.
+wire [24:0] sdram_sni_addr_mux = ra_active ? ra_sni_addr : SDRAM_SNI_ADDR;
+wire [15:0] sdram_sni_din_mux  = ra_active ? 16'h0000 : {8'h00, SDRAM_SNI_DATA};
+wire        sdram_sni_rd_mux   = ra_active ? ra_sni_rd_req : SDRAM_SNI_RD;
+wire        sdram_sni_wr_mux   = ra_active ? 1'b0 : SDRAM_SNI_WR;
+wire        sdram_sni_word_mux = ra_active ? ra_sni_word : 1'b0;
 
 // Port B of bsram DPRAM: 16-bit, word-addressed. Used for SD card save/load
 // (bk_state=1) or RA reads (otherwise). SD save/load is infrequent and user-
@@ -794,18 +815,18 @@ sdram sdram
 	.rfs1(clearing_ram ? 1'b0 : !RESET_N ? RESET_REFRESH : SNES_REFRESH),
 	.word1(0),
 
-	// RetroAchievements SNI read port (WRAM). Dormant when ENABLE_RA=0
-	// (ra_sni_rd_req tied low -> no SNI accesses, port optimized away).
-	.sni_addr  (ra_sni_addr),
-	.sni_din   (16'h0000),
+	// Shared port: SNI (host PC) and RA mirror, arbitrated by ra_active.
+	.sni_addr  (sdram_sni_addr_mux),
+	.sni_din   (sdram_sni_din_mux),
 	.sni_dout  (sdr_sni_dout),
-	.sni_rd_req(ra_sni_rd_req),
-	.sni_wr_req(1'b0),
+	.sni_rd_req(sdram_sni_rd_mux),
+	.sni_wr_req(sdram_sni_wr_mux),
 	.sni_ready (SDRAM_SNI_READY),
-	.sni_word  (ra_sni_word)
+	.sni_word  (sdram_sni_word_mux)
 );
 
 assign WRAM_Q = sdr_dout1[7:0];
+assign SDRAM_SNI_Q = sdr_sni_dout[7:0];
 
 wire        VRAM_OE_N;
 reg         VRAM_OE_N_DELAYED;
@@ -872,14 +893,19 @@ wire        BSRAM_CE_N;
 wire        BSRAM_OE_N;
 wire        BSRAM_WE_N;
 wire  [7:0] BSRAM_Q, BSRAM_D;
-dpram_dif #(BSRAM_BITS,8,BSRAM_BITS-1,16) bsram 
+wire [19:0] BSRAM_SNI_ADDR;
+wire        BSRAM_SNI_RD, BSRAM_SNI_WR;
+wire [7:0]  BSRAM_SNI_D;
+wire        BSRAM_SNI_READY = (BSRAM_SNI_RD | BSRAM_SNI_WR) & (BSRAM_CE_N | (BSRAM_OE_N & BSRAM_WE_N));
+
+dpram_dif #(BSRAM_BITS,8,BSRAM_BITS-1,16) bsram
 (
 	.clock(clk_sys),
 
 	//Thrash the BSRAM upon ROM loading
-	.address_a(clearing_ram ? mem_fill_addr[BSRAM_BITS-1:0] : BSRAM_ADDR[BSRAM_BITS-1:0]),
-	.data_a(clearing_ram ? 8'hFF : BSRAM_D),
-	.wren_a(clearing_ram ? mem_fill_we : ~BSRAM_CE_N & ~BSRAM_WE_N),
+	.address_a(clearing_ram ? mem_fill_addr[BSRAM_BITS-1:0] : BSRAM_SNI_READY ? BSRAM_SNI_ADDR : BSRAM_ADDR[BSRAM_BITS-1:0]),
+	.data_a(clearing_ram ? 8'hFF : BSRAM_SNI_READY ? BSRAM_SNI_D : BSRAM_D),
+	.wren_a(clearing_ram ? mem_fill_we : BSRAM_SNI_READY ? BSRAM_SNI_WR : ~BSRAM_CE_N & ~BSRAM_WE_N),
 	.q_a(BSRAM_Q),
 
 	// Port B: SD card save/load -or- RA byte reads (see bsram_b_addr mux above)
@@ -968,18 +994,76 @@ video_mixer #(.LINE_LENGTH(520), .GAMMA(1)) video_mixer
 ////////////////////////////  I/O PORTS  ////////////////////////////////
 
 assign {UART_RTS, UART_DTR} = 1;
-wire [15:0] uart_data;
+
+wire piano = status[43] & (uart_mode == 3);
+reg last_piano = 1'b0;
+always @(posedge clk_sys) last_piano <= piano;
+reg piano_tdata_i;
+reg sni_tdata_i;
+wire [15:0] piano_data_i;
+wire [15:0] sni_data_i;
+wire [15:0] data_o;
+wire rbf;
+wire txint;
+wire rxint;
+
+uart uart(
+	.clk(clk_sys),
+	.reset(reset || (piano ^ last_piano)),
+	.midi_speed_sel(piano),
+	.tdata_i(piano ? piano_tdata_i : sni_tdata_i),
+	.data_i(piano ? piano_data_i : sni_data_i),
+	.data_o(data_o),
+	.uartbrk(1'b0),//reset),
+	.rbfmirror(rbf),
+	.txint(txint),
+	.rxint(rxint),
+	.txd(UART_TXD),
+	.rxd(UART_RXD)
+);
+
 wire piano_joypad_do;
-wire piano = status[43];
 miraclepiano miracle(
 	.clk(clk_sys),
 	.reset(reset || !piano),
 	.strobe(JOY_STRB),
 	.joypad_o(piano_joypad_do),
 	.joypad_clock(JOY1_CLK),
-	.data_o(uart_data),
-	.txd(UART_TXD),
-	.rxd(UART_RXD)
+	.txint(txint),
+	.rxint(rxint),
+	.tdata_i(piano_tdata_i),
+	.tdata_m(piano_data_i),
+	.rdata_m(data_o)
+);
+
+wire [63:0] SNI_JOY;
+sni sni(
+	.clk(clk_sys),
+	.reset(reset || uart_mode != 6),
+	.vblank(VBlank),
+
+	.sdram_addr(SDRAM_SNI_ADDR),
+	.sdram_data(SDRAM_SNI_DATA),
+	.sdram_q(SDRAM_SNI_Q),
+	.sdram_rd_req(SDRAM_SNI_RD),
+	.sdram_wr_req(SDRAM_SNI_WR),
+	.sdram_ready(SDRAM_SNI_READY),
+
+	.bsram_addr(BSRAM_SNI_ADDR),
+	.bsram_q(BSRAM_Q),
+	.bsram_rd(BSRAM_SNI_RD),
+	.bsram_wr(BSRAM_SNI_WR),
+	.bsram_data(BSRAM_SNI_D),
+	.bsram_ready(BSRAM_SNI_READY),
+
+	.joypad(SNI_JOY),
+
+	.rbf(rbf),
+	.txint(txint),
+	.rxint(rxint),
+	.tdata_i(sni_tdata_i),
+	.tdata_m(sni_data_i),
+	.rdata_m(data_o)
 );
 wire [1:0] JOY1_DO = piano ? {1'b1,piano_joypad_do} : JOY1_DO_t;
 
@@ -1081,9 +1165,6 @@ assign USER_OUT[2] = 1'b1;
 assign USER_OUT[5] = 1'b1;
 assign USER_OUT[6] = 1'b1;
 
-wire  [1:0] datajoy0_DI = snac_p2 ? {1'b1, USER_IN[6]} : JOY1_DO;
-wire  [1:0] datajoy1_DI = snac_p2 ? {USER_IN[2], USER_IN[6]} : JOY2_DO;
-
 // JOYX_DO[0] is P4, JOYX_DO[1] is P5
 wire [1:0] JOY1_DI;
 wire [1:0] JOY2_DI;
@@ -1103,10 +1184,17 @@ always_comb begin
 		USER_OUT[0] = JOY_STRB;
 		USER_OUT[1] = joy_swap ? ~JOY2_CLK : ~JOY1_CLK;
 		USER_OUT[3] = joy_swap ? ~JOY1_CLK : ~JOY2_CLK;
-		USER_OUT[4] = joy_swap ? JOY2_P6 : snac_p2 ? JOY2_P6 : JOY1_P6;
-		JOY1_DI = joy_swap ? datajoy0_DI : snac_p2 ? {1'b1, USER_IN[5]} : {USER_IN[2], USER_IN[5]};
-		JOY2_DI = joy_swap ? {USER_IN[2], USER_IN[5]} : datajoy1_DI;		
-		JOY2_P6_DI = joy_swap ? USER_IN[4] : snac_p2 ? USER_IN[4] : (LG_P6_out | !GUN_MODE);
+		if (snac_p2) begin
+			USER_OUT[4] = joy_swap ? JOY1_P6 : JOY2_P6;
+			JOY1_DI = joy_swap ? {1'b1, USER_IN[6]} : {1'b1, USER_IN[5]};
+			JOY2_DI = joy_swap ? {USER_IN[2], USER_IN[5]} : {USER_IN[2], USER_IN[6]};
+			JOY2_P6_DI = USER_IN[4];
+		end else begin
+			USER_OUT[4] = joy_swap ? JOY2_P6 : JOY1_P6;
+			JOY1_DI = joy_swap ? JOY1_DO : {USER_IN[2], USER_IN[5]};
+			JOY2_DI = joy_swap ? {USER_IN[2], USER_IN[5]} : JOY2_DO;
+			JOY2_P6_DI = joy_swap ? USER_IN[4] : (LG_P6_out | !GUN_MODE);
+		end
 	end else begin
 		USER_OUT[0] = 1'b1;
 		USER_OUT[1] = 1'b1;

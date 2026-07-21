@@ -74,8 +74,7 @@ module savestates
 
 	output            ss_do_ovr,
 	output            ss_rom_ovr,
-	output reg        ss_busy,
-	output            ss_save_active
+	output reg        ss_busy
 );
 
 reg cpurd_n_old, cpuwr_n_old;
@@ -482,7 +481,6 @@ always @(*) begin
 end
 
 assign ss_do_ovr = ss_busy & ss_oe;
-assign ss_save_active = save_en;   // 1 during a SAVE, 0 during LOAD -- opens the CX4 RAMIO window on a LOAD
 assign ss_rom_ovr = map_active ? map_rom_ovr : ss_busy;
 
 assign aram_sel = ss_busy & (pa == 8'h84);
@@ -490,7 +488,7 @@ assign dsp_regs_sel = ss_busy & (pa == 8'h85);
 assign smp_regs_sel = ss_busy & (pa == 8'h86);
 assign bsram_sel = ss_busy & (pa == 8'h87);
 assign dspn_ram_sel = ss_busy & (pa == 8'h88);
-assign cx4_cache_sel = ss_busy & (pa == 8'h8A);
+assign cx4_cache_sel = ss_busy & (pa == 8'h89);
 assign ext_addr = ss_ext_addr;
 
 assign ddr_addr = { ss_slot[1:0], ss_ddr_addr[19:3] };

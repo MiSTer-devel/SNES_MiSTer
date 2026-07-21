@@ -475,7 +475,6 @@ CX4Map CX4Map
 	.bsram_mask(RAM_MASK),
 
 	.ss_busy   (SS_BUSY),
-	.ss_save   (SS_SAVE_EN),
 	.ss_wr     (SS_BUSY & SS_CX4_SEL & ~CPUWR_N),
 	.ss_do     (SS_CX4_DO_REG),
 
@@ -901,7 +900,6 @@ assign MAP_ACTIVE[6] = 0;
 endgenerate
 
 wire        SS_BUSY;
-wire        SS_SAVE_EN;   // savestates.save_en -> CX4 MMIO gate (SA1-style ~(ss_busy & save_en))
 wire  [7:0] SS_DO;
 wire [23:0] SS_ROM_ADDR;
 
@@ -1004,8 +1002,7 @@ savestates ss
 
 	.ss_do_ovr(SS_DO_OVR),
 	.ss_rom_ovr(SS_ROM_OVR),
-	.ss_busy(SS_BUSY),
-	.ss_save_active(SS_SAVE_EN)
+	.ss_busy(SS_BUSY)
 );
 end else begin
 	assign SS_DO = 0;
@@ -1028,7 +1025,6 @@ end else begin
 	assign SS_DO_OVR = 0;
 	assign SS_ROM_OVR = 0;
 	assign SS_BUSY = 0;
-	assign SS_SAVE_EN = 0;
 end
 endgenerate
 

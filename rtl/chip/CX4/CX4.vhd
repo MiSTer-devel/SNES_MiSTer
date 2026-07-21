@@ -35,7 +35,6 @@ entity CX4 is
 		MAPPER		: in std_logic;
 
 		SS_BUSY    : in  std_logic;
-		SS_SAVE    : in  std_logic := '0';
 		SS_WR      : in  std_logic;
 		SS_DO      : out std_logic_vector(7 downto 0);
 
@@ -202,11 +201,8 @@ begin
 		end if;
 	end process; 
 	
-	-- Open CX4 MMIO during a LOAD only (SA1-style ~(ss_busy & save_en)) so restore writes pass; a SAVE stays frozen.
-	MMIO_WR  <= not WR_N and MMIO_SEL  and SYSCLKF_CE;
-	-- Open the RAMIO ($6000) window during a LOAD so the firmware can copy the Data RAM back in;
-	-- blocked during a SAVE (SS_SAVE) so the frozen RAM is read, not written.
-	RAMIO_WR <= not WR_N and RAMIO_SEL and SYSCLKF_CE and not (SS_BUSY and SS_SAVE);
+	MMIO_WR <= not WR_N and MMIO_SEL and SYSCLKF_CE;
+	RAMIO_WR <= not WR_N and RAMIO_SEL and SYSCLKF_CE;
 	
 	process(CLK, RST_N, WR_Nr, RAMIO_SEL, MMIO_SEL, SYSCLKF_CE)
 	begin
@@ -1509,7 +1505,7 @@ begin
 					when x"68" => SS_DO <= "0000" & DPR(11 downto 8);
 					when x"69" => SS_DO <= P(7 downto 0);
 					when x"6A" => SS_DO <= "0" & P(14 downto 8);
-					-- DMA_DST/PAGE_SEL/PAGE_LOCK/IRQ_EN (0x6E-70/78/79/7E) read via MMIO on save (restored in HW); off this mux.
+					-- DMA_DST 23:16/PAGE_SEL/PAGE_LOCK/IRQ_EN (0x70/78/79/7E) read via MMIO on save (restored in HW); off this mux.
 					when x"9F" => SS_DO <= "0000000" & DMA_RUN;
 					when x"AB" => SS_DO <= "0000000" & CACHE_RUN;
 					when x"AC" => SS_DO <= "0000000" & CACHE_BANK;

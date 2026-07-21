@@ -40,6 +40,7 @@ constant SS_DSP_REGSD  = $2185
 constant SS_SMP_REGSD  = $2186
 constant SS_BSRAM_DATA = $2187
 constant SS_DSPN_DATA  = $2188
+constant SS_CX4_CACHE_DATA = $2189
 
 constant NOSHADOW      = $010000
 
@@ -127,8 +128,6 @@ constant SS_DSPNRAM   = $10
 constant SS_GSUREGS1  = $11
 constant SS_GSUCACHE  = $12
 constant SS_GSUREGS2  = $13
-constant SS_CX4_DATA   = $2189
-constant SS_CX4_CACHE_DATA = $218A
 constant SS_CX4_BASE   = SSBASE + $6300
 constant ROM_CX4       = $40
 constant SS_CX4REGS    = $14

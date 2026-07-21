@@ -50,7 +50,6 @@ entity CX4Map is
 		BSRAM_MASK	: in std_logic_vector(23 downto 0);
 
 		SS_BUSY    : in  std_logic;
-		SS_SAVE    : in  std_logic := '0';
 		SS_WR      : in  std_logic;
 		SS_DO      : out std_logic_vector(7 downto 0);
 
@@ -118,7 +117,6 @@ begin
 		MAPPER		=> MAP_CTRL(0),
 
 		SS_BUSY    => SS_BUSY,
-		SS_SAVE    => SS_SAVE,
 		SS_WR      => SS_WR,
 		SS_DO      => SS_DO,
 

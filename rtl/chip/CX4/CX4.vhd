@@ -283,10 +283,11 @@ begin
 			-- write through $7F45/$7F46 with no side effect, so they restore via MMIO in the asm.
 			if SS_WR = '1' then
 				case ADDR(7 downto 0) is
-					when x"70" => DMA_DST(23 downto 16) <= DI;  -- $7F47 write starts a DMA -> restore in HW
-					when x"78" => PAGE_SEL              <= DI(0);
-					when x"79" => PAGE_LOCK             <= DI(1 downto 0);
-					when x"7E" => IRQ_EN                <= DI(0);
+					when x"05" =>
+						IRQ_EN   <= DI(2);
+						PAGE_SEL <= DI(6);
+					when x"06" => PAGE_LOCK             <= DI(4 downto 3);
+					when x"08" => DMA_DST(23 downto 16) <= DI;  -- $7F47 write starts a DMA -> restore in HW
 					when others => null;
 				end case;
 			end if;
@@ -602,12 +603,12 @@ begin
 			end if;
 			if SS_WR = '1' then
 				case ADDR(7 downto 0) is
-					when x"AB" => CACHE_RUN                  <= DI(0);
-					when x"AC" => CACHE_BANK                 <= DI(0);
-					when x"AD" => CACHE_PAGE(0)(7 downto 0)  <= DI;
-					when x"AE" => CACHE_PAGE(0)(15 downto 8) <= DI;  -- incl. valid bit; cache RAM is serialized so the page stays coherent
-					when x"AF" => CACHE_PAGE(1)(7 downto 0)  <= DI;
-					when x"B0" => CACHE_PAGE(1)(15 downto 8) <= DI;
+					when x"03" => CACHE_RUN                  <= DI(6);
+					when x"05" => CACHE_BANK                 <= DI(7);
+					when x"0E" => CACHE_PAGE(0)(7 downto 0)  <= DI;
+					when x"0F" => CACHE_PAGE(0)(15 downto 8) <= DI;  -- incl. valid bit; cache RAM is serialized so the page stays coherent
+					when x"20" => CACHE_PAGE(1)(7 downto 0)  <= DI;
+					when x"21" => CACHE_PAGE(1)(15 downto 8) <= DI;
 					when others => null;
 				end case;
 			end if;
@@ -663,7 +664,7 @@ begin
 			end if;
 			if SS_WR = '1' then
 				case ADDR(7 downto 0) is
-					when x"9F" => DMA_RUN                   <= DI(0);
+					when x"03" => DMA_RUN                   <= DI(5);
 					when others => null;
 				end case;
 			end if;
@@ -932,18 +933,18 @@ begin
 			end if;
 			if SS_WR = '1' then
 				case ADDR(7 downto 0) is
-					when x"4A" => MACL(7 downto 0)   <= DI;
-					when x"4B" => MACL(15 downto 8)  <= DI;
-					when x"4C" => MACL(23 downto 16) <= DI;
-					when x"4D" => MACH(7 downto 0)   <= DI;
-					when x"4E" => MACH(15 downto 8)  <= DI;
-					when x"4F" => MACH(23 downto 16) <= DI;
-					when x"50" => MULA(7 downto 0)   <= signed(DI);
-					when x"51" => MULA(15 downto 8)  <= signed(DI);
-					when x"52" => MULA(23 downto 16) <= signed(DI);
-					when x"53" => MULB(7 downto 0)   <= signed(DI);
-					when x"54" => MULB(15 downto 8)  <= signed(DI);
-					when x"55" => MULB(23 downto 16) <= signed(DI);
+					when x"22" => MACL(7 downto 0)   <= DI;
+					when x"23" => MACL(15 downto 8)  <= DI;
+					when x"24" => MACL(23 downto 16) <= DI;
+					when x"25" => MACH(7 downto 0)   <= DI;
+					when x"26" => MACH(15 downto 8)  <= DI;
+					when x"27" => MACH(23 downto 16) <= DI;
+					when x"28" => MULA(7 downto 0)   <= signed(DI);
+					when x"29" => MULA(15 downto 8)  <= signed(DI);
+					when x"2A" => MULA(23 downto 16) <= signed(DI);
+					when x"2B" => MULB(7 downto 0)   <= signed(DI);
+					when x"2C" => MULB(15 downto 8)  <= signed(DI);
+					when x"2D" => MULB(23 downto 16) <= signed(DI);
 					when others => null;
 				end case;
 			end if;
@@ -1048,17 +1049,18 @@ begin
 			end if;
 			if SS_WR = '1' then
 				case ADDR(7 downto 0) is
-					when x"56" => MAR(7 downto 0)         <= DI;
-					when x"57" => MAR(15 downto 8)        <= DI;
-					when x"58" => MAR(23 downto 16)       <= DI;
-					when x"59" => MBR                     <= DI;
-					when x"5A" => ROM_ACCESS               <= DI(0);
-					when x"5B" => SRAM_ACCESS              <= DI(0);
-					when x"5C" => SRAM_WR                  <= DI(0);
-					when x"5D" => BUS_ACCESS_CNT           <= unsigned(DI(2 downto 0));
-					when x"5E" => EXT_BUS_ADDR(7 downto 0)  <= DI;
-					when x"5F" => EXT_BUS_ADDR(15 downto 8) <= DI;
-					when x"60" => EXT_BUS_ADDR(23 downto 16)<= DI;
+					when x"05" =>
+						ROM_ACCESS  <= DI(3);
+						SRAM_ACCESS <= DI(4);
+						SRAM_WR     <= DI(5);
+					when x"07" => BUS_ACCESS_CNT           <= unsigned(DI(2 downto 0));
+					when x"09" => MBR                     <= DI;
+					when x"2E" => MAR(7 downto 0)         <= DI;
+					when x"2F" => MAR(15 downto 8)        <= DI;
+					when x"30" => MAR(23 downto 16)       <= DI;
+					when x"31" => EXT_BUS_ADDR(7 downto 0)  <= DI;
+					when x"32" => EXT_BUS_ADDR(15 downto 8) <= DI;
+					when x"33" => EXT_BUS_ADDR(23 downto 16)<= DI;
 					when others => null;
 				end case;
 			end if;
@@ -1091,8 +1093,8 @@ begin
 			end if;
 			if SS_WR = '1' then
 				case ADDR(7 downto 0) is
-					when x"69" => P(7 downto 0)  <= DI;
-					when x"6A" => P(14 downto 8) <= DI(6 downto 0);
+					when x"0C" => P(7 downto 0)  <= DI;
+					when x"0D" => P(14 downto 8) <= DI(6 downto 0);
 					when others => null;
 				end case;
 			end if;
@@ -1218,39 +1220,33 @@ begin
 				end if;
 			end if;
 			if SS_WR = '1' then
-				case ADDR(7 downto 0) is
-					when x"04" => PC                       <= DI;
-					when x"05" => BANK                     <= DI(0);
-					when x"06" => STACK_RAM(0)(7 downto 0) <= DI;
-					when x"07" => STACK_RAM(0)(8)          <= DI(0);
-					when x"08" => STACK_RAM(1)(7 downto 0) <= DI;
-					when x"09" => STACK_RAM(1)(8)          <= DI(0);
-					when x"0A" => STACK_RAM(2)(7 downto 0) <= DI;
-					when x"0B" => STACK_RAM(2)(8)          <= DI(0);
-					when x"0C" => STACK_RAM(3)(7 downto 0) <= DI;
-					when x"0D" => STACK_RAM(3)(8)          <= DI(0);
-					when x"0E" => STACK_RAM(4)(7 downto 0) <= DI;
-					when x"0F" => STACK_RAM(4)(8)          <= DI(0);
-					when x"10" => STACK_RAM(5)(7 downto 0) <= DI;
-					when x"11" => STACK_RAM(5)(8)          <= DI(0);
-					when x"12" => STACK_RAM(6)(7 downto 0) <= DI;
-					when x"13" => STACK_RAM(6)(8)          <= DI(0);
-					when x"14" => STACK_RAM(7)(7 downto 0) <= DI;
-					when x"15" => STACK_RAM(7)(8)          <= DI(0);
-					when x"16" => SP                       <= unsigned(DI(2 downto 0));
-					when x"17" => CPU_RUN                  <= DI(0);
-					when x"18" => IRQ                      <= DI(0);
-					when x"19" => IRQ_FLAG                 <= DI(0);
-					when x"B8" =>
-						-- EXTRA_CYCLES range is 0 to 2; saturate the out-of-range
-						-- "11" encoding so a corrupt SS blob cannot trip a range-check.
-						if DI(1 downto 0) = "11" then
-							EXTRA_CYCLES <= 2;
-						else
-							EXTRA_CYCLES <= to_integer(unsigned(DI(1 downto 0)));
-						end if;
-					when others => null;
-				end case;
+				if ADDR(7 downto 4) = x"1" then	-- 0x10-0x1F: STACK_RAM, index ADDR(3:1), bank-bit lane ADDR(0)
+					if ADDR(0) = '0' then
+						STACK_RAM(to_integer(unsigned(ADDR(3 downto 1))))(7 downto 0) <= DI;
+					else
+						STACK_RAM(to_integer(unsigned(ADDR(3 downto 1))))(8) <= DI(0);
+					end if;
+				else
+					case ADDR(7 downto 0) is
+						when x"03" =>
+							CPU_RUN <= DI(4);
+							BANK    <= DI(7);
+						when x"04" => PC <= DI;
+						when x"05" =>
+							IRQ      <= DI(0);
+							IRQ_FLAG <= DI(1);
+						when x"06" =>
+							SP <= unsigned(DI(2 downto 0));
+							-- EXTRA_CYCLES range is 0 to 2; saturate the out-of-range
+							-- "11" encoding so a corrupt SS blob cannot trip a range-check.
+							if DI(6 downto 5) = "11" then
+								EXTRA_CYCLES <= 2;
+							else
+								EXTRA_CYCLES <= to_integer(unsigned(DI(6 downto 5)));
+							end if;
+						when others => null;
+					end case;
+				end if;
 			end if;
 		end if;
 	end process;
@@ -1269,8 +1265,8 @@ begin
 			end if;
 			if SS_WR = '1' then
 				case ADDR(7 downto 0) is
-					when x"67" => DPR(7 downto 0)  <= DI;
-					when x"68" => DPR(11 downto 8) <= DI(3 downto 0);
+					when x"0A" => DPR(7 downto 0)  <= DI;
+					when x"0B" => DPR(11 downto 8) <= DI(3 downto 0);
 					when others => null;
 				end case;
 			end if;
@@ -1341,7 +1337,7 @@ begin
 					GPR(to_integer(unsigned(IR(3 downto 0)))) <= A;
 				end if;
 			end if;
-			-- GPR (0x1A-0x49) restores via MMIO ($7F80-$7FAF) in savestates_cx4.asm.
+			-- GPR restores via MMIO ($7F80-$7FAF) in savestates_cx4.asm.
 		end if;
 	end process;
 
@@ -1387,9 +1383,9 @@ begin
 			end if;
 			if SS_WR = '1' then
 				case ADDR(7 downto 0) is
-					when x"64" => RAMB(7 downto 0)   <= DI;
-					when x"65" => RAMB(15 downto 8)  <= DI;
-					when x"66" => RAMB(23 downto 16) <= DI;
+					when x"37" => RAMB(7 downto 0)   <= DI;
+					when x"38" => RAMB(15 downto 8)  <= DI;
+					when x"39" => RAMB(23 downto 16) <= DI;
 					when others => null;
 				end case;
 			end if;
@@ -1414,9 +1410,9 @@ begin
 			end if;
 			if SS_WR = '1' then
 				case ADDR(7 downto 0) is
-					when x"61" => ROMB(7 downto 0)   <= DI;
-					when x"62" => ROMB(15 downto 8)  <= DI;
-					when x"63" => ROMB(23 downto 16) <= DI;
+					when x"34" => ROMB(7 downto 0)   <= DI;
+					when x"35" => ROMB(15 downto 8)  <= DI;
+					when x"36" => ROMB(23 downto 16) <= DI;
 					when others => null;
 				end case;
 			end if;
@@ -1451,69 +1447,59 @@ begin
 		q_b			=> DATA_RAM_Q_B
 	);
 
-	-- Registered save mux -- must be clocked, never combinational (no latch)
+	-- Registered save mux -- must be clocked, never combinational (no latch).
+	-- One contiguous state map 0x00-0x39; GPR and VEC_MEM go through MMIO in savestates_cx4.asm.
 	process(CLK)
 	begin
 		if rising_edge(CLK) then
-				-- GPR (0x1A-0x49) and VEC_MEM (0x7F-0x9E) go through MMIO in savestates_cx4.asm.
-				if unsigned(ADDR(7 downto 0)) >= 16#06# and unsigned(ADDR(7 downto 0)) <= 16#15# then
-					if ADDR(0) = '0' then SS_DO <= STACK_RAM(to_integer(unsigned(ADDR(7 downto 1))) - 3)(7 downto 0);
-					else                  SS_DO <= "0000000" & STACK_RAM(to_integer(unsigned(ADDR(7 downto 1))) - 3)(8);
+				if ADDR(7 downto 4) = x"1" then	-- 0x10-0x1F: STACK_RAM, index ADDR(3:1), bank-bit lane ADDR(0)
+					if ADDR(0) = '0' then SS_DO <= STACK_RAM(to_integer(unsigned(ADDR(3 downto 1))))(7 downto 0);
+					else                  SS_DO <= "0000000" & STACK_RAM(to_integer(unsigned(ADDR(3 downto 1))))(8);
 					end if;
 				else
 				case ADDR(7 downto 0) is
 					when x"00" => SS_DO <= A(7 downto 0);
 					when x"01" => SS_DO <= A(15 downto 8);
 					when x"02" => SS_DO <= A(23 downto 16);
-					when x"03" => SS_DO <= "0000" & FLAGS;
+					when x"03" => SS_DO <= BANK & CACHE_RUN & DMA_RUN & CPU_RUN & FLAGS;
 					when x"04" => SS_DO <= PC;
-					when x"05" => SS_DO <= "0000000" & BANK;
-					when x"16" => SS_DO <= "00000" & std_logic_vector(SP);
-					when x"17" => SS_DO <= "0000000" & CPU_RUN;
-					when x"18" => SS_DO <= "0000000" & IRQ;
-					when x"19" => SS_DO <= "0000000" & IRQ_FLAG;
-					when x"4A" => SS_DO <= MACL(7 downto 0);
-					when x"4B" => SS_DO <= MACL(15 downto 8);
-					when x"4C" => SS_DO <= MACL(23 downto 16);
-					when x"4D" => SS_DO <= MACH(7 downto 0);
-					when x"4E" => SS_DO <= MACH(15 downto 8);
-					when x"4F" => SS_DO <= MACH(23 downto 16);
-					when x"50" => SS_DO <= std_logic_vector(MULA(7 downto 0));
-					when x"51" => SS_DO <= std_logic_vector(MULA(15 downto 8));
-					when x"52" => SS_DO <= std_logic_vector(MULA(23 downto 16));
-					when x"53" => SS_DO <= std_logic_vector(MULB(7 downto 0));
-					when x"54" => SS_DO <= std_logic_vector(MULB(15 downto 8));
-					when x"55" => SS_DO <= std_logic_vector(MULB(23 downto 16));
-					when x"56" => SS_DO <= MAR(7 downto 0);
-					when x"57" => SS_DO <= MAR(15 downto 8);
-					when x"58" => SS_DO <= MAR(23 downto 16);
-					when x"59" => SS_DO <= MBR;
-					when x"5A" => SS_DO <= "0000000" & ROM_ACCESS;
-					when x"5B" => SS_DO <= "0000000" & SRAM_ACCESS;
-					when x"5C" => SS_DO <= "0000000" & SRAM_WR;
-					when x"5D" => SS_DO <= "00000" & std_logic_vector(BUS_ACCESS_CNT);
-					when x"5E" => SS_DO <= EXT_BUS_ADDR(7 downto 0);
-					when x"5F" => SS_DO <= EXT_BUS_ADDR(15 downto 8);
-					when x"60" => SS_DO <= EXT_BUS_ADDR(23 downto 16);
-					when x"61" => SS_DO <= ROMB(7 downto 0);
-					when x"62" => SS_DO <= ROMB(15 downto 8);
-					when x"63" => SS_DO <= ROMB(23 downto 16);
-					when x"64" => SS_DO <= RAMB(7 downto 0);
-					when x"65" => SS_DO <= RAMB(15 downto 8);
-					when x"66" => SS_DO <= RAMB(23 downto 16);
-					when x"67" => SS_DO <= DPR(7 downto 0);
-					when x"68" => SS_DO <= "0000" & DPR(11 downto 8);
-					when x"69" => SS_DO <= P(7 downto 0);
-					when x"6A" => SS_DO <= "0" & P(14 downto 8);
-					-- DMA_DST 23:16/PAGE_SEL/PAGE_LOCK/IRQ_EN (0x70/78/79/7E) read via MMIO on save (restored in HW); off this mux.
-					when x"9F" => SS_DO <= "0000000" & DMA_RUN;
-					when x"AB" => SS_DO <= "0000000" & CACHE_RUN;
-					when x"AC" => SS_DO <= "0000000" & CACHE_BANK;
-					when x"AD" => SS_DO <= CACHE_PAGE(0)(7 downto 0);
-					when x"AE" => SS_DO <= CACHE_PAGE(0)(15 downto 8);
-					when x"AF" => SS_DO <= CACHE_PAGE(1)(7 downto 0);
-					when x"B0" => SS_DO <= CACHE_PAGE(1)(15 downto 8);
-					when x"B8" => SS_DO <= std_logic_vector(to_unsigned(EXTRA_CYCLES, 8));
+					when x"05" => SS_DO <= CACHE_BANK & PAGE_SEL & SRAM_WR & SRAM_ACCESS & ROM_ACCESS & IRQ_EN & IRQ_FLAG & IRQ;
+					when x"06" => SS_DO <= "0" & std_logic_vector(to_unsigned(EXTRA_CYCLES, 2)) & PAGE_LOCK & std_logic_vector(SP);
+					when x"07" => SS_DO <= "00000" & std_logic_vector(BUS_ACCESS_CNT);
+					when x"08" => SS_DO <= DMA_DST(23 downto 16);
+					when x"09" => SS_DO <= MBR;
+					when x"0A" => SS_DO <= DPR(7 downto 0);
+					when x"0B" => SS_DO <= "0000" & DPR(11 downto 8);
+					when x"0C" => SS_DO <= P(7 downto 0);
+					when x"0D" => SS_DO <= "0" & P(14 downto 8);
+					when x"0E" => SS_DO <= CACHE_PAGE(0)(7 downto 0);
+					when x"0F" => SS_DO <= CACHE_PAGE(0)(15 downto 8);
+					when x"20" => SS_DO <= CACHE_PAGE(1)(7 downto 0);
+					when x"21" => SS_DO <= CACHE_PAGE(1)(15 downto 8);
+					when x"22" => SS_DO <= MACL(7 downto 0);
+					when x"23" => SS_DO <= MACL(15 downto 8);
+					when x"24" => SS_DO <= MACL(23 downto 16);
+					when x"25" => SS_DO <= MACH(7 downto 0);
+					when x"26" => SS_DO <= MACH(15 downto 8);
+					when x"27" => SS_DO <= MACH(23 downto 16);
+					when x"28" => SS_DO <= std_logic_vector(MULA(7 downto 0));
+					when x"29" => SS_DO <= std_logic_vector(MULA(15 downto 8));
+					when x"2A" => SS_DO <= std_logic_vector(MULA(23 downto 16));
+					when x"2B" => SS_DO <= std_logic_vector(MULB(7 downto 0));
+					when x"2C" => SS_DO <= std_logic_vector(MULB(15 downto 8));
+					when x"2D" => SS_DO <= std_logic_vector(MULB(23 downto 16));
+					when x"2E" => SS_DO <= MAR(7 downto 0);
+					when x"2F" => SS_DO <= MAR(15 downto 8);
+					when x"30" => SS_DO <= MAR(23 downto 16);
+					when x"31" => SS_DO <= EXT_BUS_ADDR(7 downto 0);
+					when x"32" => SS_DO <= EXT_BUS_ADDR(15 downto 8);
+					when x"33" => SS_DO <= EXT_BUS_ADDR(23 downto 16);
+					when x"34" => SS_DO <= ROMB(7 downto 0);
+					when x"35" => SS_DO <= ROMB(15 downto 8);
+					when x"36" => SS_DO <= ROMB(23 downto 16);
+					when x"37" => SS_DO <= RAMB(7 downto 0);
+					when x"38" => SS_DO <= RAMB(15 downto 8);
+					when x"39" => SS_DO <= RAMB(23 downto 16);
 					when others => SS_DO <= x"00";
 				end case;
 				end if;

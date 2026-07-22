@@ -2,11 +2,12 @@ cx4_save_regs:
 	lda.b #SS_CX4REGS
 	sta SSDATA
 
-	;// HW-kept internal regs via the SS shadow window, (CA,value) pairs, FF-terminated.  00-19, 4A-6A, 70/78/79/7E, then the FSM-resume survivors (9F, AB-B0, B8).
+	;// HW-kept internal regs via the SS shadow window, (CA,value) pairs, FF-terminated.
+	;// One contiguous range 00-39 (single-bit regs are packed, see the save mux in CX4.vhd).
 	;// Emitted BEFORE the MMIO regs: the load side replays the stream in order, and the
 	;// GPR MMIO writes ($7F80-7FAF) are gated on CPU_RUN = 0 in hardware.  The load hijacks
 	;// the NMI at game runtime (no reset), so CPU_RUN may be 1 at that point; restoring the
-	;// pairs first clears it via CA 0x17 (the save is idle-gated, so the saved value is 0).
+	;// pairs first clears it via CA 0x03 (the save is idle-gated, so the saved flags are 0).
 	ldx #$0000
 -
 	txa
@@ -14,58 +15,8 @@ cx4_save_regs:
 	lda.l SS_CX4_BASE,x
 	sta SSDATA
 	inx
-	cpx #$001A
+	cpx #$003A
 	bne -
-	ldx #$004A
--
-	txa
-	sta SSDATA
-	lda.l SS_CX4_BASE,x
-	sta SSDATA
-	inx
-	cpx #$006B
-	bne -
-	;// DMA_DST 23:16 / PAGE_SEL / PAGE_LOCK / IRQ_EN: read via MMIO for the save, restored in HW (their writes side-effect).
-	;// Emitted as (CA,value) pairs so the load side restores them through the SS shadow window like the rest.
-	lda #$70
-	sta SSDATA
-	lda.l $007F47
-	sta SSDATA
-	lda #$78
-	sta SSDATA
-	lda.l $007F48
-	sta SSDATA
-	lda #$79
-	sta SSDATA
-	lda.l $007F4C
-	sta SSDATA
-	lda #$7E
-	sta SSDATA
-	lda.l $007F51
-	eor #$01				;// $7F51 reads NOT IRQ_EN; store the true value
-	sta SSDATA
-	;// Surviving FSM-resume bits only: DMA_RUN(9F), CACHE_RUN/BANK/PAGE(AB-B0), EXTRA_CYCLES(B8).
-	;// The in-flight DMA/cache micro-state, BUS_RD_CNT and SNES_ADDR are idle at save (the snapshot
-	;// is idle-gated) and re-derive on the next operation, so they are no longer serialized.
-	ldx #$009F
-	txa
-	sta SSDATA
-	lda.l SS_CX4_BASE,x
-	sta SSDATA
-	ldx #$00AB
--
-	txa
-	sta SSDATA
-	lda.l SS_CX4_BASE,x
-	sta SSDATA
-	inx
-	cpx #$00B1
-	bne -
-	ldx #$00B8
-	txa
-	sta SSDATA
-	lda.l SS_CX4_BASE,x
-	sta SSDATA
 cx4_save_regs_end:
 	lda #$FF				;// Store register end marker
 	sta SSDATA
@@ -151,7 +102,7 @@ cx4_save_cache:
 
 cx4_load_regs:
 	;// HW-kept internal regs via the SS shadow window, (CA,value) pairs until the FF terminator.
-	;// Restored FIRST: CA 0x17 clears CPU_RUN (the save is idle-gated, so the saved value is 0),
+	;// Restored FIRST: CA 0x03 clears CPU_RUN (the save is idle-gated, so the saved value is 0),
 	;// which un-gates the CPU_RUN-gated MMIO writes below (GPR $7F80-7FAF) and the Data RAM
 	;// window.  The load hijacks the NMI at game runtime, so CPU_RUN may be 1 on entry.
 	lda #$00				;// clear B register

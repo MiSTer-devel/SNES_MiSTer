@@ -40,6 +40,7 @@ constant SS_DSP_REGSD  = $2185
 constant SS_SMP_REGSD  = $2186
 constant SS_BSRAM_DATA = $2187
 constant SS_DSPN_DATA  = $2188
+constant SS_CX4_CACHE_DATA = $2189
 
 constant NOSHADOW      = $010000
 
@@ -127,6 +128,11 @@ constant SS_DSPNRAM   = $10
 constant SS_GSUREGS1  = $11
 constant SS_GSUCACHE  = $12
 constant SS_GSUREGS2  = $13
+constant SS_CX4_BASE   = SSBASE + $6300
+constant ROM_CX4       = $40
+constant SS_CX4REGS    = $14
+constant SS_CX4RAM     = $15
+constant SS_CX4CACHE   = $16
 
 macro a8() {
 	sep #$20
@@ -588,6 +594,12 @@ Save_bsram_end:
 	bne +
 	jmp gsu_save_regs1
 +
+	txa
+	and #$F0
+	cmp.b #ROM_CX4
+	bne +
+	jmp cx4_save_regs
++
 
 Save_mapper_end:
 
@@ -940,6 +952,10 @@ Load_other:
 	bne +
 	jmp gsu_load_regs1
 +
+	cmp.b #SS_CX4REGS
+	bne +
+	jmp cx4_load_regs
++
 	jmp Load_dma_regs
 	
 
@@ -1096,3 +1112,4 @@ PPURegs3End:
 include "savestates_sa1.asm"
 include "savestates_dspn.asm"
 include "savestates_gsu.asm"
+include "savestates_cx4.asm"

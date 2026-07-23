@@ -7,7 +7,7 @@ cx4_save_regs:
 	;// Emitted BEFORE the MMIO regs: the load side replays the stream in order, and the
 	;// GPR MMIO writes ($7F80-7FAF) are gated on CPU_RUN = 0 in hardware.  The load hijacks
 	;// the NMI at game runtime (no reset), so CPU_RUN may be 1 at that point; restoring the
-	;// pairs first clears it via CA 0x03 (the save is idle-gated, so the saved flags are 0).
+	;// pairs first clears it via CA 0x03 (the save is idle-gated, so the saved run bits are 0).
 	ldx #$0000
 -
 	txa
@@ -39,7 +39,7 @@ cx4_save_regs_end:
 	cpx #$0020
 	bne -
 	;// DMA_SRC + DMA_LEN + DMA_DST 7:0/15:8  $7F40-$7F46  (7 B)
-	;// DMA_DST low/mid restore through MMIO (no side effect); DMA_DST 23:16 ($7F47) starts a DMA so it stays in the shadow window (CA 70).
+	;// DMA_DST low/mid restore through MMIO (no side effect); DMA_DST 23:16 ($7F47) starts a DMA so it stays in the shadow window (CA 08).
 	ldx #$0000
 -
 	lda.l $007F40,x

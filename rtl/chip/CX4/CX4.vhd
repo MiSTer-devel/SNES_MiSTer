@@ -39,10 +39,10 @@ entity CX4 is
 		SS_DO      : out std_logic_vector(7 downto 0);
 
 		-- Program cache serialized over SS_CACHE_*: A(0) selects L/H lane, A(9:1) is the 9-bit index.
-		SS_CACHE_A   : in  std_logic_vector(9 downto 0) := (others => '0');
-		SS_CACHE_SEL : in  std_logic := '0';
-		SS_CACHE_WR  : in  std_logic := '0';
-		SS_CACHE_DI  : in  std_logic_vector(7 downto 0) := (others => '0');
+		SS_CACHE_A   : in  std_logic_vector(9 downto 0);
+		SS_CACHE_SEL : in  std_logic;
+		SS_CACHE_WR  : in  std_logic;
+		SS_CACHE_DI  : in  std_logic_vector(7 downto 0);
 		SS_CACHE_DO  : out std_logic_vector(7 downto 0);
 
 		-- '1' when the CX4 is fully idle (BUSY=0): lets the SS controller defer the snapshot until no op is in flight.

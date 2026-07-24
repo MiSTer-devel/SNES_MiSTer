@@ -199,7 +199,7 @@ parameter CONF_STR = {
 	"D1P3OI,SuperFX Speed,Normal,Turbo;",
 	"D1P3oE,SuperFX FastROM,Yes,No;",
 	"D3P3O4,CPU Speed,Normal,Turbo;",
-	"P3OU,Audio clock,Typical,Real;",
+	"P3OU,Audio Clock,Typical,Real;",
 	"P3OV,Sufami Cart swapping,No,Yes;",
 	"P3oMP,Competition Cart time,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18;",
 	"P3-;",

@@ -34,6 +34,7 @@ entity SCPU is
 		VBLANK			: in std_logic;
 		
 		IRQ_N				: in std_logic;
+		SS_NMI_FORCE	: in std_logic := '0';
 		
 		JOY1_DI			: in std_logic_vector(1 downto 0);
 		JOY2_DI			: in std_logic_vector(1 downto 0);
@@ -625,7 +626,7 @@ begin
 				end if;
 			end if;
 			
-			P65_NMI_N <= not (NMI_FLAG and NMI_EN);
+			P65_NMI_N <= not ((NMI_FLAG and NMI_EN) or SS_NMI_FORCE);
 			P65_IRQ_N <= (not IRQ_FLAG) and IRQ_N; 
 		end if;
 	end process;

@@ -98,6 +98,7 @@ entity SNES is
 
 		SS_ADDR     : in std_logic_vector(8 downto 0);
 		SS_BUSY     : in std_logic;
+		SS_NMI_FORCE : in std_logic := '0';
 		SS_REGS_SEL : in std_logic;
 		SS_SMP_SEL  : in std_logic;
 		SS_WR       : in std_logic;
@@ -227,7 +228,8 @@ begin
 		VBLANK		=> INT_VBLANK,
 		
 		IRQ_N			=> IRQ_N,
-		
+		SS_NMI_FORCE => SS_NMI_FORCE,
+
 		CA				=> INT_CA,
 		CPURD_N		=> INT_CPURD_N,
 		CPUWR_N		=> INT_CPUWR_N,

@@ -69,7 +69,8 @@ module savestates
 
 	output            ss_do_ovr,
 	output            ss_rom_ovr,
-	output reg        ss_busy
+	output reg        ss_busy,
+	output reg        ss_nmi_force
 );
 
 reg cpurd_n_old, cpuwr_n_old;
@@ -155,6 +156,16 @@ reg [3:0] ddr_state;
 reg [7:0] ddr_data;
 reg load_ready;
 
+// Force an NMI when a request has been armed too long without a vector fetch.
+// Some game sections (title screens) run with NMI disabled and no IRQ, so no
+// hijack point ever appears. Terminal force_cnt[20] = 2^20 MCLK ticks ~48.8 ms
+// (21.48 MHz NTSC / 21.28 MHz PAL), matching the sibling nmi_cycle_cnt idiom.
+reg [20:0] force_cnt;
+wire arm_pending = (save_en | (load_en & load_ready)) & ~ss_busy; // request waiting for a hijack
+wire force_ready = force_cnt[20];
+// ss_nmi_force is registered so the CPU core sees a clean reg->OR->reg path on
+// its NMI input (both modules run on MCLK); the extra cycle is nothing vs the timer.
+
 wire ddr_busy = ddr_req != ddr_ack;
 
 localparam DDR_IDLE = 4'd0, LOAD_DATA = 4'd1, WRITE_DATA = 4'd2,
@@ -193,7 +204,16 @@ always @(posedge clk) begin
 		ss_ext_addr <= 0;
 		ss_ext_addr_inc <= 0;
 		ddr_state <= DDR_IDLE;
+		force_cnt <= 0;
+		ss_nmi_force <= 0;
 	end else begin
+		if (arm_pending)
+			force_cnt <= force_ready ? force_cnt : force_cnt + 1'b1;
+		else
+			force_cnt <= 0;
+
+		ss_nmi_force <= arm_pending & force_ready;
+
 		if (~(load_en | save_en)) begin
 			if (~save_old & save) begin
 				save_en <= 1;
@@ -208,7 +228,7 @@ always @(posedge clk) begin
 
 		if (cpurd_ce) begin
 			if (nmi_vect_l | (~ss_use_nmi & irq_vect_l)) begin // Prefer to use NMI
-				if (~ss_busy & (save_en | (load_en & load_ready))) begin
+				if (arm_pending) begin
 					ss_busy <= 1; // Override NMI/IRQ vector
 					if (save_en) begin
 						ss_count <= ss_count + 1'b1;

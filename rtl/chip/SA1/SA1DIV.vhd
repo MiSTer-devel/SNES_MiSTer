@@ -24,7 +24,7 @@ architecture rtl of SA1DIV is
 begin
     process(numer, denom)
         variable n_s  : signed(16 downto 0);                -- sign-extended numerator
-        variable mag  : unsigned(16 downto 0);              -- |numerator|, 0..32768
+        variable nmag : unsigned(16 downto 0);              -- |numerator|, 0..32768
         variable d_u  : unsigned(16 downto 0);              -- denominator, 0..65535
         variable qmag : unsigned(16 downto 0);              -- |quotient|
         variable rmag : unsigned(16 downto 0);              -- remainder magnitude
@@ -32,18 +32,18 @@ begin
     begin
         n_s := resize(signed(numer), 17);
         d_u := unsigned('0' & denom);
-        mag := unsigned(abs(n_s));                          -- magnitude of the numerator
+        nmag := unsigned(abs(n_s));                         -- magnitude of the numerator
 
-        if d_u = 0 then                                     -- Reproduce the SA-1 divide-by-zero quirk.
-            rmag := mag;                                    -- |numerator|
+        if d_u = 0 then                                     -- Reproduce the SA-1 divide-by-zero quirk
+            rmag := nmag;                                   -- |numerator|
             if n_s < 0 then
                 q_s := to_signed(1, 18);
             else
                 q_s := to_signed(-1, 18);
             end if;
         else
-            qmag := mag / d_u;                              -- unsigned magnitude division
-            rmag := mag - resize(qmag * d_u, 17);           -- remainder = mag - qmag*denominator
+            qmag := nmag / d_u;                             -- unsigned magnitude division
+            rmag := nmag - resize(qmag * d_u, 17);          -- remainder = mag - qmag*denominator
             q_s  := signed(resize(qmag, 18));               -- apply the numerator's sign
             if n_s < 0 then
                 q_s := -q_s;

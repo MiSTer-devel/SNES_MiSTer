@@ -27,15 +27,15 @@ begin
         variable nmag : unsigned(16 downto 0);              -- |numerator|, 0..32768
         variable d_u  : unsigned(16 downto 0);              -- denominator, 0..65535
         variable qmag : unsigned(16 downto 0);              -- |quotient|
-        variable rmag : unsigned(16 downto 0);              -- remainder magnitude
+        variable r_u  : unsigned(16 downto 0);              -- |remainder|
         variable q_s  : signed(17 downto 0);                -- signed quotient (holds -|q| for |q|=32768)
     begin
         n_s := resize(signed(numer), 17);
         d_u := unsigned('0' & denom);
-        nmag := unsigned(abs(n_s));                         -- magnitude of the numerator
+        nmag := unsigned(abs(n_s));
 
         if d_u = 0 then                                     -- Reproduce the SA-1 divide-by-zero quirk
-            rmag := nmag;                                   -- |numerator|
+            r_u := nmag;
             if n_s < 0 then
                 q_s := to_signed(1, 18);
             else
@@ -43,7 +43,7 @@ begin
             end if;
         else
             qmag := nmag / d_u;                             -- unsigned magnitude division
-            rmag := nmag - resize(qmag * d_u, 17);          -- remainder = mag - qmag*denominator
+            r_u := nmag - resize(qmag * d_u, 17);           -- remainder = nmag - qmag*denominator
             q_s  := signed(resize(qmag, 18));               -- apply the numerator's sign
             if n_s < 0 then
                 q_s := -q_s;
@@ -51,6 +51,6 @@ begin
         end if;
 
         quotient <= std_logic_vector(q_s(15 downto 0));
-        remain   <= std_logic_vector(rmag(15 downto 0));
+        remain   <= std_logic_vector(r_u(15 downto 0));
     end process;
 end architecture;

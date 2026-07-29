@@ -13,9 +13,9 @@ use ieee.numeric_std.all;
 
 entity SA1DIV is
     port (
-        numer    : in  std_logic_vector(15 downto 0);       -- dividend, signed
-        denom    : in  std_logic_vector(15 downto 0);       -- divisor, unsigned
-        quotient : out std_logic_vector(15 downto 0);       -- quotient, signed (sign of dividend)
+        numer    : in  std_logic_vector(15 downto 0);       -- numerator, signed
+        denom    : in  std_logic_vector(15 downto 0);       -- denominator, unsigned
+        quotient : out std_logic_vector(15 downto 0);       -- quotient, signed (sign of numerator)
         remain   : out std_logic_vector(15 downto 0)        -- remainder, unsigned magnitude
     );
 end entity;
@@ -23,19 +23,19 @@ end entity;
 architecture rtl of SA1DIV is
 begin
     process(numer, denom)
-        variable n_s  : signed(16 downto 0);                -- sign-extended dividend
-        variable mag  : unsigned(16 downto 0);              -- |dividend|, 0..32768
-        variable d_u  : unsigned(16 downto 0);              -- divisor, 0..65535
+        variable n_s  : signed(16 downto 0);                -- sign-extended numerator
+        variable mag  : unsigned(16 downto 0);              -- |numerator|, 0..32768
+        variable d_u  : unsigned(16 downto 0);              -- denominator, 0..65535
         variable qmag : unsigned(16 downto 0);              -- |quotient|
         variable rmag : unsigned(16 downto 0);              -- remainder magnitude
         variable q_s  : signed(17 downto 0);                -- signed quotient (holds -|q| for |q|=32768)
     begin
         n_s := resize(signed(numer), 17);
         d_u := unsigned('0' & denom);
-        mag := unsigned(abs(n_s));                          -- magnitude of the dividend
+        mag := unsigned(abs(n_s));                          -- magnitude of the numerator
 
         if d_u = 0 then                                     -- Reproduce the SA-1 divide-by-zero quirk.
-            rmag := mag;                                    -- |dividend|
+            rmag := mag;                                    -- |numerator|
             if n_s < 0 then
                 q_s := to_signed(1, 18);
             else
@@ -43,8 +43,8 @@ begin
             end if;
         else
             qmag := mag / d_u;                              -- unsigned magnitude division
-            rmag := mag - resize(qmag * d_u, 17);           -- remainder = mag - qmag*divisor
-            q_s  := signed(resize(qmag, 18));               -- apply the dividend's sign
+            rmag := mag - resize(qmag * d_u, 17);           -- remainder = mag - qmag*denominator
+            q_s  := signed(resize(qmag, 18));               -- apply the numerator's sign
             if n_s < 0 then
                 q_s := -q_s;
             end if;

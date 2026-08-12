@@ -53,7 +53,8 @@ entity SPPU is
 		VSYNC			: out std_logic;
 		HDE 			: out std_logic;
 		VDE 			: out std_logic;
-		
+		HVCNT_ATZERO	: out std_logic;
+
 		BG_EN			: in std_logic_vector(4 downto 0);
 
 		SS_A			: in std_logic_vector(7 downto 0);
@@ -888,6 +889,9 @@ begin
 end process;
 
 VBLANK_LINE <= FIRST_VBLANK_LINE and not FORCE_BLANK;
+
+HVCNT_ATZERO <= '1' when ENABLE = '1' and DOT_CLKR_CE = '1' and FIELD = '1' and
+                        H_CNT >= LAST_DOT and V_CNT >= LAST_LINE else '0';
 
 process( H_CNT, V_CNT, LAST_VIS_LINE )
 begin

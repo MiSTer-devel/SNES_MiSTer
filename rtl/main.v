@@ -72,6 +72,7 @@ module main (
 	output            VBLANKn,
 	output            HSYNC,
 	output            VSYNC,
+	output            HVCNT_ATZERO,
 
 	input       [1:0] JOY1_DI,
 	input       [1:0] JOY2_DI,
@@ -252,6 +253,7 @@ SNES SNES
 	.vde(VBLANKn),
 	.hsync(HSYNC),
 	.vsync(VSYNC),
+	.hvcnt_atzero(HVCNT_ATZERO),
 
 	.gg_en(GG_EN),
 	.gg_code(GG_CODE),

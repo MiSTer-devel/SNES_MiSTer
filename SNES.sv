@@ -528,6 +528,7 @@ main main
 	.VBLANKn(VBlank_out),
 	.HSYNC(HSYNC_out),
 	.VSYNC(VSYNC_out),
+	.HVCNT_ATZERO(HVCNT_ATZERO),
 
 	.JOY1_DI(JOY1_DI),
 	.JOY2_DI(GUN_MODE ? LG_DO : JOY2_DI),
@@ -607,15 +608,23 @@ main main
 assign AUDIO_L = audio_l;
 assign AUDIO_R = audio_r;
 
+wire HVCNT_ATZERO;
+
 reg RESET_N = 0;
 reg RESET_REFRESH = 0;
 always @(posedge clk_sys) begin
 	reg [1:0] div;
-	
+
 	div <= div + 1'd1;
 	RESET_REFRESH <= !div;
-	
-	if (div == 2) RESET_N <= ~reset;
+
+	// HV counters keep running during reset for stable video with vsync_adjust=2
+	// Release the reset when HV counters are at zero
+
+	if (reset) begin
+		if (div == 2) RESET_N <= 0;
+	end
+	else if (HVCNT_ATZERO) RESET_N <= 1;
 end
 
 ////////////////////////////  CODES  ///////////////////////////////////

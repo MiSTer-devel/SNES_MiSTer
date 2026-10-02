@@ -144,6 +144,7 @@ architecture rtl of CX4 is
 	signal DMA_SRC_ADDR : std_logic_vector(23 downto 0);
 	signal DMA_DAT : std_logic_vector(7 downto 0);
 	signal DMA_STATE : std_logic;
+	signal DMA_DST_RAM : std_logic;
 	signal DMA_CNT : unsigned(15 downto 0);
 	signal ROM_ACCESS, SRAM_ACCESS, SRAM_WR : std_logic;
 	signal BUS_ACCESS_CNT : unsigned(2 downto 0);
@@ -616,6 +617,9 @@ begin
 	end process;
 
 	--DMA
+	DMA_DST_RAM <= '1' when (MAPPER = '0' and DMA_DST_ADDR(22) = '0' and DMA_DST_ADDR(15 downto 12) = "0110") or
+	                        (MAPPER = '1' and DMA_DST_ADDR(22 downto 20) <= "010" and DMA_DST_ADDR(15 downto 12) = "0110") else '0';
+
 	process(CLK, RST_N)
 	begin
 		if RST_N = '0' then
@@ -638,7 +642,7 @@ begin
 					end if;
 				elsif SUSPEND = '0' and EN = '1' then
 					if DMA_STATE = '0' then
-						if DMA_WAIT_CNT = unsigned(WS1) then
+						if DMA_WAIT_CNT = unsigned(WS1) or (DMA_DST_RAM = '1' and DMA_WAIT_CNT = unsigned(WS1) - 1) then
 							DMA_WAIT_CNT <= (others => '0');
 							DMA_SRC_ADDR <= std_logic_vector(unsigned(DMA_SRC_ADDR) + 1);
 							DMA_DAT <= BUS_DI;

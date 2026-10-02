@@ -133,7 +133,7 @@ always @(posedge CLK_50M) begin
 	end
 end
 
-wire reset = RESET | buttons[1] | status[0] | cart_download | spc_download | bk_loading | clearing_ram | msu_data_download;
+wire reset = RESET | buttons[1] | status[0] | cart_download | spc_download | bk_loading | clearing_ram | msu_data_download | ramimg_download | ramimg_valid;
 
 ////////////////////////////  HPS I/O  //////////////////////////////////
 
@@ -145,7 +145,7 @@ wire reset = RESET | buttons[1] | status[0] | cart_download | spc_download | bk_
 
 `include "build_id.v"
 parameter CONF_STR = {
-	"SNES;SS3F800000:100000,UART31250,MIDI;",
+	"SNES;SS3F800000:100000,UART31250,MIDI,INITRAM3E;",
 	"FS1,SFCSMCBINBS ;",
 	"FS4,SPC;",
 	"-;",
@@ -293,6 +293,7 @@ hps_io #(.CONF_STR(CONF_STR), .WIDE(1)) hps_io
 	.ioctl_wr(ioctl_wr),
 	.ioctl_download(ioctl_download),
 	.ioctl_index(ioctl_index),
+	.ioctl_wait(ramimg_busy),
 
 	.sd_lba('{sd_lba}),
 	.sd_rd(sd_rd),
@@ -334,6 +335,8 @@ wire spc_download = ioctl_download & ioctl_index[5:0] == 6'h04;
 wire msu_audio_download = ioctl_download & ioctl_index[5:0] == 6'h02;
 wire msu_data_download  = ioctl_download & ioctl_index[5:0] == 6'h03;
 wire ssbin_download = ioctl_download & ((ioctl_index[5:0] == 6'h00) & (ioctl_index[7:6] == 2'd1));
+// INITRAM3E: a power-on RAM image from the HPS, sent before the cartridge (WRAM 128K, then ARAM 64K).
+wire ramimg_download = ioctl_download & (ioctl_index[5:0] == 6'h3E);
 
 
 reg new_vmode;
@@ -680,6 +683,46 @@ always @(posedge clk_sys) begin
 end
 wire mem_fill_we = clearing_ram & ~mem_fill_wait;
 
+// INITRAM: each 16-bit word below 128K becomes two WRAM byte writes on the SDRAM's second port, paced
+// like the fill and held off with ioctl_wait; words from 128K are ARAM, written as an SPC load is.
+// A complete image replaces the next cartridge load's WRAM and ARAM fill, once, and holds reset until then.
+reg        ramimg_valid = 0;
+reg        ramimg_full;
+reg        ramimg_busy = 0;
+reg  [1:0] ramimg_step;
+reg [16:0] ramimg_waddr;
+reg  [7:0] ramimg_wdata, ramimg_hi;
+reg        ramimg_we;
+reg        old_ramimg, old_clearing;
+wire       ramimg_wram = ramimg_download & ~ioctl_addr[17] & ~|ioctl_addr[24:18];
+wire       ramimg_aram_we = ramimg_download & ioctl_wr & ioctl_addr[17] & ~ioctl_addr[16] & ~|ioctl_addr[24:18];
+always @(posedge clk_sys) begin
+	old_ramimg <= ramimg_download;
+	old_clearing <= clearing_ram;
+	if (~old_ramimg & ramimg_download) begin ramimg_valid <= 0; ramimg_full <= 0; end
+	if (ramimg_aram_we & (ioctl_addr[15:1] == 15'h7FFF)) ramimg_full <= 1;
+	if (old_ramimg & ~ramimg_download) ramimg_valid <= ramimg_full;
+	if (old_clearing & ~clearing_ram) ramimg_valid <= 0;
+
+	ramimg_we <= 0;
+	if (ioctl_wr & ramimg_wram) begin
+		ramimg_busy  <= 1;
+		ramimg_step  <= 0;
+		ramimg_waddr <= ioctl_addr[16:0];
+		ramimg_wdata <= ioctl_dout[7:0];
+		ramimg_hi    <= ioctl_dout[15:8];
+	end else if (ramimg_busy) begin
+		ramimg_step <= ramimg_step + 1'd1;
+		case (ramimg_step)
+			0: ramimg_we <= 1;
+			2: begin ramimg_waddr[0] <= 1; ramimg_wdata <= ramimg_hi; ramimg_we <= 1; end
+			3: ramimg_busy <= 0;
+			default: ;
+		endcase
+	end
+end
+wire ramimg_keep = ramimg_valid & clearing_ram;
+
 reg [7:0] wram_fill_data;
 always @* begin
     case(status[22:21])
@@ -767,14 +810,14 @@ sdram sdram
 	.wr0(sdram_download_en ? sdram_download_wr : ~ROM_WE_N),
 	.word0(sdram_download_en | ROM_WORD),
 
-	.addr1(clearing_ram ? {7'b0000000,mem_fill_addr} : {7'b0000000,WRAM_ADDR}),
-	.din1(clearing_ram ? {8'h00,wram_fill_data} : {8'h00,WRAM_D}),
+	.addr1(clearing_ram ? {7'b0000000,mem_fill_addr} : ramimg_download ? {8'b00000000,ramimg_waddr} : {7'b0000000,WRAM_ADDR}),
+	.din1(clearing_ram ? {8'h00,wram_fill_data} : ramimg_download ? {8'h00,ramimg_wdata} : {8'h00,WRAM_D}),
 
 	.dout1(sdr_dout1),
 
-	.rd1(clearing_ram ? 1'b0 : ~WRAM_CE_N & ~WRAM_OE_N & READ_PULSE),
-	.wr1(clearing_ram ? mem_fill_we : ~WRAM_CE_N & ~WRAM_WE_N & SNES_SYSCLKF_CE),
-	.rfs1(clearing_ram ? 1'b0 : !RESET_N ? RESET_REFRESH : SNES_REFRESH),
+	.rd1((clearing_ram | ramimg_download) ? 1'b0 : ~WRAM_CE_N & ~WRAM_OE_N & READ_PULSE),
+	.wr1(clearing_ram ? mem_fill_we & ~(ramimg_keep & ~mem_fill_addr[17]) : ramimg_download ? ramimg_we : ~WRAM_CE_N & ~WRAM_WE_N & SNES_SYSCLKF_CE),
+	.rfs1((clearing_ram | ramimg_download) ? 1'b0 : !RESET_N ? RESET_REFRESH : SNES_REFRESH),
 	.word1(0),
 
 	.sni_addr(SDRAM_SNI_ADDR),
@@ -843,9 +886,9 @@ dpram_dif #(16,8,15,16) aram
 	.q_A(ARAM_Q),
 
 	// clear the RAM on loading
-	.address_b(spc_download ? addr_download[15:1] : mem_fill_addr[15:1]),
-	.data_b(spc_download ? ioctl_dout : {2{aram_fill_data}}),
-	.wren_b(spc_download ? ioctl_wr : mem_fill_we)
+	.address_b(spc_download ? addr_download[15:1] : ramimg_download ? ioctl_addr[15:1] : mem_fill_addr[15:1]),
+	.data_b((spc_download | ramimg_download) ? ioctl_dout : {2{aram_fill_data}}),
+	.wren_b(spc_download ? ioctl_wr : ramimg_download ? ramimg_aram_we : mem_fill_we & ~ramimg_keep)
 );
 
 localparam  BSRAM_BITS = 18; // 256Kbyte

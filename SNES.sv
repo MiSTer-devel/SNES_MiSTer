@@ -146,9 +146,9 @@ wire reset = RESET | buttons[1] | status[0] | cart_download | spc_download | bk_
 `include "build_id.v"
 parameter CONF_STR = {
 	"SNES;SS3F800000:100000,UART31250,MIDI;",
+	"f,RAM;",
 	"FS1,SFCSMCBINBS ;",
 	"FS4,SPC;",
-	"FC5,RAM,Power-on RAM image;",
 	"-;",
 	"O[50],Save state to SD,On,Off;",
 	"O[52:51],Savestate Slot,1,2,3,4;",
@@ -246,7 +246,7 @@ wire        ioctl_download;
 wire [24:0] ioctl_addr;
 wire [15:0] ioctl_dout;
 wire        ioctl_wr;
-wire  [7:0] ioctl_index;
+wire [15:0] ioctl_index;
 
 wire [12:0] joy0,joy1,joy2,joy3,joy4;
 wire [24:0] ps2_mouse;
@@ -329,18 +329,16 @@ wire [1:0] mouse_mode = status[6:5];
 wire       joy_swap = status[7] | piano;
 wire [2:0] LHRom_type = status[3:1];
 
-wire code_index = &ioctl_index;
+wire code_index = &ioctl_index[7:0];
 wire code_download = ioctl_download & code_index;
-wire cart_download = ioctl_download & ((ioctl_index[5:0] == 6'h01) | (ioctl_index[7:0] == 0));
+wire cart_download = ioctl_download & ~|ioctl_index[15:8] & ((ioctl_index[5:0] == 6'h01) | (ioctl_index[7:0] == 0));
 wire spc_download = ioctl_download & ioctl_index[5:0] == 6'h04;
 wire msu_audio_download = ioctl_download & ioctl_index[5:0] == 6'h02;
 wire msu_data_download  = ioctl_download & ioctl_index[5:0] == 6'h03;
 wire ssbin_download = ioctl_download & ((ioctl_index[5:0] == 6'h00) & (ioctl_index[7:6] == 2'd1));
-// Power-on RAM image (file index 5, remembered and resent at core start): WRAM 128K, then ARAM 64K.
-// Ignored once a cartridge has loaded; a mid-game pick that Main remembers applies at the next core start.
-// Any index-0 download counts as the cartridge, so a boot.rom/boot0.rom sent after the image takes it.
-reg  cart_ready = 0;
-wire ramimg_download = ioctl_download & (ioctl_index[5:0] == 6'h05) & ~cart_ready;
+// Power-on RAM image: the cartridge's "f,RAM" file (Game.RAM beside Game.sfc), sent by Main just
+// before the cartridge on index 1 with 1 in the upper byte: WRAM 128K, then ARAM 64K.
+wire ramimg_download = ioctl_download & (ioctl_index[15:8] == 8'd1) & (ioctl_index[5:0] == 6'h01);
 
 
 reg new_vmode;
@@ -689,7 +687,8 @@ wire mem_fill_we = clearing_ram & ~mem_fill_wait;
 
 // RAM image: each 16-bit word below 128K becomes two WRAM byte writes on the SDRAM's second port, paced
 // like the fill and held off with ioctl_wait; words from 128K are ARAM, written as an SPC load is.
-// A complete image replaces the next cartridge load's WRAM and ARAM fill, once, and holds reset until then.
+// A complete image replaces the next cartridge load's WRAM and ARAM fill and holds reset until then;
+// any other download drops it.
 reg        ramimg_valid = 0;
 reg        ramimg_full;
 reg        ramimg_busy = 0;
@@ -697,18 +696,17 @@ reg  [1:0] ramimg_step;
 reg [16:0] ramimg_waddr;
 reg  [7:0] ramimg_wdata, ramimg_hi;
 reg        ramimg_we;
-reg        old_ramimg, old_clearing, old_spc;
+reg        old_ramimg, old_clearing, old_download;
 wire       ramimg_wram = ramimg_download & ~ioctl_addr[17] & ~|ioctl_addr[24:18];
 wire       ramimg_aram_we = ramimg_download & ioctl_wr & ioctl_addr[17] & ~ioctl_addr[16] & ~|ioctl_addr[24:18];
 always @(posedge clk_sys) begin
 	old_ramimg <= ramimg_download;
-	old_spc <= spc_download;
+	old_download <= ioctl_download;
 	old_clearing <= clearing_ram;
-	if (~old_ramimg & ramimg_download) begin ramimg_valid <= 0; ramimg_full <= 0; end
+	if (~old_download & ioctl_download & ~cart_download) begin ramimg_valid <= 0; ramimg_full <= 0; end
 	if (ramimg_aram_we & (ioctl_addr[15:1] == 15'h7FFF)) ramimg_full <= 1;
 	if (old_ramimg & ~ramimg_download) ramimg_valid <= ramimg_full;
 	if (old_clearing & ~clearing_ram) ramimg_valid <= 0;
-	if (~old_spc & spc_download) begin ramimg_valid <= 0; ramimg_full <= 0; end
 
 	ramimg_we <= 0;
 	if (ioctl_wr & ramimg_wram) begin
@@ -1228,6 +1226,7 @@ end
 
 reg bk_ena = 0;
 reg old_downloading = 0;
+reg cart_ready = 0;
 reg ssbin_ready = 0;
 always @(posedge clk_sys) begin
 	old_downloading <= cart_download;

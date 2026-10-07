@@ -148,6 +148,7 @@ architecture rtl of SNES is
 	signal INT_HBLANK, INT_VBLANK : std_logic;
 	signal PPU_DO : std_logic_vector(7 downto 0);
 	signal PPU_DI : std_logic_vector(7 downto 0);
+	signal PPU_DI_WAIT : std_logic_vector(1 downto 0);
 
 	-- APU
 	signal SMP_CE: std_logic;
@@ -313,6 +314,11 @@ begin
 	PPU_DI <= BUSA_DO when BUSA_SEL = '1' else
 				 WRAM_DO when INT_RAMSEL_N = '0' else
 				 CPU_DO;
+	-- /PAWR-low clocks before PPU_DI holds the written byte. CPU_DO is the MDR; cart and WRAM reads go to SDRAM on the
+	-- clock /PAWR falls and return after 1.5 (ch0) and 2.25 (ch1) clocks, so WRAM data is taken only at SYSCLK_CE.
+	PPU_DI_WAIT <= "00" when BUSA_SEL = '0' and INT_RAMSEL_N = '1' else
+	               "01" when BUSA_SEL = '1' else
+	               "11";
  
 	PPU : entity work.SPPU
 	port map(
@@ -325,6 +331,7 @@ begin
 		PARD_N		=> INT_PARD_N,
 		PAWR_N		=> INT_PAWR_N,
 		DI				=> PPU_DI,
+		DI_WAIT		=> PPU_DI_WAIT,
 		DO				=> PPU_DO,
 		
 		VRAM_ADDRA	=> VRAM_ADDRA,

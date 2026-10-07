@@ -1074,7 +1074,8 @@ wire [1:0] LG_DO;
 wire [2:0] LG_TARGET;
 wire       LG_T = ((GUN_MODE[0]&joy0[6]) | (GUN_MODE[1]&joy1[6])); // always from joysticks
 
-lightgun lightgun
+// The PPU's HDE starts at H=23 (FETCH_DLY+PIPE_DLY after H=20), so P6 comes 3 dots sooner to keep OPHCT.
+lightgun #(.P6_DELAY(19)) lightgun
 (
 	.CLK(clk_sys),
 	.RESET(reset),

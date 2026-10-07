@@ -14,6 +14,8 @@ package PPU_PKG is
 
 	constant HSYNC_START: unsigned(8 downto 0) := "100101000"; --296 
 	constant VSYNC_I_HSTART: unsigned(8 downto 0) := "001111110"; --126 
+	constant PIPE_DLY: integer := 1; 
+	constant FETCH_DLY: integer := 2; 
 
 	constant BG1: integer range 0 to 3 := 0; 
 	constant BG2: integer range 0 to 3 := 1; 

@@ -68,7 +68,7 @@ package PPU_PKG is
 	constant BG_FETCH_END		: unsigned(8 downto 0) := "100001111"; 	--(256+16)-1=271
 	constant M7_FETCH_START		: unsigned(8 downto 0) := "000001110"; 	--14
 	constant M7_FETCH_END		: unsigned(8 downto 0) := "100001101"; 	--(14+256)-1=269
-	constant M7_XY_LATCH			: unsigned(8 downto 0) := "000000111"; 	--7
+	constant M7_XY_LATCH			: unsigned(8 downto 0) := "000001001"; 	--9, at DOT_CLKF; tuned with CPU IRQ_LINE_DLY: change one, re-check #274
 	constant SPR_GET_PIX_START	: unsigned(8 downto 0) := "000010000"; 	--16 
 	constant SPR_GET_PIX_END	: unsigned(8 downto 0) := "100001111"; 	--(16+256)-1=271
 	constant BG_GET_PIX_START	: unsigned(8 downto 0) := "000010001"; 	--17

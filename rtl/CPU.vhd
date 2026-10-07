@@ -127,8 +127,11 @@ architecture rtl of SCPU is
 	signal HBLANK_FF, VBLANK_FF : std_logic_vector(1 downto 0);
 	signal H6_VBLANK_FF : std_logic;
 	signal FALLING_VBLANK, LONG_FALLING_VBLANK : std_logic;
-	signal IRQ_TIME_FF : std_logic_vector(1 downto 0);
-	signal IRQ_TIME_FF2 : std_logic;
+	constant IRQ_LINE_DLY : integer := 9;	--clocks from $4211.7 set to /IRQ low (provisional); tuned with PPU_PKG M7_XY_LATCH: change one, re-check #274
+	constant IRQ_HOLD_CLK : integer := 4;	--clocks from the set in which a $4211 read does not clear
+	signal IRQ_TIME_PREV : std_logic;
+	signal IRQ_HOLD_CNT : integer range 0 to IRQ_HOLD_CLK-1;
+	signal IRQ_LINE_CNT : integer range 0 to IRQ_LINE_DLY;
 	
 	signal REFRESH_EN, REFRESH_EN2, REFRESH_EN3 : std_logic;
 	signal REFRESHED : std_logic;
@@ -535,8 +538,9 @@ begin
 			HBLANK_FF <= (others => '0');
 			VBLANK_FF <= (others => '0');
 			H6_VBLANK_FF <= '0';
-			IRQ_TIME_FF <= (others => '0');
-			IRQ_TIME_FF2 <= '0';
+			IRQ_TIME_PREV <= '0';
+			IRQ_HOLD_CNT <= 0;
+			IRQ_LINE_CNT <= 0;
 			H_CNT <= (others => '0');
 			V_CNT <= (others => '0');
 			NMI_FLAG <= '0'; 
@@ -567,9 +571,9 @@ begin
 			
 			case HVIRQ_EN is
 				when "00" => IRQ_TIME := '0';
-				when "01" => IRQ_TIME := H_TIME;					--H-IRQ:  every scanline, H=HTIME+~3.5
-				when "10" => IRQ_TIME := V_TIME;					--V-IRQ:  V=VTIME, H=~2.5
-				when "11" => IRQ_TIME := H_TIME and V_TIME;	--HV-IRQ: V=VTIME, H=HTIME+~3.5
+				when "01" => IRQ_TIME := H_TIME;					--H-IRQ:  every scanline, flag H=HTIME+3, /IRQ H=HTIME+5.25
+				when "10" => IRQ_TIME := V_TIME;					--V-IRQ:  V=VTIME, flag H=2, /IRQ H=4.25
+				when "11" => IRQ_TIME := H_TIME and V_TIME;	--HV-IRQ: V=VTIME, flag H=HTIME+3, /IRQ H=HTIME+5.25
 			end case;
 			
 			if ENABLE = '1' then
@@ -606,27 +610,37 @@ begin
 					NMI_FLAG <= '0'; 
 				end if;
 				
-				--HV IRQ
+				--HV IRQ: flag at the first tick the live registers match
 				if CLK4_CE_R = '1' then
-					IRQ_TIME_FF <= IRQ_TIME_FF(0)&IRQ_TIME;
+					IRQ_TIME_PREV <= IRQ_TIME;
 				end if;
-				if IRQ_TIME_FF = "01" then
-					IRQ_TIME_FF2 <= '1'; 
-				else
-					IRQ_TIME_FF2 <= '0'; 
-				end if;
-					
 				if HVIRQ_EN = "00" then
 					IRQ_FLAG <= '0'; 
-				elsif IRQ_TIME_FF2 = '1' then
+					IRQ_HOLD_CNT <= 0;
+				elsif CLK4_CE_R = '1' and IRQ_TIME = '1' and IRQ_TIME_PREV = '0' then
 					IRQ_FLAG <= '1'; 
-				elsif TIMEUP_READ = '1' and INT_CLKF_CE = '1' then
-					IRQ_FLAG <= '0'; 
+					IRQ_HOLD_CNT <= IRQ_HOLD_CLK-1;
+				else
+					if IRQ_HOLD_CNT /= 0 then
+						IRQ_HOLD_CNT <= IRQ_HOLD_CNT - 1;
+					elsif TIMEUP_READ = '1' and INT_CLKF_CE = '1' then
+						IRQ_FLAG <= '0'; 
+					end if;
+				end if;
+				
+				if IRQ_FLAG = '0' then
+					IRQ_LINE_CNT <= 0;
+				elsif IRQ_LINE_CNT /= IRQ_LINE_DLY then
+					IRQ_LINE_CNT <= IRQ_LINE_CNT + 1;
 				end if;
 			end if;
 			
 			P65_NMI_N <= not (NMI_FLAG and NMI_EN);
-			P65_IRQ_N <= (not IRQ_FLAG) and IRQ_N; 
+			if IRQ_FLAG = '1' and IRQ_LINE_CNT >= IRQ_LINE_DLY-1 then
+				P65_IRQ_N <= '0'; 
+			else
+				P65_IRQ_N <= IRQ_N; 
+			end if;
 		end if;
 	end process;
 

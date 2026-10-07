@@ -589,8 +589,8 @@ begin
 					H_CNT <= H_CNT + 1;
 				end if;
 				
-				--V_CNT reset during DOT_CLK
-				if VBLANK_FF = "10" and CLK4_CE_R = '0' then
+				--V_CNT reset from the VBLANK fall up to the next tick, so the H=339 sample sees V=0
+				if VBLANK = '0' and VBLANK_FF(0) = '1' then
 					V_CNT <= (others => '0');
 				--V_CNT increment immediately
 				elsif HBLANK = '0' and HBLANK_FF(0) = '1' and CLK4_CE_R = '1' then

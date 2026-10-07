@@ -61,6 +61,7 @@ module sdram
 	localparam BURST          = 3'd0; // 0=1, 1=2, 2=4, 3=8, 7=full page
 	localparam ACCESS_TYPE    = 1'd0; // 0=sequential, 1=interleaved
 	localparam CAS_LATENCY    = 3'd2; // 2/3 allowed
+	// SNES.vhd's PPU_DI_WAIT codes assume RASCAS_DELAY and CAS_LATENCY as set here, at clk_mem = 4x clk_sys.
 	localparam OP_MODE        = 2'd0; // only 0 (standard operation) allowed
 	localparam NO_WRITE_BURST = 1'd1; // 0=write burst enabled, 1=only single access write
 

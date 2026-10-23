@@ -567,9 +567,9 @@ begin
 			
 			case HVIRQ_EN is
 				when "00" => IRQ_TIME := '0';
-				when "01" => IRQ_TIME := H_TIME;					--H-IRQ:  every scanline, H=HTIME+~3.5
-				when "10" => IRQ_TIME := V_TIME;					--V-IRQ:  V=VTIME, H=~2.5
-				when "11" => IRQ_TIME := H_TIME and V_TIME;	--HV-IRQ: V=VTIME, H=HTIME+~3.5
+				when "01" => IRQ_TIME := H_TIME;					--H-IRQ:  every scanline, H=HTIME+~3.5, except H0=~2.5
+				when "10" => IRQ_TIME := V_TIME;					--V-IRQ:  V=VTIME, H=~2.5, except V0=~1.5
+				when "11" => IRQ_TIME := H_TIME and V_TIME;	--HV-IRQ: V=VTIME, H=HTIME+~3.5 except H0=~2.5
 			end case;
 			
 			if ENABLE = '1' then
@@ -582,15 +582,15 @@ begin
 				end if;
 				
 				--H/V counters
-				--H_CNT reset during DOT_CLK
+				--H_CNT reset during DOT_CLK, 1 pixel later than V_CNT reset. Counts 339->0->0->1.
 				if HBLANK_FF = "10" then-- and CLK4_CE_R = '0'
 					H_CNT <= (others => '0');
 				elsif CLK4_CE_R = '1' then
 					H_CNT <= H_CNT + 1;
 				end if;
 				
-				--V_CNT reset during DOT_CLK
-				if VBLANK_FF = "10" and CLK4_CE_R = '0' then
+				--V_CNT reset during DOT_CLK. H_CNT is 339 during V_CNT reset.
+				if VBLANK_FF = "10" then-- and CLK4_CE_R = '0' then
 					V_CNT <= (others => '0');
 				--V_CNT increment immediately
 				elsif HBLANK = '0' and HBLANK_FF(0) = '1' and CLK4_CE_R = '1' then
@@ -607,7 +607,7 @@ begin
 				end if;
 				
 				--HV IRQ
-				if CLK4_CE_R = '1' then
+				if CLK4_CE_F = '1' then
 					IRQ_TIME_FF <= IRQ_TIME_FF(0)&IRQ_TIME;
 				end if;
 				if IRQ_TIME_FF = "01" then
@@ -626,9 +626,11 @@ begin
 			end if;
 			
 			P65_NMI_N <= not (NMI_FLAG and NMI_EN);
-			P65_IRQ_N <= (not IRQ_FLAG) and IRQ_N; 
+
 		end if;
 	end process;
+
+	P65_IRQ_N <= (not IRQ_FLAG) and IRQ_N;
 
 	FALLING_VBLANK <= '1' when VBLANK_FF = "10" else '0';
 	LONG_FALLING_VBLANK <= '1' when VBLANK_FF(0) = '0' and H6_VBLANK_FF = '1' else '0';

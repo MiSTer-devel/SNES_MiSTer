@@ -24,6 +24,8 @@ module lightgun
 );
 
 parameter CROSS_SZ = 8'd3;
+// Dots from the beam reaching the aimed pixel to P6; 22 was tuned on a real Super Scope (#307) with HDE from H=20.
+parameter P6_DELAY = 22;
 
 assign PORT_DO = {1'b1, GUN_TYPE ? JUSTIFIER_LATCH[31] : JOY_LATCH0[7]};
 assign TARGET  = {{2{~Ttr & ~offscreen & draw}}, Ttr & ~offscreen & draw};
@@ -76,7 +78,7 @@ wire [8:0] j_x = {~JOY_X[7], JOY_X[6:0]};
 wire [8:0] j_y = {~JOY_Y[7], JOY_Y[6:0]};
 
 reg offscreen = 0, draw = 0;
-reg [21:0] port_p6_sr;
+reg [P6_DELAY-1:0] port_p6_sr;
 always @(posedge CLK) begin
 	reg old_pix, old_hde, old_vde, old_ms;
 	reg [8:0] hcnt, vcnt;
@@ -138,13 +140,13 @@ always @(posedge CLK) begin
 			else if (reload) reload <= reload - 3'd1;
 		end
 
-		port_p6_sr <= {port_p6_sr[20:0], ~(HDE && VDE && x == hcnt && y == vcnt) || offscreen };
+		port_p6_sr <= {port_p6_sr[P6_DELAY-2:0], ~(HDE && VDE && x == hcnt && y == vcnt) || offscreen };
 	end
 	
 	reload_pressed <= C;
 	if (GUN_TYPE && C && ~reload_pressed) reload_pend <= 3'd5;
 
-	PORT_P6 <= port_p6_sr[21];
+	PORT_P6 <= port_p6_sr[P6_DELAY-1];
 	draw <= (((SIZE || ($signed(hcnt) >= $signed(xm) && hcnt <= xp)) && y == vcnt) || 
 	         ((SIZE || ($signed(vcnt) >= $signed(ym) && vcnt <= yp)) && x == hcnt));
 end

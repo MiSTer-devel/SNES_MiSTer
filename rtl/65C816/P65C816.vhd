@@ -511,7 +511,7 @@ begin
 					if GotInterrupt = '0' then
 						GotInterrupt <= IRQ_ACTIVE or NMI_ACTIVE;
 					else
-						GotInterrupt <= '0';
+						GotInterrupt <= NMI_ACTIVE;	--an NMI latched during an interrupt sequence follows it
 					end if;
 					
 					IsResetInterrupt <= '0';

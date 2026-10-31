@@ -855,9 +855,9 @@ begin
 				end if;
 			end if;
 
-			if H_CNT = 273-1 then
+			if H_CNT = 274-1 then
 				IN_HBL <= '1';
-			elsif H_CNT = LAST_DOT then
+			elsif H_CNT = 0 then
 				IN_HBL <= '0';
 			end if;
 			
@@ -887,6 +887,11 @@ begin
 				if V_CNT = VSYNC_LINE then VSYNC <= '1'; end if;
 				if V_CNT = VSYNC_LINE+3 then VSYNC <= '0'; end if;
 			end if;
+		end if;
+
+		if ENABLE = '1' then
+			HBLANK <= IN_HBL;
+			VBLANK <= IN_VBL;
 		end if;
 	end if;
 end process;
@@ -1197,7 +1202,7 @@ begin
 	else
 		case M7_CALC_SR is
 			when "001" =>
-				if DOT_CLK = '1' then
+				if DOT_CLK = '0' then
 					MPY_MULT_A := signed(M7A);
 					MPY_MULT_B := Mode7Clip(ORG_X);
 				else
@@ -1205,7 +1210,7 @@ begin
 					MPY_MULT_B := Mode7Clip(ORG_Y);
 				end if;
 			when "010" =>
-				if DOT_CLK = '1' then
+				if DOT_CLK = '0' then
 					MPY_MULT_A := signed(M7B);
 					MPY_MULT_B := Mode7Clip(ORG_Y);
 				else
@@ -1213,17 +1218,17 @@ begin
 					MPY_MULT_B := Mode7Clip(ORG_X);
 				end if;
 			when "100" =>
-				if DOT_CLK = '1' then
+				if DOT_CLK = '0' then
 					MPY_MULT_A := signed(M7B);
 				else
 					MPY_MULT_A := signed(M7D);
 				end if;
 				MPY_MULT_B := signed(resize(M7_Y, MPY_MULT_B'length));
 			when others =>
-				if DOT_CLK = '1' then
-					MPY_MULT_A := signed(M7A);
-				else
+				if DOT_CLK = '0' then
 					MPY_MULT_A := signed(M7C);
+				else
+					MPY_MULT_A := signed(M7A);
 				end if;
 				MPY_MULT_B := signed(resize(M7_X, MPY_MULT_B'length));
 		end case;
@@ -1274,7 +1279,9 @@ begin
 				elsif H_CNT = LAST_DOT then
 					M7_SCREEN_X <= (others => '0');
 				end if;
+			end if;
 
+			if DOT_CLKF_CE = '1' then
 				if H_CNT = M7_XY_LATCH then
 					M7_TEMP_X <= (resize(signed(M7X), M7_TEMP_X'length) sll 8);
 					M7_TEMP_Y <= (resize(signed(M7Y), M7_TEMP_Y'length) sll 8);
@@ -1286,10 +1293,10 @@ begin
 			end if;
 
 			if M7_CALC_SR /= "000" then
-				if DOT_CLKF_CE = '1' then
+				if DOT_CLKR_CE = '1' then
 					M7_TEMP_X(26 downto 6) <= M7_TEMP_X(26 downto 6) + MPY(26 downto 6);
 				end if;
-				if DOT_CLKR_CE = '1' then
+				if DOT_CLKF_CE = '1' then
 					M7_TEMP_Y(26 downto 6) <= M7_TEMP_Y(26 downto 6) + MPY(26 downto 6);
 				end if;
 			end if;
@@ -2536,8 +2543,6 @@ COLOR_OUT <= (others => '0') when BG_FORCE_BLANK = '1' else
              BRIGHT_SUB_B  & BRIGHT_SUB_G  & BRIGHT_SUB_R when DOT_CLK = '1' else
 				 BRIGHT_MAIN_B & BRIGHT_MAIN_G & BRIGHT_MAIN_R;
 DOTCLK <= DOT_CLK;
-HBLANK <= IN_HBL;
-VBLANK <= IN_VBL;
 
 HIGH_RES <= HIRES or (PSEUDOHIRES and not BLEND);
 V224 <= not OVERSCAN;

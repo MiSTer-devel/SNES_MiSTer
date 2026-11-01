@@ -133,6 +133,7 @@ signal OPVCT 				: std_logic_vector(8 downto 0);
 signal OPHCT_latch 		: std_logic;
 signal OPVCT_latch 		: std_logic;
 signal EXTLATCHr 			: std_logic;
+signal HV_LATCHr 			: std_logic_vector(1 downto 0);
 signal F_LATCH 			: std_logic;
 signal CGRAM_Lsb 			: std_logic_vector(7 downto 0);
 signal BGOFS_latch 		: std_logic_vector(7 downto 0);
@@ -143,7 +144,6 @@ signal VRAMDATA_Prefetch: std_logic_vector(15 downto 0);
 signal VMADD_INC 			: unsigned(7 downto 0);
 signal OBJ_TIME_OFL 		: std_logic;
 signal OBJ_RANGE_OFL 	: std_logic;
-signal PARD_Nr 			: std_logic;
 
 signal BG_FORCE_BLANK	: std_logic;
 signal FORCE_BLANK_SR	: std_logic_vector(2 downto 0);
@@ -436,7 +436,7 @@ begin
 		BGOFS_latch <= (others => '0');
 		BGHOFS_latch <= (others => '0');
 		EXTLATCHr <= '1';
-		PARD_Nr <= '1';
+		HV_LATCHr <= "11";
 		
 		CGRAM_Lsb <= (others => '0');
 	elsif rising_edge(CLK) then
@@ -677,13 +677,22 @@ begin
 				end case;
 			end if;
 			
-			EXTLATCHr <= EXTLATCH;
-			PARD_Nr <= PARD_N;
-			if (EXTLATCH = '0' and EXTLATCHr = '1') or 
-				(PARD_N = '0' and PARD_Nr = '1' and PA = x"37") then	--SLHV 
-				OPHCT <= std_logic_vector(H_CNT);
-				OPVCT <= std_logic_vector(V_CNT);	
-				F_LATCH <= '1';
+			--PPU2: the latch line is EXTLATCH (sampled each dot) pulled low by an SLHV read; H/V latch on its falling edge
+			if DOT_CLKR_CE = '1' then
+				EXTLATCHr <= EXTLATCH;
+			end if;
+			if DOT_CLKR_CE = '1' or DOT_CLKF_CE = '1' then
+				if not (PARD_N = '0' and PA = x"37") and EXTLATCHr = '1' then
+					HV_LATCHr(0) <= '1';
+				else
+					HV_LATCHr(0) <= '0';
+				end if;
+				HV_LATCHr(1) <= HV_LATCHr(0);
+				if HV_LATCHr(0) = '0' and HV_LATCHr(1) = '1' then
+					OPHCT <= std_logic_vector(H_CNT);
+					OPVCT <= std_logic_vector(V_CNT);	
+					F_LATCH <= '1';
+				end if;
 			end if;
 		end if;
 	end if;

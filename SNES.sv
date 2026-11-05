@@ -664,10 +664,10 @@ reg [17:0] mem_fill_addr;
 reg clearing_ram = 0;
 reg mem_fill_wait;
 always @(posedge clk_sys) begin
-	if(~old_downloading & cart_download)
+	if(old_downloading & ~cart_download)
 		clearing_ram <= 1'b1;
 
-	if (&mem_fill_addr) clearing_ram <= 0;
+	if (&mem_fill_addr & mem_fill_wait) clearing_ram <= 0;
 
 	if (clearing_ram) begin
 		mem_fill_wait <= ~mem_fill_wait;
@@ -730,10 +730,35 @@ reg [23:0] sdram_download_addr;
 reg [15:0] sdram_download_data;
 reg        sdram_download_wr;
 reg        sdram_download_en;
+reg  [1:0] dl_rfs = 0;
+reg  [5:0] dl_idle = 0;
+reg        dl_idle_rfs = 0;
+reg  [1:0] dl_hold = 0;
+reg        dl_wr_pend = 0;
+wire       dl_wr = (ioctl_wr | dl_wr_pend) & ~|dl_hold;
+wire       dl_refresh = dl_rfs[1] | dl_idle_rfs;
+always @(posedge clk_sys) begin
+	dl_rfs <= {dl_rfs[0], cart_download & ioctl_wr & ~|dl_hold};
+	dl_idle_rfs <= 0;
+	if (|dl_hold) dl_hold <= dl_hold - 1'd1;
+	if (~cart_download | ioctl_wr) dl_idle <= 0;
+	else begin
+		dl_idle <= dl_idle + 1'd1;
+		if (&dl_idle) begin
+			dl_idle_rfs <= 1;
+			dl_hold <= 3;
+		end
+	end
+	if (ioctl_wr & |dl_hold) dl_wr_pend <= 1;
+	else if (dl_wr) dl_wr_pend <= 0;
+end
+
 always @(posedge clk_mem) begin
-	sdram_download_addr <= addr_download;
-	sdram_download_data <= ioctl_dout;
-	sdram_download_wr <= ioctl_wr;
+	if (ioctl_wr) begin
+		sdram_download_addr <= addr_download;
+		sdram_download_data <= ioctl_dout;
+	end
+	sdram_download_wr <= dl_wr;
 	sdram_download_en <= sdram_download;
 end
 
@@ -763,7 +788,7 @@ sdram sdram
 	.din0(sdram_download_en ? sdram_download_data : ROM_D),
 	.dout0(ROM_Q),
 
-	.rd0(sdram_download_en ? 1'b0 : !RESET_N ? RESET_REFRESH : ~ROM_OE_N),
+	.rd0(sdram_download_en ? dl_refresh : clearing_ram ? 1'b0 : !RESET_N ? RESET_REFRESH : ~ROM_OE_N),
 	.wr0(sdram_download_en ? sdram_download_wr : ~ROM_WE_N),
 	.word0(sdram_download_en | ROM_WORD),
 
@@ -774,7 +799,7 @@ sdram sdram
 
 	.rd1(clearing_ram ? 1'b0 : ~WRAM_CE_N & ~WRAM_OE_N & READ_PULSE),
 	.wr1(clearing_ram ? mem_fill_we : ~WRAM_CE_N & ~WRAM_WE_N & SNES_SYSCLKF_CE),
-	.rfs1(clearing_ram ? 1'b0 : !RESET_N ? RESET_REFRESH : SNES_REFRESH),
+	.rfs1(sdram_download_en ? dl_refresh : clearing_ram ? 1'b0 : !RESET_N ? RESET_REFRESH : SNES_REFRESH),
 	.word1(0),
 
 	.sni_addr(SDRAM_SNI_ADDR),
@@ -1198,11 +1223,12 @@ reg  bk_loading = 0;
 reg  bk_state   = 0;
 wire [31:0] sd_lba_end = rom_type[7:4] == 4'h2 && rom_type[3] ? {ram_mask[23:9],1'b1} : ram_mask[23:9];//For Sufami with B cart, it's double size
 always @(posedge clk_sys) begin
-	reg old_load = 0, old_save = 0, old_ack;
+	reg old_load = 0, old_save = 0, old_ack, old_clearing = 0;
 
 	old_load <= bk_load & bk_ena;
 	old_save <= bk_save & bk_ena;
 	old_ack  <= sd_ack;
+	old_clearing <= clearing_ram;
 
 	if(~old_ack & sd_ack) {sd_rd, sd_wr} <= 0;
 
@@ -1214,7 +1240,7 @@ always @(posedge clk_sys) begin
 			sd_rd <=  bk_load;
 			sd_wr <= ~bk_load;
 		end
-		if(old_downloading & ~cart_download & |img_size & bk_ena) begin
+		if(old_clearing & ~clearing_ram & |img_size & bk_ena) begin
 			bk_state <= 1;
 			bk_loading <= 1;
 			sd_lba <= 0;
